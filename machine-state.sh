@@ -144,7 +144,7 @@ cat /proc/loadavg
 
 if [ $(likwid_command_exists "likwid-powermeter") ]; then
     header "Performance energy bias"
-    likwid_command "likwid-powermeter -i | grep -i bias"
+    likwid_command "likwid-powermeter -i" | grep -i bias
 fi
 
 header "NUMA balancing"

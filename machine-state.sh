@@ -1,6 +1,9 @@
 #!/bin/bash -l
 
+### Configurations ####
 DO_LIKWID=1
+LIKWID_PATH=""
+#######################
 
 function header {
     echo
@@ -9,8 +12,12 @@ function header {
     echo "################################################################################"
 }
 
-function likwid_command {
-    checkCmd=$(command -v $1)
+function likwid_command_exists {
+    if [[ -z "${LIKWID_PATH//}" ]]; then
+        checkCmd=$(command -v $1)
+    else
+        checkCmd=$(command -v $LIKWID_PATH"/""$1")
+    fi
     if [ ${DO_LIKWID} ]; then
         if [[ -z "${checkCmd//}" ]]; then
             echo "false"
@@ -21,6 +28,17 @@ function likwid_command {
         echo "false"
     fi
 }
+
+function likwid_command {
+    if [ ${DO_LIKWID} ]; then
+        if [[ -z "${LIKWID_PATH//}" ]]; then
+            command $1
+        else
+            command "$LIKWID_PATH""/""$1"
+        fi
+    fi
+}
+
 
 function print_powercap_folder {
     FOLDER=$1
@@ -70,21 +88,27 @@ function print_powercap_folder {
     fi
 }
 
-
-if [ $(which likwid-topology 2>/dev/null | wc -l) != "1" ]; then
-    module load likwid
+if [[ -z "${LIKWID_PATH//}" ]]; then
     if [ $(which likwid-topology 2>/dev/null | wc -l) != "1" ]; then
-        DO_LIKWID=0
+        module load likwid
+        if [ $(which likwid-topology 2>/dev/null | wc -l) != "1" ]; then
+            DO_LIKWID=0
+        fi
     fi
+else
+        if [ $($LIKWID_PATH/likwid-topology 2>/dev/null | wc -l) != "1" ]; then
+            echo "LIKWID not found in path"
+            DO_LIKWID=0
+        fi
 fi
 
 header "Logged in users"
 users
 w
 
-if [ ${DO_LIKWID} -a -x likwid-pin ]; then
+if [ $(likwid_command_exists likwid-pin) = "true" ]; then
     header "CPUset"
-    likwid-pin -p
+    likwid_command "likwid-pin -p"
 fi
 
 header "CGroups"
@@ -94,23 +118,23 @@ echo -n "Allowed Memory controllers: "
 cat /sys/fs/cgroup/cpuset/cpuset.effective_mems
 
 header "Topology"
-if [ ${DO_LIKWID} -a -x likwid-topology ]; then
-    likwid-topology
+if [ $(likwid_command_exists likwid-topology) = "true" ]; then
+    likwid_command "likwid-topology"
 else
     lscpu
 fi
 numactl -H
 
 header "Frequencies"
-if [ $(likwid_command likwid-setFrequencies) = "true" ]; then
-    likwid-setFrequencies -p
+if [ $(likwid_command_exists likwid-setFrequencies) = "true" ]; then
+    likwid_command "likwid-setFrequencies -p"
 else
     echo "likwid-setFrequencies not available"
 fi
 
 header "Prefetchers"
-if [ $(likwid_command likwid-features) = "true" ]; then
-    likwid-features -l -c N
+if [ $(likwid_command_exists likwid-features) = "true" ]; then
+    likwid_command "likwid-features -l -c N"
 else
     echo "likwid-features not available"
 fi
@@ -118,9 +142,9 @@ fi
 header "Load"
 cat /proc/loadavg
 
-if [ ${DO_LIKWID} ]; then
-header "Performance energy bias"
-likwid-powermeter -i | grep -i bias
+if [ $(likwid_command_exists "likwid-powermeter") ]; then
+    header "Performance energy bias"
+    likwid_command "likwid-powermeter -i | grep -i bias"
 fi
 
 header "NUMA balancing"

@@ -192,6 +192,10 @@ fi
 
 header "Operating System"
 cat /etc/*release*
+header "Operating System (LSB)"
+if [ $(which lsb_release 2>/dev/null | wc -l) > 0 ]; then
+    lsb_release 2>&1
+fi
 header "Operating System Kernel"
 uname -a
 header "Hostname"

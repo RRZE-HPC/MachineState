@@ -13,6 +13,13 @@ function header {
     echo "################################################################################"
 }
 
+function subheader {
+    echo
+    echo "#-------------------------------------------------------------------------------"
+    echo "# $1"
+    echo "#-------------------------------------------------------------------------------"
+}
+
 function likwid_command_exists {
     if [[ -z "${LIKWID_PATH//}" ]]; then
         checkCmd=$(command -v $1)
@@ -125,18 +132,29 @@ function check_dmidecode {
     fi
 }
 
+function print_version_if_exists {
+    HEADER="$1"
+    EXEC="$2"
+    if [ $(which ${EXEC} 2>/dev/null | wc -l ) == 1 ]; then
+        EXECPATH=$(which ${EXEC})
+        subheader "$HEADER"
+        echo "Path: ${EXECPATH}"
+        ${EXECPATH} --version
+    fi
+}
+
 if [[ -z "${LIKWID_PATH//}" ]]; then
     if [ $(which likwid-topology 2>/dev/null | wc -l) != "1" ]; then
-        module load likwid
+        module load likwid 2>/dev/null
         if [ $(which likwid-topology 2>/dev/null | wc -l) != "1" ]; then
             DO_LIKWID=0
         fi
     fi
 else
-        if [ $($LIKWID_PATH/likwid-topology 2>/dev/null | wc -l) != "1" ]; then
-            echo "LIKWID not found in path"
-            DO_LIKWID=0
-        fi
+    if [ $($LIKWID_PATH/likwid-topology 2>/dev/null | wc -l) != "1" ]; then
+        echo "LIKWID not found in path"
+        DO_LIKWID=0
+    fi
 fi
 
 
@@ -145,7 +163,7 @@ hostname -f
 header "Operating System"
 cat /etc/*release*
 header "Operating System (LSB)"
-if [ $(which lsb_release 2>/dev/null | wc -l) > 0 ]; then
+if [ $(which lsb_release 2>/dev/null | wc -l) == "1" ]; then
     lsb_release 2>&1
 fi
 header "Operating System Kernel"
@@ -213,10 +231,22 @@ cat /sys/kernel/mm/transparent_hugepage/enabled
 echo -n "Use zero page: "
 cat /sys/kernel/mm/transparent_hugepage/use_zero_page
 
-header "Hardware power limits"
-RAPL_FOLDERS=$(find /sys/devices/virtual/powercap -name "intel-rapl\:*")
-for F in ${RAPL_FOLDERS}; do print_powercap_folder $F; done
+header "Writeback workqueue settings"
+if [ -d /sys/bus/workqueue/writeback/ ]; then
+    for F in $(ls /sys/bus/workqueue/writeback/*); do
+        echo "${F} : $(cat ${F})"
+    done
+else
+    echo "No writeback workqueue information (/sys/bus/workqueue/writeback)"
+fi
 
+header "Hardware power limits"
+if [ -d /sys/devices/virtual/powercap ]; then
+    RAPL_FOLDERS=$(find /sys/devices/virtual/powercap -name "intel-rapl\:*")
+    for F in ${RAPL_FOLDERS}; do print_powercap_folder $F; done
+else
+    echo "No hardware power limit information (/sys/devices/virtual/powercap)"
+fi
 
 
 OUT=$(module 2>&1 1>/dev/null || echo $?)
@@ -225,27 +255,39 @@ if [ "$OUT" == "0" ]; then
     module list 2>&1
 fi
 
-header "Compiler"
-CC=""
-if [ $(which icc 2>/dev/null | wc -l ) == 1 ]; then
-    CC=$(which icc)
-elif [ $(which gcc 2>/dev/null | wc -l ) == 1 ]; then
-    CC=$(which gcc)
-elif [ $(which clang 2>/dev/null | wc -l ) == 1 ]; then
-    CC=$(which clang)
+header "C Compiler(s)"
+print_version_if_exists "ICC" icc
+print_version_if_exists "GCC" gcc
+print_version_if_exists "CLANG" clang
+print_version_if_exists "PGCC" pgcc
+print_version_if_exists "XLC" xlc
+print_version_if_exists "ARMCLANG" armclang
+if [ ! -z ${CC} ]; then
+    print_version_if_exists " \$CC (${CC})" "${CC}"
 fi
-$CC --version
+
+header "C++ Compiler(s)"
+print_version_if_exists "ICPC" icpc
+print_version_if_exists "G++" g++
+print_version_if_exists "PG++" pg++
+print_version_if_exists "ARMCLANG++" armclang++
+if [ ! -z ${CXX} ]; then
+    print_version_if_exists " \$CXX (${CXX})" "${CXX}"
+fi
+
+header "Fortran Compiler(s)"
+print_version_if_exists "IFORT" ifort
+print_version_if_exists "GFORTRAN" gfortran
+print_version_if_exists "PGF90" pgf90
+print_version_if_exists "ARMFLANG" armflang
+if [ ! -z ${FC} ]; then
+    print_version_if_exists " \$FC (${FC})" "${FC}"
+fi
 
 header "MPI"
-if [ $(which mpiexec 2>/dev/null | wc -l ) == 1 ]; then
-    mpiexec --version
-elif [ $(which mpiexec.hydra 2>/dev/null | wc -l ) == 1 ]; then
-    mpiexec.hydra --version
-elif [ $(which mpirun 2>/dev/null | wc -l ) == 1 ]; then
-    mpirun --version
-else
-    echo "No MPI found"
-fi
+print_version_if_exists "MPIEXEC" mpiexec
+print_version_if_exists "MPIEXEC.HYDRA" mpiexec.hydra
+print_version_if_exists "MPIRUN" mpirun
 
 
 if [ $(which nvidia-smi 2>/dev/null | wc -l ) == 1 ]; then
@@ -261,7 +303,7 @@ fi
 header "dmidecode"
 check_dmidecode
 
-header "environment variables"
+header "Environment variables"
 env
 
 if [ $# -ge 1 ]; then
@@ -277,5 +319,3 @@ if [ $# -ge 1 ]; then
         ldd $(which $1)
     fi
 fi
-
-

@@ -9,6 +9,7 @@ Differences between Shell and Python version
 --------------------------------------------------------------------------------
 The Shell version (`machine-state.sh`) executes some commands and just dumps the
 output to stdout.
+
 The Python version (`machine-state.py`) collects all data and outputs it in JSON
 format. This version is currently under development.
 

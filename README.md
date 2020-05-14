@@ -5,6 +5,14 @@ This script should be executed before running benchmarks to determine the
 current system settings and the execution enviroment.
 
 --------------------------------------------------------------------------------
+Differences between Shell and Python version
+--------------------------------------------------------------------------------
+The Shell version (`machine-state.sh`) executes some commands and just dumps the
+output to stdout.
+The Python version (`machine-state.py`) collects all data and outputs it in JSON
+format. This version is currently under development.
+
+--------------------------------------------------------------------------------
 Checks
 --------------------------------------------------------------------------------
 - Hostname, operating system and kernel version

@@ -46,10 +46,19 @@ import argparse
 ################################################################################
 # Configuration
 ################################################################################
+# Some classes call LIKWID to get the required information. With the DO_LIKWID
+# switch, this can be de/activated.
 DO_LIKWID = True
+# The LIKWID_PATH is currently unused.
 LIKWID_PATH = ""
+# The DmiDecodeFile class reads the whole content of this file and includes it
+# as string to the JSON dict.
 DMIDECODE_FILE = "/etc/dmidecode.txt"
+# Currently unused option. The BiosInfo class uses information from sysfs
 BIOS_XML_FILE = ""
+# The ModulesInfo class requires this path to read the loaded modules. It will
+# call 'tclsh MODULECMD_TCL_PATH' if tclsh and MODULECMD_TCL_PATH exist.
+MODULECMD_TCL_PATH = "/apps/modules/modulecmd.tcl"
 
 ################################################################################
 # Version information
@@ -62,7 +71,8 @@ MACHINESTATE_VERSION = "0.1"
 ENCODING = getpreferredencoding()
 
 ################################################################################
-# Helper Functions
+# Helper Functions used in multiple places. If a parser function is used only
+# in a single class, it is defined as static method in the class
 ################################################################################
 
 
@@ -413,6 +423,7 @@ class MachineState():
             UsersInfo,
             CpuAffinity,
             MachineStateVersionInfo,
+            ModulesInfo,
         ]
         if DO_LIKWID:
             self.subclasses.append(PrefetcherInfo)
@@ -1278,6 +1289,22 @@ class MachineStateVersionInfo(InfoGroup):
         self.constants["Version"] = MACHINESTATE_VERSION
 
 ################################################################################
+# Infos about loaded modules in the modules system
+################################################################################
+class ModulesInfo(InfoGroup):
+    def __init__(self, extended=False):
+        super(ModulesInfo, self).__init__(name="ModulesInfo", extended=extended)
+        parse = ModulesInfo.parsemodules
+        cmd_opts = "{} sh list -t 2>&1".format(MODULECMD_TCL_PATH)
+        cmd = "tclsh"
+        if len(get_abspath(cmd)) > 0 and pexists(MODULECMD_TCL_PATH):
+            self.commands["Loaded"] = (cmd, cmd_opts, None, parse)
+    @staticmethod
+    def parsemodules(value):
+        slist = re.split("\n", value)
+        return slist[1:]
+
+################################################################################
 # Infos from nvidia-smi (Nvidia GPUs)
 # TODO
 ################################################################################
@@ -1298,11 +1325,6 @@ class MachineStateVersionInfo(InfoGroup):
 
 ################################################################################
 # Infos from veosinfo (NEC Tsubasa)
-# TODO
-################################################################################
-
-################################################################################
-# Infos from module system
 # TODO
 ################################################################################
 

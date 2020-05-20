@@ -40,6 +40,7 @@ from os.path import exists as pexists
 from os.path import getsize as psize
 from locale import getpreferredencoding
 import hashlib
+import argparse
 
 
 ################################################################################
@@ -1122,13 +1123,15 @@ class ExecutableInfoLibraries(InfoGroup):
 
 class ExecutableInfo(MultiClassInfoGroup):
     def __init__(self, executable, extended=False):
-        super(ExecutableInfo, self).__init__(subclass=None, extended=extended)
+        super(ExecutableInfo, self).__init__(extended=extended)
         self.name = "ExecutableInfo"
         self.executable = executable
         self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
     def generate(self):
-        self.instances.append(ExecutableInfoExec(self.executable, extended=self.extended))
-        self.instances.append(ExecutableInfoLibraries(self.executable, extended=self.extended))
+        self._instances.append(ExecutableInfoExec(self.executable, extended=self.extended))
+        self._instances.append(ExecutableInfoLibraries(self.executable, extended=self.extended))
+        for inst in self._instances:
+            inst.generate()
 
 ################################################################################
 # Infos about the temperature using coretemp
@@ -1292,6 +1295,7 @@ class CpuAffinity(InfoGroup):
 # Infos from module system
 # TODO
 ################################################################################
+
 
 if __name__ == "__main__":
     executable = None

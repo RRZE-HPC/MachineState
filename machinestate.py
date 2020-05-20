@@ -1331,12 +1331,18 @@ class ModulesInfo(InfoGroup):
 def read_cli():
     parser = argparse.ArgumentParser(description='Read system state and output as JSON document')
     parser.add_argument('-e', '--extended', action='store_true', default=False, help='extended output')
+    parser.add_argument('-o', '--output', help='save JSON to file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(sys.argv[1:]))
-    return pargs["extended"], pargs["executable"]
+    return pargs["extended"], pargs["executable"], pargs["output"]
 
 if __name__ == "__main__":
-    extended, executable = read_cli()
+    extended, executable, outfile = read_cli()
     mstate = MachineState(extended=extended, executable=executable)
     mstate.update()
-    print(mstate.get_json())
+    if not outfile:
+        print(mstate.get_json())
+    else:
+        with open(outfile, "w") as outfp:
+            outfp.write(mstate.get_json())
+            outfp.write("\n")

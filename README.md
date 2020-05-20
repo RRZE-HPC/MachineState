@@ -69,6 +69,8 @@ positional arguments:
 optional arguments:
   -h, --help      show this help message and exit
   -e, --extended  extended output
+  -o OUTPUT, --output OUTPUT
+                  save JSON to file
 ```
 
 Gather data and print JSON
@@ -119,4 +121,10 @@ $ ./machinestate.py hostname
         }
     }
 }
+```
+
+Redirecting JSON output to file
+
+```
+$ ./machinestate.py -o $(hostname -s).json
 ```

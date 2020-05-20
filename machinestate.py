@@ -236,9 +236,9 @@ class InfoGroup:
             outdict.update({inst.name : clsout})
         outdict.update(self._data)
         return outdict
-    def get_json(self):
+    def get_json(self, sort=False, intend=4):
         outdict = self.get()
-        return json.dumps(outdict, sort_keys=False, indent=4)
+        return json.dumps(outdict, sort_keys=sort, indent=intend)
 
 class PathMatchInfoGroup(InfoGroup):
     '''Class for matching files in a folder and create subclasses for each path'''
@@ -362,9 +362,9 @@ class MachineState():
             clsout = inst.get()
             outdict.update({inst.name : clsout})
         return outdict
-    def get_json(self):
+    def get_json(self, sort=False, intend=4):
         outdict = self.get()
-        return json.dumps(outdict, sort_keys=False, indent=4)
+        return json.dumps(outdict, sort_keys=sort, indent=intend)
 
 ################################################################################
 # Configuration Classes
@@ -716,9 +716,8 @@ class PowercapInfoConstraintClass(InfoGroup):
                  "TimeWindowUs".format(ident)]
         files = ["constraint_{}_power_limit_uw".format(ident),
                  "constraint_{}_time_window_us".format(ident)]
-        funcs = [totitle, int, int]
-        for key, fname, func in zip(names, files, funcs):
-            self.files[key] = (pjoin(base, fname), r"(.+)", func)
+        for key, fname in zip(names, files):
+            self.files[key] = (pjoin(base, fname), r"(.+)", int)
 
 class PowercapInfoClass(PathMatchInfoGroup):
     def __init__(self, ident, extended=False, package=0):
@@ -1212,22 +1211,26 @@ class ModulesInfo(InfoGroup):
 ################################################################################
 
 def read_cli():
-    parser = argparse.ArgumentParser(description='Read system state and output as JSON document')
-    parser.add_argument('-e', '--extended', action='store_true', default=False, help='extended output')
-    parser.add_argument('-o', '--output', help='save JSON to file', default=None)
+    parser = argparse.ArgumentParser(description='Reads and outputs system information as JSON document')
+    parser.add_argument('-e', '--extended', action='store_true', default=False, help='extended output (default: False)')
+    parser.add_argument('-s', '--sort', action='store_true', default=False, help='sort JSON output (default: False)')
+    parser.add_argument('-i', '--intend', default=4, type=int, help='intention in JSON output (default: 4)')
+    parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(sys.argv[1:]))
-    return pargs["extended"], pargs["executable"], pargs["output"]
+    return pargs
+    #return pargs["extended"], pargs["executable"], pargs["output"]
 
 if __name__ == "__main__":
-    extended, executable, outfile = read_cli()
-    mstate = MachineState(extended=extended, executable=executable)
+    cliargs = read_cli()
+    mstate = MachineState(extended=cliargs["extended"],
+                          executable=cliargs["executable"])
     mstate.update()
-    if not outfile:
-        print(mstate.get_json())
+    if not cliargs["output"]:
+        print(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
     else:
-        with open(outfile, "w") as outfp:
-            outfp.write(mstate.get_json())
+        with open(cliargs["output"], "w") as outfp:
+            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
             outfp.write("\n")
 
 #    n = CoretempInfo(extended=extended)

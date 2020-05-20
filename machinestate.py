@@ -412,6 +412,7 @@ class MachineState():
             VulnerabilitiesInfo,
             UsersInfo,
             CpuAffinity,
+            MachineStateVersionInfo,
         ]
         if DO_LIKWID:
             self.subclasses.append(PrefetcherInfo)
@@ -1248,9 +1249,10 @@ class UsersInfo(InfoGroup):
 # Infos from the dmidecode file (if DMIDECODE_FILE is available)
 ################################################################################
 class DmiDecodeFile(InfoGroup):
-    def __init__(self, dmifile, extended=False):
+    def __init__(self, extended=False):
         super(DmiDecodeFile, self).__init__(name="DmiDecodeFile", extended=extended)
-        self.files["DmiDecode"] = (dmifile, )
+        if pexists(DMIDECODE_FILE):
+            self.files["DmiDecode"] = (DMIDECODE_FILE, )
 
 ################################################################################
 # Infos about the CPU affinity
@@ -1266,6 +1268,14 @@ class CpuAffinity(InfoGroup):
             abspath = get_abspath("likwid-pin")
             if len(abspath) > 0:
                 self.commands["Affinity"] = (abspath, "-c N -p 2>&1", r"(.*)", tointlist)
+
+################################################################################
+# Infos about this script
+################################################################################
+class MachineStateVersionInfo(InfoGroup):
+    def __init__(self, extended=False):
+        super(MachineStateVersionInfo, self).__init__(name="MachineStateVersion", extended=extended)
+        self.constants["Version"] = MACHINESTATE_VERSION
 
 ################################################################################
 # Infos from nvidia-smi (Nvidia GPUs)
@@ -1296,11 +1306,15 @@ class CpuAffinity(InfoGroup):
 # TODO
 ################################################################################
 
+def read_cli():
+    parser = argparse.ArgumentParser(description='Read system state and output as JSON document')
+    parser.add_argument('-e', '--extended', action='store_true', default=False, help='extended output')
+    parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
+    pargs = vars(parser.parse_args(sys.argv[1:]))
+    return pargs["extended"], pargs["executable"]
 
 if __name__ == "__main__":
-    executable = None
-    if len(sys.argv) > 1:
-        executable = sys.argv[1]
-    mstate = MachineState(extended=False, executable=executable)
+    extended, executable = read_cli()
+    mstate = MachineState(extended=extended, executable=executable)
     mstate.update()
     print(mstate.get_json())

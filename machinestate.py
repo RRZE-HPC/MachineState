@@ -1264,6 +1264,10 @@ class CpuAffinity(InfoGroup):
             if len(abspath) > 0:
                 self.commands["Affinity"] = (abspath, "-c N -p 2>&1", r"(.*)", tointlist)
 
+################################################################################
+# Infos from nvidia-smi (Nvidia GPUs)
+# TODO
+################################################################################
 #class NvidiaSmiInfoClass(BaseInfo):
 #    def __init__(self, device, extended=False):
 #        super(NvidiaSmiInfoClass, self).__init__(name="Card".format(device), extended=extended)
@@ -1279,7 +1283,15 @@ class CpuAffinity(InfoGroup):
 #        for key, regex in zip(names, matches):
 #            self.commands[key] = (self.cmd, self.cmd_opts, regex, int)
 
+################################################################################
+# Infos from veosinfo (NEC Tsubasa)
+# TODO
+################################################################################
 
+################################################################################
+# Infos from module system
+# TODO
+################################################################################
 
 if __name__ == "__main__":
     executable = None
@@ -1288,8 +1300,3 @@ if __name__ == "__main__":
     mstate = MachineState(extended=False, executable=executable)
     mstate.update()
     print(mstate.get_json())
-
-#    ex = CpuAffinity(extended=True)
-#    ex.generate()
-#    ex.update()
-#    print(ex.get_json())

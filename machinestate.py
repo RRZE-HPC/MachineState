@@ -70,8 +70,25 @@ MACHINESTATE_VERSION = "0.1"
 ################################################################################
 ENCODING = getpreferredencoding()
 
+
 ################################################################################
-# Helper Functions used in multiple places. If a parser function is used only
+# Helper functions
+################################################################################
+
+# TODO switch to shutil.which
+#from shutil import which as get_abspath
+def get_abspath(cmd):
+    '''Returns absoulte path of executable using the which command.'''
+    data = ""
+    try:
+        rawdata = check_output("which {}; exit 0".format(cmd), stderr=DEVNULL, shell=True)
+        data = rawdata.decode(ENCODING).strip()
+    except:
+        raise Exception("Cannot expand filepath of '{}'".format(cmd))
+    return data
+
+################################################################################
+# Parser Functions used in multiple places. If a parser function is used only
 # in a single class, it is defined as static method in the class
 ################################################################################
 
@@ -86,28 +103,6 @@ def tostrlist(value):
     '''
     if value:
         return re.split(r"[,\s]", value)
-
-def touniqstrlist(value):
-    '''Returns string split at \s and , in list of unique strings.
-
-    :param value: string with sub-strings
-
-    :returns: Expanded list with unique strings
-    :rtype: [str]
-    '''
-    return list(set(tostrlist(value)))
-
-def countuniqstrlist(value):
-    '''Returns count of unique strings in string list creating by splitting at \s and ,.
-
-    :param value: string with sub-strings
-
-    :returns: Count of unique strings
-    :rtype: int
-    '''
-    all_list = tostrlist(value)
-    uniq_list = list(set(all_list))
-    return len(uniq_list)
 
 def tointlist(value):
     '''Returns string split at \s and , in list of integers. Supports lists like 0,1-4,7.
@@ -130,31 +125,21 @@ def tointlist(value):
         raise ValueError("Unable to cast value '{}' to intlist".format(value))
     return outlist
 
-def read_file(filename):
-    try:
-        with open(filename, "rb") as fptr:
-            return fptr.read().decode(ENCODING).strip()
-    except Exception as excep:
-        raise excep
-
 def totitle(value):
     '''Returns titleized split (string.title()) with _ and whitespaces removed.'''
     return value.title().replace("_", "").replace(" ", "")
 
-def get_abspath(cmd):
-    '''Returns absoulte path of executable using the which command.'''
-    data = ""
-    try:
-        rawdata = check_output("which {}; exit 0".format(cmd), stderr=DEVNULL, shell=True)
-        data = rawdata.decode(ENCODING).strip()
-    except:
-        raise Exception("Cannot expand filepath of '{}'".format(cmd))
-    return data
 
+################################################################################
+# Processing functions for single entries in class attributes files and commands
+# TODO: Write function that processes all entries for a single file/cmd to
+#       reduce runtime. Some commands are called multiple times to get different
+#       information
+################################################################################
 def process_file(args):
     data = None
     fname, *matchconvert = args
-    if fname and pexists(fname):
+    if fname and pexists(fname) and os.path.isfile(fname):
         with (open(fname, "rb")) as filefp:
             data = filefp.read().decode(ENCODING).strip()
             if matchconvert:
@@ -192,118 +177,38 @@ def process_cmd(args):
                             data = cconvert(data)
     return data
 
-def process_function(args):
-    data = None
-    func, *funcargs = args
-    if func:
-        if funcargs:
-            fargs, = funcargs
-            data = func(fargs)
-        else:
-            data = func()
-    return data
 
 ################################################################################
 # Base Classes
 ################################################################################
 
-class BaseInfo:
-    def __init__(self, name=None, extended=False):
-        self.extended = extended
-        self.name = name
-        self.data = {}
-        self.files = {}
-        self.commands = {}
-        self.functions = {}
-        self.constants = {}
-
-    def update(self):
-        outdict = {}
-        if len(self.files) > 0:
-            for key in self.files:
-                val = self.files.get(key, (None,))
-                fdata = process_file(val)
-                outdict[key] = fdata
-        if len(self.commands) > 0:
-            for key in self.commands:
-                val = self.commands.get(key, (None,))
-                cdata = process_cmd(val)
-                outdict[key] = cdata
-        if len(self.functions) > 0:
-            for key in self.functions:
-                val = self.functions.get(key, (None,))
-                mdata = process_function(val)
-                outdict[key] = mdata
-        if len(self.constants) > 0:
-            for key in self.constants:
-                outdict[key] = self.constants[key]
-        #if len(d) == len(self.files)+len(self.commands):
-        self.data = outdict
-    def generate(self):
-        pass
-    def get(self):
-        return self.data
-    def get_json(self):
-        outdict = self.get()
-        return json.dumps(outdict, sort_keys=False, indent=4)
-
-
-class BaseInfoGroup():
-    def __init__(self, subclass=BaseInfo, name=None, extended=False):
-        self.instances = []
-        self.name = name
-        self.extended = extended
-        self.subclass = subclass
-    def generate(self):
-        pass
-    def update(self):
-        for inst in self.instances:
-            inst.update()
-    def get(self):
-        outdict = {}
-        for inst in self.instances:
-            clsout = inst.get()
-            outdict.update({inst.name : clsout})
-        return outdict
-    def get_json(self):
-        outdict = self.get()
-        return json.dumps(outdict, sort_keys=False, indent=4)
 
 class InfoGroup:
-    def __init__(self, name=None,
-                       extended=False,
-#                       subclass=None,
-#                       basepath=None,
-#                       match=None,
-#                       mlist=None
-                ):
+    def __init__(self, name=None, extended=False):
+        # Holds subclasses
         self._instances = []
+        # Holds the data of this class instance
         self._data = {}
+        # Space for file reads
+        # Key -> (filename, regex_with_one_group, convert_function)
+        # If regex_with_one_group is None, the whole content of filename is passed to convert_function
+        # If convert_function is None, the output is saved as string
         self.files = {}
+        # Space for commands for execution
+        # Key -> (executable, exec_arguments, regex_with_one_group, convert_function)
+        # If regex_with_one_group is None, the whole content of filename is passed to convert_function
+        # If convert_function is None, the output is saved as string
         self.commands = {}
+        # Space for constants
+        # Key -> Value
         self.constants = {}
         self.name = name
         self.extended = extended
-#        self.subclass = subclass
-#        self.basepath = basepath
-#        self.match = match
-#        self.list = mlist
+
     def generate(self):
+        '''Generate subclasses, defined by derived classes'''
         pass
-#        glist = []
-#        if self.basepath and self.match:
-#            mat = re.compile(self.match)
-#            base = self.basepath
-#            try:
-#                glist += sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
-#            except ValueError:
-#                glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
-#        if self.list:
-#            glist += self.list
-#        for item in glist:
-#            cls = self.subclass(item, extended=self.extended)
-#            cls.generate()
-#            self._instances.append(cls)
+
     def update(self):
         outdict = {}
         if len(self.files) > 0:
@@ -336,15 +241,18 @@ class InfoGroup:
         return json.dumps(outdict, sort_keys=False, indent=4)
 
 class PathMatchInfoGroup(InfoGroup):
+    '''Class for matching files in a folder and create subclasses for each path'''
     def __init__(self, name=None,
                        extended=False,
                        basepath=None,
                        match=None,
-                       subclass=None):
+                       subclass=None,
+                       subargs={}):
         super(PathMatchInfoGroup, self).__init__(extended=extended, name=name)
         self.basepath = basepath
         self.match = match
         self.subclass = subclass
+        self.subargs = subargs
     def generate(self):
         glist = []
         if self.basepath and self.match and self.subclass:
@@ -355,41 +263,52 @@ class PathMatchInfoGroup(InfoGroup):
             except ValueError:
                 glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
             for item in glist:
-                cls = self.subclass(item, extended=self.extended)
+                cls = self.subclass(item, extended=self.extended, **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
 
 class ListInfoGroup(InfoGroup):
+    '''Class for creating subclasses based on a list given by the user. All subclasses have the same
+    class type.
+    '''
     def __init__(self, name=None,
                        extended=False,
                        userlist=None,
-                       subclass=None):
+                       subclass=None,
+                       subargs={}):
         super(ListInfoGroup, self).__init__(extended=extended, name=name)
         self.userlist = userlist or []
         self.subclass = subclass
+        self.subargs = subargs
     def generate(self):
         if self.userlist and self.subclass:
             for item in self.userlist:
-                cls = self.subclass(item, extended=self.extended)
+                cls = self.subclass(item, extended=self.extended, **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
 
 class MultiClassInfoGroup(InfoGroup):
+    '''Class for creating subclasses based on a list of class types given by the user.
+    '''
     def __init__(self, name=None,
                        extended=False,
-                       classlist=None):
+                       classlist=None,
+                       classargs={}):
         super(MultiClassInfoGroup, self).__init__(extended=extended, name=name)
         self.classlist = classlist
+        self.classargs = classargs
+
     def generate(self):
         for cltype in self.classlist:
-            cls = cltype(extended=self.extended)
+            cls = cltype(extended=self.extended, **self.classargs)
             cls.generate()
             self._instances.append(cls)
 
+# This is basically a MultiClassInfoGroup but it does not have a name and no generate function
+# but could be rewritten using a MultiClassInfoGroup
 class MachineState():
     def __init__(self, extended=False, executable=None):
         self.extended = extended
-        self.additional = {}
         self.executable = executable
         self.subclasses = [
             HostInfo,
@@ -409,9 +328,7 @@ class MachineState():
             TransparentHugepages,
             PowercapInfo,
             Hugepages,
-            CCompilerInfo,
-            CPlusCompilerInfo,
-            FortranCompilerInfo,
+            CompilerInfo,
             MpiInfo,
             ShellEnvironment,
             PythonInfo,
@@ -444,11 +361,7 @@ class MachineState():
         for inst in self.instances:
             clsout = inst.get()
             outdict.update({inst.name : clsout})
-        for k in self.additional:
-            outdict.update({k : self.additional[k]})
         return outdict
-    def add_data(self, name, datadict):
-        self.additional.update({name : datadict})
     def get_json(self):
         outdict = self.get()
         return json.dumps(outdict, sort_keys=False, indent=4)
@@ -584,7 +497,7 @@ class CpuFrequencyClass(InfoGroup):
         if pexists(pjoin(base, "scaling_max_freq")):
             self.files["MinFreq"] = (pjoin(base, "scaling_min_freq"), r"(\d+)", int)
         if pexists(pjoin(base, "scaling_governor")):
-            self.files["Governor"] = (pjoin(base, "scaling_governor"))
+            self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
 
 class CpuFrequency(PathMatchInfoGroup):
     def __init__(self, extended=False):
@@ -599,8 +512,8 @@ class CpuFrequency(PathMatchInfoGroup):
 ################################################################################
 # NUMA Topology
 ################################################################################
-class NumaInfoHugepagesClass(BaseInfo):
-    def __init__(self, node, size, extended=False):
+class NumaInfoHugepagesClass(InfoGroup):
+    def __init__(self, size, extended=False, node=0):
         name = "Hugepages-{}".format(size)
         super(NumaInfoHugepagesClass, self).__init__(name=name, extended=extended)
         base = "/sys/devices/system/node/node{}/hugepages/hugepages-{}".format(node, size)
@@ -608,10 +521,9 @@ class NumaInfoHugepagesClass(BaseInfo):
                       "Free" : (pjoin(base, "free_hugepages"), r"(\d+)", int),
                      }
 
-class NumaInfoClass(BaseInfo):
+class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, extended=False):
-        super(NumaInfoClass, self).__init__(name="Node{}".format(node), extended=extended)
-        self.hugepages = []
+        super(NumaInfoClass, self).__init__(name="NumaInfo", extended=extended)
         base = "/sys/devices/system/node/node{}".format(node)
         self.files = {"MemTotal" : (pjoin(base, "meminfo"),
                                     r"Node {} MemTotal:\s+(\d+\s[kKMG][B])".format(node)),
@@ -623,50 +535,20 @@ class NumaInfoClass(BaseInfo):
                       "CpuList" : (pjoin(base, "cpulist"), r"(.*)", tointlist),
                      }
         if extended:
-            self.files["Writeback"] = (pjoin(base, "meminfo"),
-                                       r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node))
+            if extended:
+                self.files["Writeback"] = (pjoin(base, "meminfo"),
+                                           r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node))
         self.basepath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(node)
         self.match = r".*/hugepages-(\d+[kKMG][B])$"
-        self.node = node
-#        self.subclass = NumaInfoHugepagesClass
+        self.subclass = NumaInfoHugepagesClass
+        self.subargs = {"node" : node}
 
-    def generate(self):
-        super(NumaInfoClass, self).generate()
-        sizepath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(self.node)
-        #sizepath = self.basepath
-        smat = re.compile(r".*/hugepages-(\d+[kKMG][B])$")
-#        smat = re.compile(self.match)
-        sizes = sorted([smat.match(x).group(1) for x in glob(sizepath) if smat.match(x)])
-        for size in sizes:
-            cls = NumaInfoHugepagesClass(self.node, size)
-            cls.generate()
-            self.hugepages.append(cls)
-
-    def update(self):
-        super(NumaInfoClass, self).update()
-        for cls in self.hugepages:
-            cls.update()
-    def get(self):
-        outdict = super(NumaInfoClass, self).get()
-        for cls in self.hugepages:
-            outdict.update({cls.name : cls.get()})
-        return outdict
-
-class NumaInfo(BaseInfoGroup):
+class NumaInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
-        super(NumaInfo, self).__init__(subclass=NumaInfoClass, extended=extended)
-        self.name = "NumaInfo"
-        self.base = "/sys/devices/system/node/node*"
+        super(NumaInfo, self).__init__(name="NumaInfo", extended=extended)
+        self.basepath = "/sys/devices/system/node/node*"
         self.match = r".*/node(\d+)$"
-    def generate(self):
-        base = "/sys/devices/system/node/node*"
-        nmat = re.compile(r".*/node(\d+)$")
-        nodes = sorted([int(nmat.match(x).group(1)) for x in glob(base) if nmat.match(x)])
-        for node in nodes:
-            cls = self.subclass(node=node, extended=self.extended)
-            cls.generate()
-            self.instances.append(cls)
-
+        self.subclass = NumaInfoClass
 
 ################################################################################
 # Cache Topology
@@ -820,58 +702,72 @@ class TransparentHugepages(InfoGroup):
 
 ################################################################################
 # Infos about powercapping
-################################################################################
-class PowercapInfoClass(InfoGroup):
-    def __init__(self, socket, ident, extended=False):
+#################################################################################
+class PowercapInfoConstraintClass(InfoGroup):
+    def __init__(self, ident, extended=False, package=0, domain=-1):
+        super(PowercapInfoConstraintClass, self).__init__(extended=extended)
+        base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
+        self.name = "Constraint{}".format(ident)
+        with open(pjoin(base, "constraint_{}_name".format(ident)), "rb") as fptr:
+            self.name = totitle(fptr.read().decode(ENCODING).strip())
+        if domain >= 0:
+            base = pjoin(base, "intel-rapl:{}:{}".format(package, domain))
+        names = ["PowerLimitUw".format(ident),
+                 "TimeWindowUs".format(ident)]
+        files = ["constraint_{}_power_limit_uw".format(ident),
+                 "constraint_{}_time_window_us".format(ident)]
+        funcs = [totitle, int, int]
+        for key, fname, func in zip(names, files, funcs):
+            self.files[key] = (pjoin(base, fname), r"(.+)", func)
+
+class PowercapInfoClass(PathMatchInfoGroup):
+    def __init__(self, ident, extended=False, package=0):
         super(PowercapInfoClass, self).__init__(extended=extended)
         base = "/sys/devices/virtual/powercap/intel-rapl"
-        base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(socket, socket, ident))
+        base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(package, package, ident))
         with open(pjoin(base, "name"), "rb") as fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
-        for path in glob(pjoin(base, "constraint_*_name")):
-            if pexists(pjoin(base, "constraint_*_name")):
-                number = re.match(r".*/constraint_(\d+)_name", path).group(1)
-                names = ["Constraint{}_Name".format(number),
-                         "Constraint{}_PowerLimitUw".format(number),
-                         "Constraint{}_TimeWindowUs".format(number)]
-                files = ["constraint_{}_name".format(number),
-                         "constraint_{}_power_limit_uw".format(number),
-                         "constraint_{}_time_window_us".format(number)]
-                funcs = [totitle, int, int]
-                for key, fname, func in zip(names, files, funcs):
-                    self.files[key] = (pjoin(path, fname), r"(.+)", func)
+        self.basepath = pjoin(base, "constraint_*_name")
+        self.match = r".*/constraint_(\d+)_name"
+        self.subclass = PowercapInfoConstraintClass
+        self.subargs = {"package" : package, "domain" : ident}
 
+class PowercapInfoPackageClass(PathMatchInfoGroup):
+    def __init__(self, ident, extended=False):
+        super(PowercapInfoPackageClass, self).__init__(name="Package", extended=extended)
+        base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(ident)
+        self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
+        self.basepath = pjoin(base, "constraint_*_name")
+        self.match = r".*/constraint_(\d+)_name"
+        self.subclass = PowercapInfoConstraintClass
+        self.subargs = {"package" : ident}
 
-class PowercapInfoPackage(BaseInfoGroup):
-    def __init__(self, socket, extended=False):
-        super(PowercapInfoPackage, self).__init__(subclass=PowercapInfoClass, extended=extended)
-        self.name = "PowercapInfoPackage"
-        self.socket = socket
+class PowercapInfoPackage(PathMatchInfoGroup):
+    def __init__(self, package, extended=False):
+        super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended)
+        base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
+        with open(pjoin(base, "name"), "rb") as fptr:
+            self.name = totitle(fptr.read().decode(ENCODING).strip())
+        self.basepath = pjoin(base, "intel-rapl:{}:*".format(package))
+        self.match = r".*/intel-rapl\:\d+:(\d+)"
+        self.package = package
+        self.subargs = {"package" : package}
+        self.subclass = PowercapInfoClass
     def generate(self):
-        base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(self.socket)
-        search = pjoin(base, "intel-rapl:{}:*".format(self.socket))
-        dmat = re.compile(r".*/intel-rapl\:\d+:(\d+)")
-        domains = sorted([int(dmat.match(f).group(1)) for f in glob(search) if dmat.match(f)])
-        for dom in domains:
-            cls = self.subclass(self.socket, dom, extended=self.extended)
-            cls.generate()
-            self.instances.append(cls)
+        super(PowercapInfoPackage, self).generate()
+        cls = PowercapInfoPackageClass(self.package, extended=self.extended)
+        cls.generate()
+        self._instances.append(cls)
 
 
-class PowercapInfo(BaseInfoGroup):
+class PowercapInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
-        super(PowercapInfo, self).__init__(subclass=PowercapInfoPackage, extended=extended)
-        self.name = "PowercapInfo"
-    def generate(self):
-        base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*"
-        pmat = re.compile(r".*/intel-rapl\:(\d+)")
-        packages = sorted([int(pmat.match(f).group(1)) for f in glob(base) if pmat.match(f)])
-        for pack in packages:
-            cls = self.subclass(pack, extended=self.extended)
-            cls.name = "Package{}".format(pack)
-            cls.generate()
-            self.instances.append(cls)
+        super(PowercapInfo, self).__init__(name="PowercapInfo", extended=extended)
+        self.subclass = PowercapInfoPackage
+        self.basepath = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*"
+        self.match = r".*/intel-rapl\:(\d+)"
+
 
 ################################################################################
 # Infos about hugepages
@@ -900,14 +796,14 @@ class Hugepages(PathMatchInfoGroup):
 class CompilerInfoClass(InfoGroup):
     def __init__(self, executable, extended=False):
         super(CompilerInfoClass, self).__init__(extended)
-        self.name = totitle(executable)
+        self.name = executable
         self.commands = {"Version" : (executable, "--version", r"(\d+\.\d+\.\d+)")}
         self.constants["Path"] = get_abspath(executable)
 
 
 class CCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False):
-        super(CCompilerInfo, self).__init__(name="C_Compiler", extended=extended)
+        super(CCompilerInfo, self).__init__(name="C", extended=extended)
         self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
@@ -919,7 +815,7 @@ class CCompilerInfo(ListInfoGroup):
 
 class CPlusCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False):
-        super(CPlusCompilerInfo, self).__init__(name="C++_Compiler", extended=extended)
+        super(CPlusCompilerInfo, self).__init__(name="C++", extended=extended)
         self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
@@ -931,7 +827,7 @@ class CPlusCompilerInfo(ListInfoGroup):
 
 class FortranCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False):
-        super(FortranCompilerInfo, self).__init__(name="Fortran_Compiler", extended=extended)
+        super(FortranCompilerInfo, self).__init__(name="Fortran", extended=extended)
         self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang"]
         self.subclass = CompilerInfoClass
         if "FC" in os.environ:
@@ -952,7 +848,7 @@ class CompilerInfo(MultiClassInfoGroup):
 class PythonInfoClass(InfoGroup):
     def __init__(self, executable, extended=False):
         super(PythonInfoClass, self).__init__(extended)
-        self.name = totitle(executable)
+        self.name = executable
         abspath = get_abspath(executable)
         self.commands = {"Version" : (abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")}
         self.constants = {"Path" : get_abspath(abspath)}
@@ -1148,8 +1044,8 @@ class ExecutableInfo(MultiClassInfoGroup):
 ################################################################################
 # Infos about the temperature using coretemp
 ################################################################################
-class CoretempInfoHwmonClass(BaseInfo):
-    def __init__(self, socket, hwmon, sensor, extended=False):
+class CoretempInfoHwmonClass(InfoGroup):
+    def __init__(self, sensor, extended=False, socket=0, hwmon=0):
         super(CoretempInfoHwmonClass, self).__init__(extended=extended)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
         self.name = process_file((pjoin(base, "temp{}_label".format(sensor)),))
@@ -1159,47 +1055,31 @@ class CoretempInfoHwmonClass(BaseInfo):
             self.files["Alarm"] = (pjoin(base, "temp{}_crit_alarm".format(sensor)), r"(\d+)", int)
             self.files["Max"] = (pjoin(base, "temp{}_max".format(sensor)), r"(\d+)", int)
 
-class CoretempInfoHwmon(BaseInfoGroup):
-    def __init__(self, socket, hwmon, extended=False):
-        super(CoretempInfoHwmon, self).__init__(subclass=CoretempInfoHwmonClass, extended=extended)
-        self.name = "Hwmon{}".format(hwmon)
-        self.socket = socket
-        self.hwmon = hwmon
-    def generate(self):
-        base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/temp*_label".format(self.socket, self.hwmon)
-        hmat = re.compile(r".*/temp(\d+)_label$")
-        sensors = sorted([int(hmat.match(x).group(1)) for x in glob(base) if hmat.match(x)])
-        for sensor in sensors:
-            cls = self.subclass(self.socket, self.hwmon, sensor, extended=self.extended)
-            cls.generate()
-            self.instances.append(cls)
+class CoretempInfoHwmon(PathMatchInfoGroup):
+    def __init__(self, hwmon, extended=False, socket=0):
+        super(CoretempInfoHwmon, self).__init__(name="Hwmon{}".format(hwmon), extended=extended)
+        self.subclass = CoretempInfoHwmonClass
+        self.subargs = {"socket" : socket, "hwmon" : hwmon}
+        base = "/sys/devices/platform/coretemp.{}".format(socket)
+        self.basepath = pjoin(base, "hwmon/hwmon{}/temp*_label".format(hwmon))
+        self.match = r".*/temp(\d+)_label$"
 
-class CoretempInfoSocket(BaseInfoGroup):
+class CoretempInfoSocket(PathMatchInfoGroup):
     def __init__(self, socket, extended=False):
-        super(CoretempInfoSocket, self).__init__(subclass=CoretempInfoHwmon, extended=extended)
-        self.name = "Package{}".format(socket)
+        super(CoretempInfoSocket, self).__init__(name="Package{}".format(socket), extended=extended)
         self.socket = socket
-    def generate(self):
-        base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon*".format(self.socket)
-        hmat = re.compile(r".*/hwmon(\d+)$")
-        hwmons = sorted([int(hmat.match(x).group(1)) for x in glob(base) if hmat.match(x)])
-        for hwmon in hwmons:
-            cls = self.subclass(self.socket, hwmon, extended=self.extended)
-            cls.generate()
-            self.instances.append(cls)
+        self.subargs = {"socket" : socket}
+        self.subclass = CoretempInfoHwmon
+        self.basepath = "/sys/devices/platform/coretemp.{}/hwmon/hwmon*".format(self.socket)
+        self.match = r".*/hwmon(\d+)$"
 
-class CoretempInfo(BaseInfoGroup):
+class CoretempInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
-        super(CoretempInfo, self).__init__(subclass=CoretempInfoSocket, extended=extended)
-        self.name = "CoretempInfo"
-    def generate(self):
-        base = "/sys/devices/platform/coretemp.*"
-        pmat = re.compile(r".*/coretemp\.(\d+)$")
-        packages = sorted([int(pmat.match(x).group(1)) for x in glob(base) if pmat.match(x)])
-        for pack in packages:
-            cls = self.subclass(pack, extended=self.extended)
-            cls.generate()
-            self.instances.append(cls)
+        super(CoretempInfo, self).__init__(name="CoretempInfo", extended=extended)
+        self.subclass = CoretempInfoSocket
+        self.basepath = "/sys/devices/platform/coretemp.*"
+        self.match = r".*/coretemp\.(\d+)$"
+
 
 ################################################################################
 # Infos about the BIOS
@@ -1254,7 +1134,10 @@ class VulnerabilitiesInfo(InfoGroup):
 class UsersInfo(InfoGroup):
     def __init__(self, extended=False):
         super(UsersInfo, self).__init__(name="UsersInfo", extended=extended)
-        self.commands["LoggedIn"] = ("users", "", r"(.*)", countuniqstrlist)
+        self.commands["LoggedIn"] = ("users", "", r"(.*)", UsersInfo.countusers)
+    @staticmethod
+    def countusers(value):
+        return len(list(set(re.split(r"[,\s]", value))))
 
 ################################################################################
 # Infos from the dmidecode file (if DMIDECODE_FILE is available)
@@ -1308,7 +1191,7 @@ class ModulesInfo(InfoGroup):
 # Infos from nvidia-smi (Nvidia GPUs)
 # TODO
 ################################################################################
-#class NvidiaSmiInfoClass(BaseInfo):
+#class NvidiaSmiInfoClass(InfoGroup):
 #    def __init__(self, device, extended=False):
 #        super(NvidiaSmiInfoClass, self).__init__(name="Card".format(device), extended=extended)
 #        self.cmd = "nvidia-smi"
@@ -1346,3 +1229,8 @@ if __name__ == "__main__":
         with open(outfile, "w") as outfp:
             outfp.write(mstate.get_json())
             outfp.write("\n")
+
+#    n = CoretempInfo(extended=extended)
+#    n.generate()
+#    n.update()
+#    print(n.get_json())

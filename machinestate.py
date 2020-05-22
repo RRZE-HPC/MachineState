@@ -52,7 +52,7 @@ import argparse
 # switch, this can be de/activated.
 DO_LIKWID = True
 # The LIKWID_PATH is currently unused.
-LIKWID_PATH = ""
+LIKWID_PATH = None
 # The DmiDecodeFile class reads the whole content of this file and includes it
 # as string to the JSON dict.
 DMIDECODE_FILE = "/etc/dmidecode.txt"
@@ -78,7 +78,7 @@ ENCODING = getpreferredencoding()
 ################################################################################
 
 # TODO switch to shutil.which
-#from shutil import which as get_abspath
+from shutil import which
 def get_abspath(cmd):
     '''Returns absoulte path of executable using the which command.'''
     data = ""
@@ -363,16 +363,21 @@ class MachineState():
             MachineStateVersionInfo,
             ModulesInfo,
         ]
-        if DO_LIKWID:
-            self.subclasses.append(PrefetcherInfo)
-            self.subclasses.append(TurboInfo)
-        self.instances = []
+
         for cls in self.subclasses:
             self._instances.append(cls(extended=extended))
         if pexists(DMIDECODE_FILE):
             self._instances.append(DmiDecodeFile(DMIDECODE_FILE, extended=self.extended))
         if self.executable:
             self._instances.append(ExecutableInfo(self.executable, extended=self.extended))
+        if DO_LIKWID:
+            likwid_base = LIKWID_PATH
+            if not likwid_base:
+                path = which("likwid-topology")
+                if path:
+                    likwid_base = os.path.dirname(path)
+            self._instances.append(PrefetcherInfo(likwid_base=likwid_base, extended=self.extended))
+            self._instances.append(TurboInfo(likwid_base=likwid_base, extended=self.extended))
     def update(self):
         for inst in self._instances:
             inst.generate()
@@ -397,12 +402,12 @@ class MachineState():
 class OSInfo(InfoGroup):
     def __init__(self, extended=False):
         super(OSInfo, self).__init__(name="OperatingSystemInfo", extended=extended)
-        self.files = {"Name" : ("/etc/os-release", "NAME=[\"]*(?P<Name>[^\"]+)[\"]*"),
-                      "Version" : ("/etc/os-release", "VERSION=[\"]*(?P<Version>[^\"]+)[\"]*"),
+        self.files = {"Name" : ("/etc/os-release", "NAME=[\"]*([^\"]+)[\"]*\s*"),
+                      "Version" : ("/etc/os-release", "VERSION=[\"]*([^\"]+)[\"]*\s*"),
                      }
         if extended:
-            self.files["URL"] = ("/etc/os-release", "HOME_URL=[\"]*([^\"]+)[\"]*")
-            self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"]+)[\"]*")
+            self.files["URL"] = ("/etc/os-release", "HOME_URL=[\"]*([^\"]+)[\"]*\s*")
+            self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\d\s]+)[\"]*")
 
 ################################################################################
 # Infos about NUMA balancing
@@ -959,27 +964,36 @@ class ShellEnvironment(InfoGroup):
 # TODO: Does it work on ARM and POWER?
 ################################################################################
 class PrefetcherInfoClass(InfoGroup):
-    def __init__(self, ident, extended=False):
+    def __init__(self, ident, extended=False, likwid_base=None):
         super(PrefetcherInfoClass, self).__init__(name="Cpu{}".format(ident), extended=extended)
         names = ["HW_PREFETCHER", "CL_PREFETCHER", "DCU_PREFETCHER", "IP_PREFETCHER"]
         cmd_opts = "-c {} -l".format(ident)
         cmd = "likwid-features"
-        if len(get_abspath(cmd)) > 0:
+        if likwid_base and os.path.isdir(likwid_base):
+            abscmd = pjoin(likwid_base, cmd)
+        if abscmd:
             for name in names:
-                self.commands[name] = (cmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
+                self.commands[name] = (abscmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
 
 class PrefetcherInfo(PathMatchInfoGroup):
-    def __init__(self, extended=False):
+    def __init__(self, extended=False, likwid_base=None):
         super(PrefetcherInfo, self).__init__(name="PrefetcherInfo", extended=extended)
-        self.basepath = "/sys/devices/system/cpu/cpu*"
-        self.match = r".*/cpu(\d+)$"
-        self.subclass = PrefetcherInfoClass
+        cmd = "likwid-features"
+        if likwid_base and os.path.isdir(likwid_base):
+            abscmd = pjoin(likwid_base, cmd)
+        else:
+            abscmd = which(cmd)
+        if abscmd:
+            self.basepath = "/sys/devices/system/cpu/cpu*"
+            self.match = r".*/cpu(\d+)$"
+            self.subclass = PrefetcherInfoClass
+            self.subargs = {"likwid_base" : likwid_base}
 
 ################################################################################
 # Infos about the turbo frequencies (LIKWID only)
 ################################################################################
 class TurboInfo(InfoGroup):
-    def __init__(self, extended=False):
+    def __init__(self, extended=False, likwid_base=None):
         super(TurboInfo, self).__init__(name="TurboInfo", extended=extended)
         self.cmd = "likwid-powermeter"
         self.cmd_opts = "-i 2>&1"
@@ -990,16 +1004,20 @@ class TurboInfo(InfoGroup):
                    r"Minimal Uncore frequency:\s+([\d\.]+ MHz)",
                    r"Maximal Uncore frequency:\s+([\d\.]+ MHz)",
                   ]
-        if len(get_abspath(self.cmd)) > 0:
-            data = process_cmd((self.cmd, self.cmd_opts, matches[0]))
+        if likwid_base and os.path.isdir(likwid_base):
+            abscmd = pjoin(likwid_base, self.cmd)
+        else:
+            abscmd = which(self.cmd)
+        if abscmd:
+            data = process_cmd((abscmd, self.cmd_opts, matches[0]))
             if len(data) > 0 and not self.error_match:
                 for name, regex in zip(names, matches):
-                    self.commands[name] = (self.cmd, self.cmd_opts, regex)
+                    self.commands[name] = (abscmd, self.cmd_opts, regex)
                 regex = r"Performance energy bias:\s+(\d+)\s.*"
-                self.commands["PerfEnergyBias"] = (self.cmd, self.cmd_opts, regex, int)
+                self.commands["PerfEnergyBias"] = (abscmd, self.cmd_opts, regex, int)
                 regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
-                self.commands["TurboFrequencies"] = (self.cmd, self.cmd_opts, None, freqfunc)
+                self.commands["TurboFrequencies"] = (abscmd, self.cmd_opts, None, freqfunc)
     @staticmethod
     def getactivecores(indata):
         freqs = []

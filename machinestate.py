@@ -25,6 +25,8 @@
 #
 # =======================================================================================
 
+# TODO: Should sizes like "32654660 kB" be transformed to number in bytes?
+
 ################################################################################
 # Imports
 ################################################################################
@@ -158,23 +160,41 @@ def process_cmd(args):
     data = None
     cmd, *optsmatchconvert = args
     if cmd:
-        which = "which {}; exit 0;".format(cmd)
-        data = check_output(which, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+        which_cmd = "which {}; exit 0;".format(cmd)
+        data = check_output(which_cmd, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
         if data and len(data) > 0:
             if optsmatchconvert:
                 cmd_opts, *matchconvert = optsmatchconvert
                 exe = "{} {}; exit 0;".format(cmd, cmd_opts)
                 data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
-                if data and len(data) > 0:
+                if data and len(data) >= 0:
                     cmatch, *convert = matchconvert
                     if cmatch:
-                        mat = re.search(cmatch, data)
+                        mat = re.match(cmatch, data)
                         if mat:
                             data = mat.group(1)
+                        elif '\n' in data:
+                            for l in data.split("\n"):
+                                mat = re.match(cmatch, l)
+                                if mat:
+                                    data = mat.group(1)
+                                    break
                     if convert:
                         cconvert, = convert
                         if cconvert:
-                            data = cconvert(data)
+                            try:
+                                data = cconvert(data)
+                            except:
+                                pass
+                else:
+                    if len(matchconvert) == 2:
+                        cmatch, cconvert = matchconvert
+                        if cconvert:
+                            try:
+                                data = cconvert(None)
+                            except:
+                                pass
+
     return data
 
 
@@ -308,6 +328,7 @@ class MultiClassInfoGroup(InfoGroup):
 # but could be rewritten using a MultiClassInfoGroup
 class MachineState():
     def __init__(self, extended=False, executable=None):
+        self._instances = []
         self.extended = extended
         self.executable = executable
         self.subclasses = [
@@ -347,18 +368,18 @@ class MachineState():
             self.subclasses.append(TurboInfo)
         self.instances = []
         for cls in self.subclasses:
-            self.instances.append(cls(extended=extended))
+            self._instances.append(cls(extended=extended))
         if pexists(DMIDECODE_FILE):
-            self.instances.append(DmiDecodeFile(DMIDECODE_FILE, extended=extended))
+            self._instances.append(DmiDecodeFile(DMIDECODE_FILE, extended=self.extended))
         if self.executable:
-            self.instances.append(ExecutableInfo(self.executable, extended=extended))
+            self._instances.append(ExecutableInfo(self.executable, extended=self.extended))
     def update(self):
-        for inst in self.instances:
+        for inst in self._instances:
             inst.generate()
             inst.update()
     def get(self):
         outdict = {}
-        for inst in self.instances:
+        for inst in self._instances:
             clsout = inst.get()
             outdict.update({inst.name : clsout})
         return outdict
@@ -419,31 +440,34 @@ class CpuInfo(InfoGroup):
         if platform.machine() in ["x86_64", "i386"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)"),
-                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
-                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)"),
+                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
+                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
+                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
                          }
-        elif platform.machine() in ["armv7", "amdv8"]:
+        elif platform.machine() in ["armv7", "armv8"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"CPU implementer\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"CPU architecture\s+:\s(.+)"),
-                          "Model" : ("/proc/cpuinfo", r"CPU variant\s+:\s(.+)"),
-                          "Stepping" : ("/proc/cpuinfo", r"CPU revision\s+:\s(.+)"),
-                          "Variant" : ("/proc/cpuinfo", r"CPU part\s+:\s(.+)"),
+                          "Family" : ("/proc/cpuinfo", r"CPU architecture\s+:\s(.+)", int),
+                          "Model" : ("/proc/cpuinfo", r"CPU variant\s+:\s(.+)", int),
+                          "Stepping" : ("/proc/cpuinfo", r"CPU revision\s+:\s(.+)", int),
+                          "Variant" : ("/proc/cpuinfo", r"CPU part\s+:\s(.+)", int),
                          }
         elif platform.machine() in ["power"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)"),
-                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
-                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)"),
+                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
+                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
+                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
                          }
         if pexists("/sys/devices/system/cpu/smt/active"):
             self.files["SMT"] = ("/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
         if extended:
-            self.files.update({"Flags" : ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist),
-                               "Bugs" : ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist),
-                               "Microcode" : ("/proc/cpuinfo", r"microcode\s+:\s(.+)"),})
+            if platform.machine() in ["x86_64", "i386"]:
+                self.files["Flags"] = ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
+                self.files["Microcode"] = ("/proc/cpuinfo", r"microcode\s+:\s(.+)")
+                self.files["Bugs"] = ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
+            elif platform.machine() in ["armv7", "armv8"]:
+                self.files["Flags"] = ("/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
 
 ################################################################################
 # CPU Topology
@@ -498,6 +522,12 @@ class CpuFrequencyClass(InfoGroup):
             self.files["MinFreq"] = (pjoin(base, "scaling_min_freq"), r"(\d+)", int)
         if pexists(pjoin(base, "scaling_governor")):
             self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
+        if pexists(pjoin(base, "energy_performance_preference")):
+            self.files["EnergyPerfPreference"] = (pjoin(base, "energy_performance_preference"), r"(.+)")
+        if extended:
+            if pexists(pjoin(base, "cpuinfo_transition_latency")):
+                self.files["TransitionLatency"] = (pjoin(base, "cpuinfo_transition_latency"), r"(\d+)", int)
+
 
 class CpuFrequency(PathMatchInfoGroup):
     def __init__(self, extended=False):
@@ -507,7 +537,20 @@ class CpuFrequency(PathMatchInfoGroup):
             self.basepath = "/sys/devices/system/cpu/cpu*"
             self.match = r".*/cpu(\d+)$"
             self.subclass = CpuFrequencyClass
-
+        if extended:
+            base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(0)
+            if pexists(pjoin(base, "cpuinfo_max_freq")):
+                self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
+            if pexists(pjoin(base, "cpuinfo_min_freq")):
+                self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", int)
+            if pexists(pjoin(base, "scaling_driver")):
+                self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
+            if pexists(pjoin(base, "scaling_available_frequencies")):
+                self.files["AvailFrequencies"] = (pjoin(base, "scaling_available_frequencies"), r"(.*)", tointlist)
+            if pexists(pjoin(base, "scaling_available_governors")):
+                self.files["AvailGovernors"] = (pjoin(base, "scaling_available_governors"), r"(.*)", tostrlist)
+            if pexists(pjoin(base, "energy_performance_available_preferences")):
+                self.files["AvailEnergyPerfPreferences"] = (pjoin(base, "energy_performance_available_preferences"), r"(.*)", tostrlist)
 
 ################################################################################
 # NUMA Topology
@@ -523,7 +566,7 @@ class NumaInfoHugepagesClass(InfoGroup):
 
 class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, extended=False):
-        super(NumaInfoClass, self).__init__(name="NumaInfo", extended=extended)
+        super(NumaInfoClass, self).__init__(name="NumaNode{}".format(node), extended=extended)
         base = "/sys/devices/system/node/node{}".format(node)
         self.files = {"MemTotal" : (pjoin(base, "meminfo"),
                                     r"Node {} MemTotal:\s+(\d+\s[kKMG][B])".format(node)),
@@ -864,7 +907,7 @@ class PythonInfo(ListInfoGroup):
 ################################################################################
 class MpiInfoClass(InfoGroup):
     def __init__(self, executable, extended=False):
-        super(MpiInfoClass, self).__init__(name=totitle(executable), extended=extended)
+        super(MpiInfoClass, self).__init__(name=executable, extended=extended)
         self.commands = {"Version" : (executable, "--version", r"(.+)", MpiInfoClass.mpiversion),
                          "Implementor" : (executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
                         }
@@ -913,6 +956,7 @@ class ShellEnvironment(InfoGroup):
 
 ################################################################################
 # Infos about CPU prefetchers (LIKWID only)
+# TODO: Does it work on ARM and POWER?
 ################################################################################
 class PrefetcherInfoClass(InfoGroup):
     def __init__(self, ident, extended=False):
@@ -939,6 +983,7 @@ class TurboInfo(InfoGroup):
         super(TurboInfo, self).__init__(name="TurboInfo", extended=extended)
         self.cmd = "likwid-powermeter"
         self.cmd_opts = "-i 2>&1"
+        self.error_match = r"Cannot gather values"
         names = ["BaseClock", "MinClock", "MinUncoreClock", "MaxUncoreClock"]
         matches = [r"Base clock:\s+([\d\.]+ MHz)",
                    r"Minimal clock:\s+([\d\.]+ MHz)",
@@ -946,11 +991,11 @@ class TurboInfo(InfoGroup):
                    r"Maximal Uncore frequency:\s+([\d\.]+ MHz)",
                   ]
         if len(get_abspath(self.cmd)) > 0:
-            data = process_cmd((self.cmd, self.cmd_opts, "^(Cannot gather values)"))
-            if len(data) == 0:
+            data = process_cmd((self.cmd, self.cmd_opts, matches[0]))
+            if len(data) > 0 and not self.error_match:
                 for name, regex in zip(names, matches):
                     self.commands[name] = (self.cmd, self.cmd_opts, regex)
-                regex = r"Performance energy bias:\s+([\d\.]+).*"
+                regex = r"Performance energy bias:\s+(\d+)\s.*"
                 self.commands["PerfEnergyBias"] = (self.cmd, self.cmd_opts, regex, int)
                 regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
@@ -1034,11 +1079,7 @@ class ExecutableInfo(MultiClassInfoGroup):
         self.name = "ExecutableInfo"
         self.executable = executable
         self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
-    def generate(self):
-        self._instances.append(ExecutableInfoExec(self.executable, extended=self.extended))
-        self._instances.append(ExecutableInfoLibraries(self.executable, extended=self.extended))
-        for inst in self._instances:
-            inst.generate()
+        self.classargs = {"executable" : self.executable}
 
 ################################################################################
 # Infos about the temperature using coretemp
@@ -1136,16 +1177,18 @@ class UsersInfo(InfoGroup):
         self.commands["LoggedIn"] = ("users", "", r"(.*)", UsersInfo.countusers)
     @staticmethod
     def countusers(value):
+        if not value or len(value) == 0:
+            return 0
         return len(list(set(re.split(r"[,\s]", value))))
 
 ################################################################################
 # Infos from the dmidecode file (if DMIDECODE_FILE is available)
 ################################################################################
 class DmiDecodeFile(InfoGroup):
-    def __init__(self, extended=False):
+    def __init__(self, dmifile, extended=False):
         super(DmiDecodeFile, self).__init__(name="DmiDecodeFile", extended=extended)
-        if pexists(DMIDECODE_FILE):
-            self.files["DmiDecode"] = (DMIDECODE_FILE, )
+        if pexists(dmifile):
+            self.files["DmiDecode"] = (dmifile, )
 
 ################################################################################
 # Infos about the CPU affinity

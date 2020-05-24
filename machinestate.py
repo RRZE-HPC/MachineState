@@ -41,6 +41,7 @@ from os.path import join as pjoin
 from os.path import exists as pexists
 from os.path import getsize as psize
 from locale import getpreferredencoding
+from datetime import timedelta, datetime
 import hashlib
 import argparse
 
@@ -131,6 +132,15 @@ def totitle(value):
     '''Returns titleized split (string.title()) with _ and whitespaces removed.'''
     return value.title().replace("_", "").replace(" ", "")
 
+def fopen(filename):
+    if filename and pexists(filename) and os.path.isfile(filename):
+        try:
+            filefp = open(filename, "rb")
+        except PermissionError:
+            return None
+        except BaseException as e:
+            raise e
+        return filefp
 
 ################################################################################
 # Processing functions for single entries in class attributes files and commands
@@ -138,31 +148,57 @@ def totitle(value):
 #       reduce runtime. Some commands are called multiple times to get different
 #       information
 ################################################################################
+def match_data(data, regex_str):
+    out = data
+    regex = re.compile(regex_str)
+    nlregex = re.compile(r"\n")
+    mat = regex.match(data)
+    if mat:
+        out = mat.group(1)
+    else:
+        mat = regex.search(data)
+        if mat:
+            out = mat.group(1)
+        elif nlregex.search(data):
+            for line in nlregex.split(data):
+                mat = regex.match(line)
+                if mat:
+                    out = mat.group(1)
+                    break
+                else:
+                    mat = regex.search(line)
+                    if mat:
+                        out = mat.group(1)
+                        break
+    return out
+
 def process_file(args):
     data = None
     fname, *matchconvert = args
-    if fname and pexists(fname) and os.path.isfile(fname):
-        with (open(fname, "rb")) as filefp:
-            data = filefp.read().decode(ENCODING).strip()
-            if matchconvert:
-                fmatch, *convert = matchconvert
-                if fmatch:
-                    mat = re.search(fmatch, data)
-                    if mat:
-                        data = mat.group(1)
-                if convert:
-                    fconvert, = convert
-                    if fconvert:
+    filefp = fopen(fname)
+    if filefp:
+        data = filefp.read().decode(ENCODING).strip()
+        if matchconvert:
+            fmatch, *convert = matchconvert
+            if fmatch:
+                data = match_data(data, fmatch)
+            if convert:
+                fconvert, = convert
+                if fconvert:
+                    try:
                         data = fconvert(data)
+                    except:
+                        pass
     return data
 
 def process_cmd(args):
     data = None
     cmd, *optsmatchconvert = args
     if cmd:
-        which_cmd = "which {}; exit 0;".format(cmd)
-        data = check_output(which_cmd, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
-        if data and len(data) > 0:
+        abspath = which(cmd)
+        #which_cmd = "which {}; exit 0;".format(cmd)
+        #data = check_output(which_cmd, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+        if abspath and len(abspath) > 0:
             if optsmatchconvert:
                 cmd_opts, *matchconvert = optsmatchconvert
                 exe = "{} {}; exit 0;".format(cmd, cmd_opts)
@@ -170,15 +206,7 @@ def process_cmd(args):
                 if data and len(data) >= 0:
                     cmatch, *convert = matchconvert
                     if cmatch:
-                        mat = re.match(cmatch, data)
-                        if mat:
-                            data = mat.group(1)
-                        elif '\n' in data:
-                            for l in data.split("\n"):
-                                mat = re.match(cmatch, l)
-                                if mat:
-                                    data = mat.group(1)
-                                    break
+                        data = match_data(data, cmatch)
                     if convert:
                         cconvert, = convert
                         if cconvert:
@@ -407,7 +435,7 @@ class OSInfo(InfoGroup):
                      }
         if extended:
             self.files["URL"] = ("/etc/os-release", "HOME_URL=[\"]*([^\"]+)[\"]*\s*")
-            self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\d\s]+)[\"]*")
+            #self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\n]+)[\"]*")
 
 ################################################################################
 # Infos about NUMA balancing
@@ -449,15 +477,15 @@ class CpuInfo(InfoGroup):
                           "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
                           "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
                          }
-        elif platform.machine() in ["armv7", "armv8"]:
-            self.files = {"Vendor" : ("/proc/cpuinfo", r"CPU implementer\s+:\s(.*)"),
-                          "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"CPU architecture\s+:\s(.+)", int),
-                          "Model" : ("/proc/cpuinfo", r"CPU variant\s+:\s(.+)", int),
-                          "Stepping" : ("/proc/cpuinfo", r"CPU revision\s+:\s(.+)", int),
-                          "Variant" : ("/proc/cpuinfo", r"CPU part\s+:\s(.+)", int),
+        elif platform.machine() in ["aarch64"]:
+            self.files = {"Vendor" : ("/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)"),
+                          #"Name" : ("/proc/cpuinfo", r"model name\s+:\s([]-)\n"),
+                          "Family" : ("/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int),
+                          "Model" : ("/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int),
+                          "Stepping" : ("/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int),
+                          "Variant" : ("/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int),
                          }
-        elif platform.machine() in ["power"]:
+        elif platform.machine() in ["ppc64le", "ppc64"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
                           "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
@@ -471,7 +499,7 @@ class CpuInfo(InfoGroup):
                 self.files["Flags"] = ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
                 self.files["Microcode"] = ("/proc/cpuinfo", r"microcode\s+:\s(.+)")
                 self.files["Bugs"] = ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
-            elif platform.machine() in ["armv7", "armv8"]:
+            elif platform.machine() in ["aarch64"]:
                 self.files["Flags"] = ("/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
 
 ################################################################################
@@ -529,9 +557,6 @@ class CpuFrequencyClass(InfoGroup):
             self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
         if pexists(pjoin(base, "energy_performance_preference")):
             self.files["EnergyPerfPreference"] = (pjoin(base, "energy_performance_preference"), r"(.+)")
-        if extended:
-            if pexists(pjoin(base, "cpuinfo_transition_latency")):
-                self.files["TransitionLatency"] = (pjoin(base, "cpuinfo_transition_latency"), r"(\d+)", int)
 
 
 class CpuFrequency(PathMatchInfoGroup):
@@ -544,6 +569,8 @@ class CpuFrequency(PathMatchInfoGroup):
             self.subclass = CpuFrequencyClass
         if extended:
             base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(0)
+            if pexists(pjoin(base, "cpuinfo_transition_latency")):
+                self.files["TransitionLatency"] = (pjoin(base, "cpuinfo_transition_latency"), r"(\d+)", int)
             if pexists(pjoin(base, "cpuinfo_max_freq")):
                 self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
             if pexists(pjoin(base, "cpuinfo_min_freq")):
@@ -614,7 +641,15 @@ class CacheTopologyClass(InfoGroup):
             self.files["Sets"] = (pjoin(base, "number_of_sets"), r"(\d+)", int)
             self.files["Associativity"] = (pjoin(base, "ways_of_associativity"), r"(\d+)", int)
             self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", int)
-            self.files["PhysicalLineSize"] = (pjoin(base, "physical_line_partition"), r"(\d+)", int)
+            phys_line_part = pjoin(base, "physical_line_partition")
+            if pexists(phys_line_part):
+                self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", int)
+            alloc_policy = pjoin(base, "allocation_policy")
+            if pexists(alloc_policy):
+                self.files["AllocPolicy"] = (alloc_policy, r"(.+)")
+            write_policy = pjoin(base, "write_policy")
+            if pexists(write_policy):
+                self.files["WritePolicy"] = (write_policy, r"(.+)", int)
 
         #"CpuList" : (pjoin(self.basepath, "shared_cpu_list"), r"(.+)", tointlist),
     @staticmethod
@@ -659,9 +694,27 @@ class CacheTopology(PathMatchInfoGroup):
 class Uptime(InfoGroup):
     def __init__(self, extended=False):
         super(Uptime, self).__init__(name="Uptime", extended=extended)
-        self.files = {"Uptime" : ("/proc/uptime", r"([\d\.]+)\s+[\d\.]+", float)}
+        self.files = {"Uptime" : ("/proc/uptime", r"([\d\.]+)\s+[\d\.]+", float),
+                      "UptimeReadable" : ("/proc/uptime", r"([\d\.]+)\s+[\d\.]+", Uptime.totimedelta)
+                     }
         if extended:
             self.files.update({"CpusIdle" : ("/proc/uptime", r"[\d\.]+\s+([\d\.]+)", float)})
+    @staticmethod
+    def totimedelta(value):
+        ivalue = int(float(value))
+        msec = int((float(value) - ivalue)*1000)
+        minutes = int(ivalue/60)
+        hours = int(minutes/60)
+        days = int(hours/24)
+        weeks = int(days/7)
+        seconds = ivalue % 60
+        date = datetime.now() - timedelta(weeks=weeks,
+                                          days=days,
+                                          hours=hours,
+                                          minutes=minutes,
+                                          seconds=seconds,
+                                          milliseconds=msec)
+        return date.ctime()
 
 ################################################################################
 # Infos about the load of the system
@@ -983,11 +1036,14 @@ class PrefetcherInfo(PathMatchInfoGroup):
             abscmd = pjoin(likwid_base, cmd)
         else:
             abscmd = which(cmd)
+
         if abscmd:
-            self.basepath = "/sys/devices/system/cpu/cpu*"
-            self.match = r".*/cpu(\d+)$"
-            self.subclass = PrefetcherInfoClass
-            self.subargs = {"likwid_base" : likwid_base}
+            data = process_cmd((abscmd, "-l -c 0", r"Feature\s+CPU\s(\d+)", int))
+            if data == 0:
+                self.basepath = "/sys/devices/system/cpu/cpu*"
+                self.match = r".*/cpu(\d+)$"
+                self.subclass = PrefetcherInfoClass
+                self.subargs = {"likwid_base" : likwid_base}
 
 ################################################################################
 # Infos about the turbo frequencies (LIKWID only)
@@ -1102,9 +1158,9 @@ class ExecutableInfo(MultiClassInfoGroup):
 ################################################################################
 # Infos about the temperature using coretemp
 ################################################################################
-class CoretempInfoHwmonClass(InfoGroup):
+class CoretempInfoHwmonClassX86(InfoGroup):
     def __init__(self, sensor, extended=False, socket=0, hwmon=0):
-        super(CoretempInfoHwmonClass, self).__init__(extended=extended)
+        super(CoretempInfoHwmonClassX86, self).__init__(extended=extended)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
         self.name = process_file((pjoin(base, "temp{}_label".format(sensor)),))
         self.files["Input"] = (pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
@@ -1113,30 +1169,53 @@ class CoretempInfoHwmonClass(InfoGroup):
             self.files["Alarm"] = (pjoin(base, "temp{}_crit_alarm".format(sensor)), r"(\d+)", int)
             self.files["Max"] = (pjoin(base, "temp{}_max".format(sensor)), r"(\d+)", int)
 
-class CoretempInfoHwmon(PathMatchInfoGroup):
+class CoretempInfoHwmonX86(PathMatchInfoGroup):
     def __init__(self, hwmon, extended=False, socket=0):
-        super(CoretempInfoHwmon, self).__init__(name="Hwmon{}".format(hwmon), extended=extended)
-        self.subclass = CoretempInfoHwmonClass
+        super(CoretempInfoHwmonX86, self).__init__(name="Hwmon{}".format(hwmon), extended=extended)
+        self.subclass = CoretempInfoHwmonClassX86
         self.subargs = {"socket" : socket, "hwmon" : hwmon}
         base = "/sys/devices/platform/coretemp.{}".format(socket)
         self.basepath = pjoin(base, "hwmon/hwmon{}/temp*_label".format(hwmon))
         self.match = r".*/temp(\d+)_label$"
 
-class CoretempInfoSocket(PathMatchInfoGroup):
+class CoretempInfoSocketX86(PathMatchInfoGroup):
     def __init__(self, socket, extended=False):
-        super(CoretempInfoSocket, self).__init__(name="Package{}".format(socket), extended=extended)
+        super(CoretempInfoSocketX86, self).__init__(name="Package{}".format(socket), extended=extended)
         self.socket = socket
         self.subargs = {"socket" : socket}
-        self.subclass = CoretempInfoHwmon
+        self.subclass = CoretempInfoHwmonX86
         self.basepath = "/sys/devices/platform/coretemp.{}/hwmon/hwmon*".format(self.socket)
         self.match = r".*/hwmon(\d+)$"
+
+class CoretempInfoHwmonClassARM(InfoGroup):
+    def __init__(self, sensor, extended=False, hwmon=0):
+        super(CoretempInfoHwmonClassARM, self).__init__(extended=extended)
+        base = "/sys/devices/virtual/hwmon/hwmon{}".format(hwmon)
+        self.name = "Core{}".format(sensor)
+        self.files["Input"] = (pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
+        if extended:
+            self.files["Critical"] = (pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
+
+class CoretempInfoSocketARM(PathMatchInfoGroup):
+    def __init__(self, hwmon, extended=False):
+        super(CoretempInfoSocketARM, self).__init__(name="Hwmon{}".format(hwmon), extended=extended)
+        self.basepath = "/sys/devices/virtual/hwmon/hwmon{}/temp*_input".format(hwmon)
+        self.match = r".*/temp(\d+)_input$"
+        self.subclass = CoretempInfoHwmonClassARM
+        self.subargs = {"hwmon" : hwmon}
 
 class CoretempInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
         super(CoretempInfo, self).__init__(name="CoretempInfo", extended=extended)
-        self.subclass = CoretempInfoSocket
-        self.basepath = "/sys/devices/platform/coretemp.*"
-        self.match = r".*/coretemp\.(\d+)$"
+        machine = platform.machine()
+        if machine in ["x86_64", "i386"]:
+            self.subclass = CoretempInfoSocketX86
+            self.basepath = "/sys/devices/platform/coretemp.*"
+            self.match = r".*/coretemp\.(\d+)$"
+        elif machine in ["aarch64"]:
+            self.subclass = CoretempInfoSocketARM
+            self.basepath = "/sys/devices/virtual/hwmon/hwmon*"
+            self.match = r".*/hwmon(\d+)$"
 
 
 ################################################################################
@@ -1163,11 +1242,15 @@ class ThermalZoneInfoClass(InfoGroup):
         name = "ThermalZone{}".format(zone)
         super(ThermalZoneInfoClass, self).__init__(name=name, extended=extended)
         base = "/sys/devices/virtual/thermal/thermal_zone{}".format(zone)
+        if pexists(pjoin(base, "device/description")):
+            with (open(pjoin(base, "device/description"), "rb")) as filefp:
+                self.name = filefp.read().decode(ENCODING).strip()
         self.files["Temperature"] = (pjoin(base, "temp"), r"(\d+)", int)
         if extended:
             self.files["Policy"] = (pjoin(base, "policy"), r"(.+)")
             avpath = pjoin(base, "available_policies")
             self.files["AvailablePolicies"] = (avpath, r"(.+)", tostrlist)
+            self.files["Type"] = (pjoin(base, "type"), r"(.+)")
 
 class ThermalZoneInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
@@ -1248,6 +1331,47 @@ class ModulesInfo(InfoGroup):
         return slist[1:]
 
 ################################################################################
+# Infos about InfiniBand adapters
+################################################################################
+class InfinibandInfoClassPort(InfoGroup):
+    def __init__(self, port, extended=False, anon=False, driver=""):
+        super(InfinibandInfoClassPort, self).__init__(extended=extended)
+        self.name = "Port{}".format(port)
+        ibpath = "/sys/class/infiniband/{}/ports/{}".format(driver, port)
+        self.files["Rate"] = (pjoin(ibpath, "rate"), r"(.+)")
+        self.files["PhysState"] = (pjoin(ibpath, "phys_state"), r"(.+)")
+        self.files["LinkLayer"] = (pjoin(ibpath, "link_layer"), r"(.+)")
+
+
+class InfinibandInfoClass(PathMatchInfoGroup):
+    def __init__(self, driver, extended=False, anon=False):
+        super(InfinibandInfoClass, self).__init__(extended=extended)
+        self.name = driver
+        ibpath = "/sys/class/infiniband/{}".format(driver)
+        self.files["BoardId"] = (pjoin(ibpath, "board_id"), r"(.+)")
+        self.files["FirmwareVersion"] = (pjoin(ibpath, "fw_ver"), r"([\d\.]+)")
+        self.files["HCAType"] = (pjoin(ibpath, "hca_type"), r"([\w\d\.]+)")
+        self.files["HWRevision"] = (pjoin(ibpath, "hw_rev"), r"([\w\d\.]+)")
+        self.files["NodeType"] = (pjoin(ibpath, "node_type"), r"(.+)")
+        if not anon:
+            self.files["NodeGUID"] = (pjoin(ibpath, "node_guid"), r"(.+)")
+            self.files["NodeDescription"] = (pjoin(ibpath, "node_desc"), r"(.+)")
+            self.files["SysImageGUID"] = (pjoin(ibpath, "sys_image_guid"), r"(.+)")
+        self.basepath = "/sys/class/infiniband/{}/ports/*".format(driver)
+        self.match = r".*/(\d+)$"
+        self.subclass = InfinibandInfoClassPort
+        self.subargs = {"driver" : driver}
+
+class InfinibandInfo(PathMatchInfoGroup):
+    def __init__(self, extended=False, anon=False):
+        super(InfinibandInfo, self).__init__(extended=extended)
+        self.name = "InfinibandInfo"
+        if pexists("/sys/class/infiniband"):
+            self.basepath = "/sys/class/infiniband/*"
+            self.match = r".*/(.*)$"
+            self.subclass = InfinibandInfoClass
+
+################################################################################
 # Infos from nvidia-smi (Nvidia GPUs)
 # TODO
 ################################################################################
@@ -1284,17 +1408,17 @@ def read_cli():
 
 if __name__ == "__main__":
     cliargs = read_cli()
-    mstate = MachineState(extended=cliargs["extended"],
-                          executable=cliargs["executable"])
-    mstate.update()
-    if not cliargs["output"]:
-        print(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
-    else:
-        with open(cliargs["output"], "w") as outfp:
-            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
-            outfp.write("\n")
+#    mstate = MachineState(extended=cliargs["extended"],
+#                          executable=cliargs["executable"])
+#    mstate.update()
+#    if not cliargs["output"]:
+#        print(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
+#    else:
+#        with open(cliargs["output"], "w") as outfp:
+#            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
+#            outfp.write("\n")
 
-#    n = CoretempInfo(extended=extended)
-#    n.generate()
-#    n.update()
-#    print(n.get_json())
+    n = InfinibandInfo(extended=cliargs["extended"])
+    n.generate()
+    n.update()
+    print(n.get_json())

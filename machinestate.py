@@ -225,6 +225,39 @@ def process_cmd(args):
 
     return data
 
+def get_config_file(args):
+    outdict = {}
+    fname, *matchconvert = args
+    if fname:
+        outdict["Filename"] = str(fname)
+        if matchconvert:
+            fmatch, *convert = matchconvert
+            if fmatch:
+                outdict["Regex"] = str(fmatch)
+                if convert:
+                    fconvert, = convert
+                    if fconvert:
+                        outdict["Parser"] = str(fconvert)
+    return outdict
+
+def get_config_cmd(args):
+    outdict = {}
+    cmd, *optsmatchconvert = args
+    if cmd:
+        outdict["Command"] = str(cmd)
+        if optsmatchconvert:
+            cmd_opts, *matchconvert = optsmatchconvert
+            if cmd_opts:
+                outdict["CommandOpts"] = str(cmd_opts)
+                if matchconvert:
+                    cmatch, *convert = matchconvert
+                    if cmatch:
+                        outdict["Regex"] = str(cmatch)
+                        if convert:
+                            cconvert, = convert
+                            if cconvert:
+                                outdict["Parser"] = str(cconvert)
+    return outdict
 
 ################################################################################
 # Base Classes
@@ -287,6 +320,34 @@ class InfoGroup:
     def get_json(self, sort=False, intend=4):
         outdict = self.get()
         return json.dumps(outdict, sort_keys=sort, indent=intend)
+    def get_config(self):
+        outdict = {}
+        #outdict["Name"] = self.name
+        selfdict = {}
+        selfdict["Type"] = str(self.__class__.__name__)
+        selfdict["ClassType"] = "InfoGroup"
+        if len(self.files) > 0:
+            outfiles = {}
+            for key in self.files:
+                val = self.files.get(key, None)
+                outfiles[key] = get_config_file(val)
+            outdict.update({"Files" : outfiles})
+        if len(self.commands) > 0:
+            outcmds = {}
+            for key in self.commands:
+                val = self.commands.get(key, None)
+                outcmds[key] = get_config_cmd(val)
+            outdict.update({"Commands" : outcmds})
+
+        if len(self.constants) > 0:
+            outconst = {}
+            for key in self.constants:
+                outconst[key] = self.constants[key]
+            outdict.update({"Constants" : outconst})
+        outdict["Config"] = selfdict
+        for inst in self._instances:
+            outdict.update({inst.name : inst.get_config()})
+        return outdict
 
 class PathMatchInfoGroup(InfoGroup):
     '''Class for matching files in a folder and create subclasses for each path'''
@@ -314,6 +375,24 @@ class PathMatchInfoGroup(InfoGroup):
                 cls = self.subclass(item, extended=self.extended, **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
+    def get_config(self):
+        outdict = super(PathMatchInfoGroup, self).get_config()
+        selfdict = {}
+        selfdict["Type"] = str(self.__class__.__name__)
+        selfdict["ClassType"] = "PathMatchInfoGroup"
+        if self.basepath:
+            selfdict["SearchPath"] = str(self.basepath)
+        if self.match:
+            selfdict["Regex"] = str(self.match)
+        if self.subclass:
+            selfdict["SubClass"] = str(self.subclass)
+        if self.subargs:
+            selfdict["SubArgs"] = str(self.subargs)
+        outdict["Config"] = selfdict
+        for inst in self._instances:
+            outdict.update({inst.name : inst.get_config()})
+        return outdict
+
 
 class ListInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list given by the user. All subclasses have the same
@@ -334,6 +413,21 @@ class ListInfoGroup(InfoGroup):
                 cls = self.subclass(item, extended=self.extended, **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
+    def get_config(self):
+        outdict = super(ListInfoGroup, self).get_config()
+        selfdict = {}
+        selfdict["Type"] = str(self.__class__.__name__)
+        selfdict["ClassType"] = "ListInfoGroup"
+        if self.subclass:
+            selfdict["SubClass"] = str(self.subclass)
+        if self.subargs:
+            selfdict["SubArgs"] = str(self.subargs)
+        if self.userlist:
+            selfdict["List"] = str(self.userlist)
+        for inst in self._instances:
+            outdict.update({inst.name : inst.get_config()})
+        outdict["Config"] = selfdict
+        return outdict
 
 class MultiClassInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list of class types given by the user.
@@ -351,6 +445,15 @@ class MultiClassInfoGroup(InfoGroup):
             cls = cltype(extended=self.extended, **self.classargs)
             cls.generate()
             self._instances.append(cls)
+    def get_config(self):
+        outdict = super(MultiClassInfoGroup, self).get_config()
+        outdict["Type"] = str(self.__class__.__name__)
+        outdict["ClassType"] = "MultiClassInfoGroup"
+        for cls, args in zip(self.classlist, self.classargs):
+            outdict[str(cls)] = str(args)
+        for inst in self._instances:
+            outdict.update({inst.name : inst.get_config()})
+        return outdict
 
 # This is basically a MultiClassInfoGroup but it does not have a name and no generate function
 # but could be rewritten using a MultiClassInfoGroup
@@ -418,6 +521,12 @@ class MachineState():
         return outdict
     def get_json(self, sort=False, intend=4):
         outdict = self.get()
+        return json.dumps(outdict, sort_keys=sort, indent=intend)
+    def get_config(self, sort=False, intend=4):
+        outdict = {}
+        for inst in self._instances:
+            clsout = inst.get_config()
+            outdict.update({inst.name : clsout})
         return json.dumps(outdict, sort_keys=sort, indent=intend)
 
 ################################################################################
@@ -1399,8 +1508,9 @@ def read_cli():
     parser = argparse.ArgumentParser(description='Reads and outputs system information as JSON document')
     parser.add_argument('-e', '--extended', action='store_true', default=False, help='extended output (default: False)')
     parser.add_argument('-s', '--sort', action='store_true', default=False, help='sort JSON output (default: False)')
-    parser.add_argument('-i', '--intend', default=4, type=int, help='intention in JSON output (default: 4)')
+    parser.add_argument('-i', '--indent', default=4, type=int, help='indention in JSON output (default: 4)')
     parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
+    parser.add_argument('-c', '--config', help='print configuration as JSON (files, commands, ...)', default=False, action='store_true')
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(sys.argv[1:]))
     return pargs
@@ -1408,17 +1518,23 @@ def read_cli():
 
 if __name__ == "__main__":
     cliargs = read_cli()
-#    mstate = MachineState(extended=cliargs["extended"],
-#                          executable=cliargs["executable"])
-#    mstate.update()
-#    if not cliargs["output"]:
-#        print(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
-#    else:
-#        with open(cliargs["output"], "w") as outfp:
-#            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["intend"]))
-#            outfp.write("\n")
+    mstate = MachineState(extended=cliargs["extended"],
+                          executable=cliargs["executable"])
+    mstate.update()
+    jsonout = {}
+    if not cliargs["config"]:
+        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"])
+    else:
+        jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
+    if not cliargs["output"]:
+        print(jsonout)
+    else:
+        with open(cliargs["output"], "w") as outfp:
+            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+            outfp.write("\n")
 
-    n = InfinibandInfo(extended=cliargs["extended"])
-    n.generate()
-    n.update()
-    print(n.get_json())
+#    n = ThermalZoneInfo(extended=cliargs["extended"])
+#    n.generate()
+#    print(json.dumps(n.get_config(), sort_keys=True, indent=4))
+#    n.update()
+#    print(n.get_json())

@@ -50,6 +50,7 @@ Checks
     - Module system
     - Installed compilers and MPI implementations
     - Runtime enviroment
+    - Accelerator information (Nvidida GPUs and NEC Tsubasa)
     - Dmidecode system configuration (if available)
     - Information about the benchmark (if cmd is passed as cli argument)
 
@@ -59,18 +60,27 @@ Usage (Python version)
 Getting usage help:
 ```
 $ ./machinestate.py -h
-usage: machinestate.py [-h] [-e] [executable]
+usage: machinestate.py [-h] [-e] [-s] [-a] [-c] [-j JSON] [-i INDENT]
+                       [-o OUTPUT]
+                       [executable]
 
-Read system state and output as JSON document
+Reads and outputs system information as JSON document
 
 positional arguments:
-  executable      analyze executable (optional)
+  executable            analyze executable (optional)
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -e, --extended  extended output
+  -h, --help            show this help message and exit
+  -e, --extended        extended output (default: False)
+  -s, --sort            sort JSON output (default: False)
+  -a, --anonymous       Remove host-specific information (default: False)
+  -c, --config          print configuration as JSON (files, commands, ...)
+  -j JSON, --json JSON  compare given JSON with current state
+  -i INDENT, --indent INDENT
+                        indention in JSON output (default: 4)
   -o OUTPUT, --output OUTPUT
-                  save JSON to file
+                        save JSON to file (default: stdout)
+
 ```
 
 Gather data and print JSON
@@ -127,4 +137,14 @@ Redirecting JSON output to file
 
 ```
 $ ./machinestate.py -o $(hostname -s).json
+```
+
+Sort keys in JSON output
+```
+$ ./machinestate.py -s
+```
+
+Compare JSON file created with `machinestate.py` with current state
+```
+$ ./machinestate.py -j oldstate.json
 ```

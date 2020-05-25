@@ -526,7 +526,7 @@ class MultiClassInfoGroup(InfoGroup):
 class MachineState(MultiClassInfoGroup):
     def __init__(self, extended=False, executable=None, anon=False):
         super(MachineState, self).__init__(extended=extended, anon=anon)
-        self.constants["MACHINESTATE_VERSION"] = MACHINESTATE_VERSION
+        self.constants["MachineStateVersion"] = MACHINESTATE_VERSION
         self.classlist = [
             HostInfo,
             CpuInfo,
@@ -1695,7 +1695,7 @@ def read_cli():
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
-if __name__ == "__main__":
+def main_routine():
     cliargs = read_cli()
     mstate = MachineState(extended=cliargs["extended"],
                           executable=cliargs["executable"],
@@ -1724,3 +1724,6 @@ if __name__ == "__main__":
 #    copydict = deepcopy(ndict)
 #    print(n == copydict)
 #    print(n.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+
+if __name__ == "__main__":
+    main_routine()

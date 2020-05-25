@@ -44,6 +44,7 @@ from locale import getpreferredencoding
 from datetime import timedelta, datetime
 import hashlib
 import argparse
+from copy import deepcopy
 
 
 ################################################################################
@@ -283,6 +284,8 @@ class InfoGroup:
         # Space for constants
         # Key -> Value
         self.constants = {}
+        # Keys in the group that are required to check equality
+        self.required4equal = []
         self.name = name
         self.extended = extended
 
@@ -348,6 +351,20 @@ class InfoGroup:
         for inst in self._instances:
             outdict.update({inst.name : inst.get_config()})
         return outdict
+    def __eq__(self, other):
+        selfdict = self.get()
+        for key in self.required4equal:
+            if key in other:
+                #print("__eq__('{}', '{}')".format(selfdict[key], other[key]))
+                if selfdict[key] != other[key]:
+                    return False
+        for inst in self._instances:
+            if inst.name in other:
+                #print("__eq__('{}', '{}')".format(inst.name, other[inst.name]))
+                instout = (inst.__eq__(other[inst.name]))
+                if instout == False:
+                    return False
+        return True
 
 class PathMatchInfoGroup(InfoGroup):
     '''Class for matching files in a folder and create subclasses for each path'''
@@ -542,6 +559,7 @@ class OSInfo(InfoGroup):
         self.files = {"Name" : ("/etc/os-release", "NAME=[\"]*([^\"]+)[\"]*\s*"),
                       "Version" : ("/etc/os-release", "VERSION=[\"]*([^\"]+)[\"]*\s*"),
                      }
+        self.required4equal = self.files.keys()
         if extended:
             self.files["URL"] = ("/etc/os-release", "HOME_URL=[\"]*([^\"]+)[\"]*\s*")
             #self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\n]+)[\"]*")
@@ -561,17 +579,19 @@ class NumaBalance(InfoGroup):
                      "numa_balancing_scan_period_min_ms", "numa_balancing_scan_size_mb"]
             for key, fname in zip(names, files):
                 self.files[key] = (pjoin(base, fname), regex, int)
+        self.required4equal = self.files.keys()
 
 ################################################################################
 # Infos about the host
 ################################################################################
 class HostInfo(InfoGroup):
-    def __init__(self, extended=False):
+    def __init__(self, extended=False, anon=False):
         super(HostInfo, self).__init__(name="HostInfo", extended=extended)
-        self.commands = {"Hostname" : ("hostname", "-s", r"(.+)")}
-        if extended:
-            self.commands.update({"Domainname" : ("hostname", "-d", r"(.+)")})
-            self.commands.update({"FQDN" : ("hostname", "-f", r"(.+)")})
+        if not anon:
+            self.commands = {"Hostname" : ("hostname", "-s", r"(.+)")}
+            if extended:
+                self.commands.update({"Domainname" : ("hostname", "-d", r"(.+)")})
+                self.commands.update({"FQDN" : ("hostname", "-f", r"(.+)")})
 
 ################################################################################
 # Infos about the CPU
@@ -601,15 +621,19 @@ class CpuInfo(InfoGroup):
                           "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
                           "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
                          }
+        self.required4equal = ["Vendor", "Family", "Model", "Stepping"]
         if pexists("/sys/devices/system/cpu/smt/active"):
             self.files["SMT"] = ("/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
+            self.required4equal.append("SMT")
         if extended:
             if platform.machine() in ["x86_64", "i386"]:
                 self.files["Flags"] = ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
                 self.files["Microcode"] = ("/proc/cpuinfo", r"microcode\s+:\s(.+)")
                 self.files["Bugs"] = ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
+                self.required4equal.append("Microcode")
             elif platform.machine() in ["aarch64"]:
                 self.files["Flags"] = ("/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
+
 
 ################################################################################
 # CPU Topology
@@ -624,6 +648,7 @@ class CpuTopologyClass(InfoGroup):
         self.constants = {"HWThread" : ident,
                           "ThreadId" : CpuTopologyClass.getthreadid(ident)
                          }
+        self.required4equal = self.files.keys() + self.constants.keys()
 
     @staticmethod
     def getthreadid(hwthread):
@@ -666,7 +691,7 @@ class CpuFrequencyClass(InfoGroup):
             self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
         if pexists(pjoin(base, "energy_performance_preference")):
             self.files["EnergyPerfPreference"] = (pjoin(base, "energy_performance_preference"), r"(.+)")
-
+        self.required4equal = self.files.keys()
 
 class CpuFrequency(PathMatchInfoGroup):
     def __init__(self, extended=False):
@@ -692,6 +717,7 @@ class CpuFrequency(PathMatchInfoGroup):
                 self.files["AvailGovernors"] = (pjoin(base, "scaling_available_governors"), r"(.*)", tostrlist)
             if pexists(pjoin(base, "energy_performance_available_preferences")):
                 self.files["AvailEnergyPerfPreferences"] = (pjoin(base, "energy_performance_available_preferences"), r"(.*)", tostrlist)
+        self.required4equal = ["Driver"]
 
 ################################################################################
 # NUMA Topology
@@ -704,6 +730,7 @@ class NumaInfoHugepagesClass(InfoGroup):
         self.files = {"Count" : (pjoin(base, "nr_hugepages"), r"(\d+)", int),
                       "Free" : (pjoin(base, "free_hugepages"), r"(\d+)", int),
                      }
+        self.required4equal = ["Count"]
 
 class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, extended=False):
@@ -722,6 +749,7 @@ class NumaInfoClass(PathMatchInfoGroup):
             if extended:
                 self.files["Writeback"] = (pjoin(base, "meminfo"),
                                            r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node))
+        self.required4equal = ["MemFree", "CpuList"]
         self.basepath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(node)
         self.match = r".*/hugepages-(\d+[kKMG][B])$"
         self.subclass = NumaInfoHugepagesClass
@@ -759,7 +787,7 @@ class CacheTopologyClass(InfoGroup):
             write_policy = pjoin(base, "write_policy")
             if pexists(write_policy):
                 self.files["WritePolicy"] = (write_policy, r"(.+)", int)
-
+        self.required4equal = self.files.keys()
         #"CpuList" : (pjoin(self.basepath, "shared_cpu_list"), r"(.+)", tointlist),
     @staticmethod
     def getcpulist(arg):
@@ -806,6 +834,7 @@ class Uptime(InfoGroup):
         self.files = {"Uptime" : ("/proc/uptime", r"([\d\.]+)\s+[\d\.]+", float),
                       "UptimeReadable" : ("/proc/uptime", r"([\d\.]+)\s+[\d\.]+", Uptime.totimedelta)
                      }
+        self.required4equal = ["Uptime"]
         if extended:
             self.files.update({"CpusIdle" : ("/proc/uptime", r"[\d\.]+\s+([\d\.]+)", float)})
     @staticmethod
@@ -835,6 +864,7 @@ class LoadAvg(InfoGroup):
                       "LoadAvg5m" : ("/proc/loadavg", r"[\d\.]+\s+([\d+\.]+)", float),
                       "LoadAvg15m" : ("/proc/loadavg", r"[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float),
                      }
+        self.required4equal = self.files.keys()
         if extended:
             rpmatch = r"[\d+\.]+\s+[\d+\.]+\s+[\d+\.]+\s+(\d+)"
             self.files["RunningProcesses"] = ("/proc/loadavg", rpmatch, int)
@@ -858,6 +888,7 @@ class MemInfo(InfoGroup):
             self.files.update({"Buffers" : ("/proc/meminfo", r"Buffers:\s+(\d+\s[kKMG][B])"),
                                "Cached" : ("/proc/meminfo", r"Cached:\s+(\d+\s[kKMG][B])"),
                               })
+        self.required4equal = ["MemFree"]
 
 ################################################################################
 # Infos about the kernel
@@ -868,6 +899,7 @@ class KernelInfo(InfoGroup):
         self.files = {"Version" : ("/proc/sys/kernel/osrelease",),
                       "CmdLine" : ("/proc/cmdline",),
                      }
+        self.required4equal = self.files.keys()
 
 ################################################################################
 # Infos about CGroups
@@ -886,6 +918,7 @@ class CgroupInfo(InfoGroup):
             files = ["cpuset.effective_cpus", "cpuset.effective_mems"]
             for key, fname in zip(names, files):
                 self.files[key] = (pjoin(base, fname), r"(.+)", tointlist)
+        self.required4equal = self.files.keys()
 
 ################################################################################
 # Infos about the writeback workqueue
@@ -897,6 +930,7 @@ class Writeback(InfoGroup):
         self.files = {"CPUmask" : (pjoin(base, "cpumask"), r"(.+)"),
                       "MaxActive" : (pjoin(base, "max_active"), r"(\d+)", int),
                      }
+        self.required4equal = self.files.keys()
 
 ################################################################################
 # Infos about transparent hugepages
@@ -908,6 +942,7 @@ class TransparentHugepages(InfoGroup):
         self.files = {"State" : (pjoin(base, "enabled"), r".*\[(.*)\].*"),
                       "UseZeroPage" : (pjoin(base, "use_zero_page"), r"(\d+)", bool),
                      }
+        self.required4equal = self.files.keys()
 
 
 ################################################################################
@@ -922,12 +957,13 @@ class PowercapInfoConstraintClass(InfoGroup):
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         if domain >= 0:
             base = pjoin(base, "intel-rapl:{}:{}".format(package, domain))
-        names = ["PowerLimitUw".format(ident),
-                 "TimeWindowUs".format(ident)]
+        names = ["PowerLimitUw",
+                 "TimeWindowUs"]
         files = ["constraint_{}_power_limit_uw".format(ident),
                  "constraint_{}_time_window_us".format(ident)]
         for key, fname in zip(names, files):
             self.files[key] = (pjoin(base, fname), r"(.+)", int)
+        self.required4equal = names
 
 class PowercapInfoClass(PathMatchInfoGroup):
     def __init__(self, ident, extended=False, package=0):
@@ -1008,6 +1044,7 @@ class CompilerInfoClass(InfoGroup):
         self.name = executable
         self.commands = {"Version" : (executable, "--version", r"(\d+\.\d+\.\d+)")}
         self.constants["Path"] = get_abspath(executable)
+        self.required4equal.append("Version")
 
 
 class CCompilerInfo(ListInfoGroup):
@@ -1019,7 +1056,7 @@ class CCompilerInfo(ListInfoGroup):
             comp = os.environ["CC"]
             if comp not in self.compilerlist:
                 self.compilerlist.append(comp)
-        self.userlist = [ c for c in self.compilerlist if len(get_abspath(c)) > 0]
+        self.userlist = [ c for c in self.compilerlist if which(c)]
 
 
 class CPlusCompilerInfo(ListInfoGroup):
@@ -1031,7 +1068,7 @@ class CPlusCompilerInfo(ListInfoGroup):
             comp = os.environ["CXX"]
             if comp not in self.compilerlist:
                 self.compilerlist.append(comp)
-        self.userlist = [ c for c in self.compilerlist if len(get_abspath(c)) > 0]
+        self.userlist = [ c for c in self.compilerlist if which(c)]
 
 
 class FortranCompilerInfo(ListInfoGroup):
@@ -1043,7 +1080,7 @@ class FortranCompilerInfo(ListInfoGroup):
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
                 self.compilerlist.append(comp)
-        self.userlist = [ c for c in self.compilerlist if len(get_abspath(c)) > 0]
+        self.userlist = [ c for c in self.compilerlist if which(c)]
 
 
 class CompilerInfo(MultiClassInfoGroup):
@@ -1058,9 +1095,11 @@ class PythonInfoClass(InfoGroup):
     def __init__(self, executable, extended=False):
         super(PythonInfoClass, self).__init__(extended)
         self.name = executable
-        abspath = get_abspath(executable)
-        self.commands = {"Version" : (abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")}
-        self.constants = {"Path" : get_abspath(abspath)}
+        abspath = which(executable)
+        if abspath:
+            self.commands = {"Version" : (abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")}
+            self.constants = {"Path" : abspath}
+        self.required4equal.append("Version")
 
 class PythonInfo(ListInfoGroup):
     def __init__(self, extended=False):
@@ -1078,7 +1117,10 @@ class MpiInfoClass(InfoGroup):
         self.commands = {"Version" : (executable, "--version", r"(.+)", MpiInfoClass.mpiversion),
                          "Implementor" : (executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
                         }
-        self.constants["Path"] = get_abspath(executable)
+        abscmd = which(executable)
+        if abscmd and len(abscmd) > 0:
+            self.constants["Path"] = get_abspath(executable)
+        self.required4equal(["Version", "Implementor"])
 
     @staticmethod
     def mpivendor(value):
@@ -1136,6 +1178,7 @@ class PrefetcherInfoClass(InfoGroup):
         if abscmd:
             for name in names:
                 self.commands[name] = (abscmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
+        self.required4equal = names
 
 class PrefetcherInfo(PathMatchInfoGroup):
     def __init__(self, extended=False, likwid_base=None):
@@ -1183,6 +1226,7 @@ class TurboInfo(InfoGroup):
                 regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
                 self.commands["TurboFrequencies"] = (abscmd, self.cmd_opts, None, freqfunc)
+        self.required4equal = self.commands.keys()
     @staticmethod
     def getactivecores(indata):
         freqs = []
@@ -1203,6 +1247,7 @@ class ClocksourceInfoClass(InfoGroup):
         self.files["Current"] = (pjoin(base, "current_clocksource"), r"(\s+)", str)
         if extended:
             self.files["Available"] = (pjoin(base, "available_clocksource"), r"(.+)", tostrlist)
+        self.required4equal = ["Current"]
 
 class ClocksourceInfo(PathMatchInfoGroup):
     def __init__(self, extended=False):
@@ -1224,6 +1269,7 @@ class ExecutableInfoExec(InfoGroup):
                           "Size" : psize(abspath)}
         if extended:
             self.constants["MD5sum"] = ExecutableInfoExec.getmd5sum(abspath)
+        self.required4equal = self.constants.keys()
     @staticmethod
     def getmd5sum(filename):
         hash_md5 = hashlib.md5()
@@ -1254,6 +1300,7 @@ class ExecutableInfoLibraries(InfoGroup):
                     libdict.update({lib : lib})
                 else:
                     libdict.update({lib : None})
+        self.required4equal = libdict.keys()
         self._data = libdict
 
 class ExecutableInfo(MultiClassInfoGroup):
@@ -1342,6 +1389,7 @@ class BiosInfo(InfoGroup):
             self.files["ProductName"] = (pjoin(base, "product_name"),)
             if pexists(pjoin(base, "product_vendor")):
                 self.files["ProductVendor"] = (pjoin(base, "product_vendor"),)
+            self.required4equal = self.files.keys()
 
 ################################################################################
 # Infos about the thermal zones
@@ -1376,7 +1424,9 @@ class VulnerabilitiesInfo(InfoGroup):
         super(VulnerabilitiesInfo, self).__init__(name="VulnerabilitiesInfo", extended=extended)
         base = "/sys/devices/system/cpu/vulnerabilities"
         for vfile in glob(pjoin(base, "*")):
-            self.files[totitle(os.path.basename(vfile))] = (vfile,)
+            vkey = totitle(os.path.basename(vfile))
+            self.files[vkey] = (vfile,)
+            self.required4equal.append(vkey)
 
 ################################################################################
 # Infos about logged in users (only count to avoid logging user names)
@@ -1411,9 +1461,10 @@ class CpuAffinity(InfoGroup):
         if "get_schedaffinity" in dir(os):
             self.constants["Affinity" : os.get_schedaffinity()]
         elif DO_LIKWID:
-            abspath = get_abspath("likwid-pin")
-            if len(abspath) > 0:
+            abscmd = which("likwid-pin")
+            if abscmd and len(abscmd) > 0:
                 self.commands["Affinity"] = (abspath, "-c N -p 2>&1", r"(.*)", tointlist)
+                self.required4equal.append("Affinity")
 
 ################################################################################
 # Infos about this script
@@ -1434,6 +1485,7 @@ class ModulesInfo(InfoGroup):
         cmd = "tclsh"
         if len(get_abspath(cmd)) > 0 and pexists(MODULECMD_TCL_PATH):
             self.commands["Loaded"] = (cmd, cmd_opts, None, parse)
+            self.required4equal.append("Loaded")
     @staticmethod
     def parsemodules(value):
         slist = re.split("\n", value)
@@ -1511,6 +1563,7 @@ def read_cli():
     parser.add_argument('-i', '--indent', default=4, type=int, help='indention in JSON output (default: 4)')
     parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
     parser.add_argument('-c', '--config', help='print configuration as JSON (files, commands, ...)', default=False, action='store_true')
+    parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(sys.argv[1:]))
     return pargs
@@ -1533,8 +1586,9 @@ if __name__ == "__main__":
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-#    n = ThermalZoneInfo(extended=cliargs["extended"])
-#    n.generate()
-#    print(json.dumps(n.get_config(), sort_keys=True, indent=4))
-#    n.update()
-#    print(n.get_json())
+    n = BiosInfo(extended=cliargs["extended"])
+    n.generate()
+    n.update()
+    ndict = n.get()
+    copydict = deepcopy(ndict)
+    print(n == copydict)

@@ -45,7 +45,8 @@ from datetime import timedelta, datetime
 import hashlib
 import argparse
 from copy import deepcopy
-
+#from unittest.TestCase import assertAlmostEqual
+import unittest
 
 ################################################################################
 # Configuration
@@ -260,6 +261,18 @@ def get_config_cmd(args):
                                 outdict["Parser"] = str(cconvert)
     return outdict
 
+def assert_relativly_equal(actual, desired, rel_diff=0.0):
+    """
+    Test for relative difference between actual and desired
+    passes if abs(actual-desired)/abs(desired) % 1.0 < rel_diff
+    """
+    if actual == desired:
+        # Catching NaN, inf and 0
+        return
+    if not abs(actual - desired) / abs(desired) % 1.0 <= rel_diff:
+        raise AssertionError("relative difference was not met with {}. Expected {!r} with rel. "
+                             "difference of {!r}.".format(actual, desired, rel_diff))
+
 ################################################################################
 # Base Classes
 ################################################################################
@@ -354,12 +367,45 @@ class InfoGroup:
         return outdict
     def __eq__(self, other):
         selfdict = self.get()
+        tcase = unittest.TestCase()
+        if isinstance(other, str):
+            if pexists(other):
+                try:
+                    jsonfp = open(cliargs["json"])
+                except BaseException as e:
+                    print(e)
+                    sys.exit(1)
+                else:
+                    with jsonfp:
+                        other = json.load(jsonfp)
+            else:
+                other = json.loads(other)
+
         for key in self.required4equal:
             if key in other:
-                #
-                if selfdict[key] != other[key]:
+                ##
+                selfval = selfdict[key]
+                otherval = other[key]
+                if isinstance(selfval, str) and re.match(r"^([\d\.]+).*", str(selfval)):
+                    smatch = re.match(r"^([\d\.]+).*", selfval).group(1)
+                    omatch = re.match(r"^([\d\.]+).*", otherval).group(1)
+                    try:
+                        selfval = float(smatch)
+                        otherval = float(omatch)
+                    except:
+                        pass
+
+                if isinstance(selfval, int) or isinstance(selfval, float):
+                    if selfval != otherval:
+                        try:
+                            tcase.assertAlmostEqual(first=selfval, second=otherval, delta=selfval*0.2)
+                        except BaseException as e:
+                            print("Equality check failed for key {}: {}".format(key, e))
+                            print("assertAlmostEqual('{}', '{}', delta={})".format(selfval, otherval, selfval*0.2))
+                            return False
+                elif selfval != otherval:
                     print("Equality check failed for key {}".format(key))
-                    print("__eq__('{}', '{}')".format(selfdict[key], other[key]))
+                    print("__eq__({}, '{}', '{}')".format(type(selfval), selfval, otherval))
                     return False
         for inst in self._instances:
             if inst.name in other:
@@ -868,7 +914,7 @@ class LoadAvg(InfoGroup):
                       "LoadAvg5m" : ("/proc/loadavg", r"[\d\.]+\s+([\d+\.]+)", float),
                       "LoadAvg15m" : ("/proc/loadavg", r"[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float),
                      }
-        self.required4equal = self.files.keys()
+        #self.required4equal = ["LoadAvg15m"]
         if extended:
             rpmatch = r"[\d+\.]+\s+[\d+\.]+\s+[\d+\.]+\s+(\d+)"
             self.files["RunningProcesses"] = ("/proc/loadavg", rpmatch, int)
@@ -1588,16 +1634,8 @@ if __name__ == "__main__":
     mstate.generate()
     mstate.update()
     if cliargs["json"]:
-        try:
-            jsonfp = open(cliargs["json"])
-        except BaseException as e:
-            print(e)
-            sys.exit(1)
-        else:
-            with jsonfp:
-                jdict = json.load(jsonfp)
-                print(mstate == jdict)
-                sys.exit(0)
+        print(mstate == cliargs["json"])
+        sys.exit(0)
     jsonout = {}
     if not cliargs["config"]:
         jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"])

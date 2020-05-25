@@ -64,6 +64,8 @@ BIOS_XML_FILE = ""
 # The ModulesInfo class requires this path to read the loaded modules. It will
 # call 'tclsh MODULECMD_TCL_PATH' if tclsh and MODULECMD_TCL_PATH exist.
 MODULECMD_TCL_PATH = "/apps/modules/modulecmd.tcl"
+# The NecTsubasaInfo class requires this path to call the vecmd command
+VEOS_BASE = "/opt/nec/ve/bin"
 
 ################################################################################
 # Version information
@@ -154,24 +156,16 @@ def match_data(data, regex_str):
     out = data
     regex = re.compile(regex_str)
     nlregex = re.compile(r"\n")
-    mat = regex.match(data)
-    if mat:
-        out = mat.group(1)
-    else:
-        mat = regex.search(data)
+    for line in nlregex.split(data):
+        mat = regex.match(line)
         if mat:
             out = mat.group(1)
-        elif nlregex.search(data):
-            for line in nlregex.split(data):
-                mat = regex.match(line)
-                if mat:
-                    out = mat.group(1)
-                    break
-                else:
-                    mat = regex.search(line)
-                    if mat:
-                        out = mat.group(1)
-                        break
+            break
+        else:
+            mat = regex.search(line)
+            if mat:
+                out = mat.group(1)
+                break
     return out
 
 def process_file(args):
@@ -532,6 +526,7 @@ class MultiClassInfoGroup(InfoGroup):
 class MachineState(MultiClassInfoGroup):
     def __init__(self, extended=False, executable=None, anon=False):
         super(MachineState, self).__init__(extended=extended, anon=anon)
+        self.constants["MACHINESTATE_VERSION"] = MACHINESTATE_VERSION
         self.classlist = [
             HostInfo,
             CpuInfo,
@@ -561,10 +556,15 @@ class MachineState(MultiClassInfoGroup):
             VulnerabilitiesInfo,
             UsersInfo,
             CpuAffinity,
-            MachineStateVersionInfo,
             ModulesInfo,
+            NvidiaSmiInfo,
         ]
+        if which("nvidia-smi"):
+            self.classlist.append(NvidiaSmiInfo)
         self.classargs = [{} for x in self.classlist]
+        if pexists(VEOS_BASE):
+            self.classlist.append(NecTsubasaInfo)
+            self.classargs.append({"ve_base" : VEOS_BASE})
         if pexists(DMIDECODE_FILE):
             self.classlist.append(DmiDecodeFile)
             self.classargs.append({"dmifile" : DMIDECODE_FILE})
@@ -1100,7 +1100,7 @@ class CompilerInfoClass(InfoGroup):
 class CCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CCompilerInfo, self).__init__(name="C", extended=extended, anon=anon)
-        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang"]
+        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
             comp = os.environ["CC"]
@@ -1112,7 +1112,7 @@ class CCompilerInfo(ListInfoGroup):
 class CPlusCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CPlusCompilerInfo, self).__init__(name="C++", extended=extended, anon=anon)
-        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++"]
+        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
             comp = os.environ["CXX"]
@@ -1124,7 +1124,7 @@ class CPlusCompilerInfo(ListInfoGroup):
 class FortranCompilerInfo(ListInfoGroup):
     def __init__(self, extended=False, anon=False):
         super(FortranCompilerInfo, self).__init__(name="Fortran", extended=extended, anon=anon)
-        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang"]
+        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort"]
         self.subclass = CompilerInfoClass
         if "FC" in os.environ:
             comp = os.environ["FC"]
@@ -1589,26 +1589,95 @@ class InfinibandInfo(PathMatchInfoGroup):
 
 ################################################################################
 # Infos from nvidia-smi (Nvidia GPUs)
-# TODO
 ################################################################################
-#class NvidiaSmiInfoClass(InfoGroup):
-#    def __init__(self, device, extended=False, anon=False):
-#        super(NvidiaSmiInfoClass, self).__init__(name="Card".format(device), extended=extended, anon=anon)
-#        self.cmd = "nvidia-smi"
-#        self.cmd_opts = "dmon -c 1 -i {}".format(device)
-#        matches = [r"\s+\d+\s+(\d+)",
-#                   r"\s+\d+\s+\d+\s+(\d+)",
-#                   r"\s+\d+\s+\d+\s+\d+\s+([\d-]+)",
-#                   r"\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)",
-#                   r"\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+)",
-#                  ]
-#        names = ["Power", "GpuTemp", "MemTemp", "Mclk", "Pclk"]
-#        for key, regex in zip(names, matches):
-#            self.commands[key] = (self.cmd, self.cmd_opts, regex, int)
+class NvidiaSmiInfoClass(InfoGroup):
+    def __init__(self, device, extended=False, anon=False):
+        super(NvidiaSmiInfoClass, self).__init__(extended=extended, anon=anon)
+        self.name = "Card{}".format(device)
+        self.cmd = "nvidia-smi"
+        self.cmd_opts = "-q -i {}".format(device)
+        abscmd = which(self.cmd)
+        if abscmd:
+            self.commands["ProductName"] = (self.cmd, self.cmd_opts, r"\s+Product Name\s+:\s+(.+)")
+            self.commands["VBiosVersion"] = (self.cmd, self.cmd_opts, r"\s+VBIOS Version\s+:\s+(.+)")
+            self.commands["ComputeMode"] = (self.cmd, self.cmd_opts, r"\s+Compute Mode\s+:\s+(.+)")
+            self.commands["GPUCurrentTemp"] = (self.cmd, self.cmd_opts, r"\s+GPU Current Temp\s+:\s+(\d+\sC)")
+            self.commands["MemTotal"] = (self.cmd, self.cmd_opts, r"\s+Total\s+:\s+(\d+\sMiB)")
+            self.commands["MemFree"] = (self.cmd, self.cmd_opts, r"\s+Free\s+:\s+(\d+\sMiB)")
+            if extended:
+                self.commands["PciDevice"] = (self.cmd, self.cmd_opts, r"^GPU\s+([0-9a-fA-F:]+)")
+                self.commands["PciLinkWidth"] = (self.cmd, self.cmd_opts, r"\s+Current\s+:\s+(\d+x)")
+                self.commands["GPUMaxOpTemp"] = (self.cmd, self.cmd_opts, r"\s+GPU Max Operating Temp\s+:\s+(\d+\sC)")
+
+class NvidiaSmiInfo(ListInfoGroup):
+    def __init__(self, extended=False, anon=False):
+        super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo", extended=extended, anon=anon)
+        self.cmd = "nvidia-smi"
+        self.cmd_opts = "-q"
+        abscmd = which(self.cmd)
+        if abscmd:
+            num_gpus = process_cmd((self.cmd, self.cmd_opts, r"Attached GPUs\s+:\s+(\d+)", int))
+            if num_gpus > 0:
+                self.userlist = [i for i in range(num_gpus)]
+                self.subclass = NvidiaSmiInfoClass
+        self.commands["DriverVersion"] = (self.cmd, self.cmd_opts, r"Driver Version\s+:\s+([\d\.]+)")
+        self.commands["CudaVersion"] = (self.cmd, self.cmd_opts, r"CUDA Version\s+:\s+([\d\.]+)")
+
 
 ################################################################################
 # Infos from veosinfo (NEC Tsubasa)
-# TODO
+################################################################################
+class NecTsubasaInfoTemps(InfoGroup):
+    def __init__(self, tempkeys, ve_base="", extended=False, anon=False, device=0):
+        super(NecTsubasaInfoTemps, self).__init__(extended=extended, anon=anon)
+        self.name = "Temperatures"
+        vecmd = pjoin(ve_base, "vecmd")
+        veargs = "-N {} info".format(device)
+        for tempkey in tempkeys:
+            self.commands[tempkey] = (vecmd, veargs, "\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
+
+class NecTsubasaInfoClass(InfoGroup):
+    def __init__(self, device, ve_base="", extended=False, anon=False):
+        super(NecTsubasaInfoClass, self).__init__(extended=extended, anon=anon)
+        self.name = "Card{}".format(device)
+        vecmd = pjoin(ve_base, "vecmd")
+        veargs = "-N {} info".format(device)
+        if pexists(vecmd):
+            self.commands["State"] = (vecmd, veargs, r"VE State\s+:\s+(.+)", totitle)
+            self.commands["Model"] = (vecmd, veargs, r"VE Model\s+:\s+(\d+)")
+            self.commands["ProductType"] = (vecmd, veargs, r"Product Type\s+:\s+(\d+)")
+            self.commands["DriverVersion"] = (vecmd, veargs, r"VE Driver Version\s+:\s+([\d\.]+)")
+            self.commands["Cores"] = (vecmd, veargs, r"Cores\s+:\s+(\d+)")
+            self.commands["MemTotal"] = (vecmd, veargs, r"Memory Size\s+:\s+(\d+)")
+            if extended:
+                self.commands["PciLinkWidth"] = (vecmd, veargs, r"Negotiated Link Width\s+:\s+(x\d+)")
+            ve_temps = process_cmd((vecmd, veargs, None, NecTsubasaInfoClass.gettempkeys))
+            tempargs = {"device" : device, "ve_base" : ve_base}
+            self._instances.append(NecTsubasaInfoTemps(ve_temps, extended=extended, anon=anon, **tempargs))
+    @staticmethod
+    def gettempkeys(value):
+        keys = []
+        for line in re.split("\n", value):
+            if re.match("(.+):\s+[\d\.]+\sC$", line):
+                key = re.match("(.+):\s+[\d\.]+\sC$", line).group(1).strip()
+                keys.append(key)
+        return keys
+
+
+class NecTsubasaInfo(ListInfoGroup):
+    def __init__(self, ve_base="", extended=False, anon=False):
+        super(NecTsubasaInfo, self).__init__(name="NecTsubasaInfo", extended=extended, anon=anon)
+        vecmd = pjoin(ve_base, "vecmd")
+        if pexists(vecmd):
+            num_ves = process_cmd((vecmd, "info", r"Attached VEs\s+:\s+(\d+)", int))
+            if num_ves > 0:
+                self.userlist = [i for i in range(num_ves)]
+                self.subclass = NecTsubasaInfoClass
+                self.subargs = {"ve_base" : ve_base}
+
+
+################################################################################
+# Skript code
 ################################################################################
 
 def read_cli():
@@ -1648,7 +1717,7 @@ if __name__ == "__main__":
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-#    n = CompilerInfo(extended=cliargs["extended"])
+#    n = NecTsubasaInfo(VEOS_BASE, extended=cliargs["extended"])
 #    n.generate()
 #    n.update()
 #    ndict = n.get()

@@ -163,7 +163,7 @@ def process_file(args):
     data = None
     fname, *matchconvert = args
     filefp = fopen(fname)
-    with filefp:
+    if filefp:
         data = filefp.read().decode(ENCODING).strip()
         if matchconvert:
             fmatch, *convert = matchconvert
@@ -176,6 +176,7 @@ def process_file(args):
                         data = fconvert(data)
                     except BaseException:
                         pass
+        filefp.close()
     return data
 
 def process_cmd(args):
@@ -352,8 +353,9 @@ class InfoGroup:
         if isinstance(other, str):
             if pexists(other):
                 jsonfp = fopen(other)
-                with jsonfp:
+                if jsonfp:
                     other = json.loads(jsonfp.read().decode(ENCODING))
+                    jsonfp.close()
             else:
                 other = json.loads(other)
 
@@ -752,7 +754,8 @@ class CpuTopologyClass(InfoGroup):
     def getthreadid(hwthread):
         base = "/sys/devices/system/cpu/cpu{}/topology/thread_siblings_list".format(hwthread)
         outfp = fopen(base)
-        with outfp:
+        tid = 0
+        if outfp:
             tid = 0
             data = outfp.read().decode(ENCODING).strip()
             dlist = data.split(",")
@@ -763,7 +766,8 @@ class CpuTopologyClass(InfoGroup):
                 if len(dlist) > 1:
                     trange = range(int(dlist[0]), int(dlist[1])+1)
                     tid = trange.index(hwthread)
-            return tid
+            outfp.close
+        return tid
 
 
 class CpuTopology(PathMatchInfoGroup):
@@ -809,8 +813,9 @@ class CpuTopology(PathMatchInfoGroup):
         return 0
     def getsmtwidth():
         filefp = fopen("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
-        with filefp:
+        if filefp:
             data = filefp.read().decode(ENCODING).strip()
+            filefp.close()
             return len(re.split(r",", data))
         return 1
     def getnumpackages():
@@ -818,10 +823,11 @@ class CpuTopology(PathMatchInfoGroup):
         plist = []
         for fname in flist:
             filefp = fopen(fname)
-            with filefp:
+            if filefp:
                 data = filefp.read().decode(ENCODING).strip()
                 if data not in plist:
                     plist.append(data)
+                filefp.close()
         if len(plist) > 0:
             return len(plist)
         return 1
@@ -830,10 +836,11 @@ class CpuTopology(PathMatchInfoGroup):
         plist = []
         for fname in flist:
             filefp = fopen(fname)
-            with filefp:
+            if filefp:
                 data = filefp.read().decode(ENCODING).strip()
                 if data not in plist:
                     plist.append(data)
+                filefp.close()
         return len(plist)
 
 ################################################################################
@@ -969,12 +976,13 @@ class CacheTopologyClass(InfoGroup):
         for cpu in cpus:
             path = pjoin("/sys/devices/system/cpu/cpu{}".format(cpu), cpath)
             filefp = fopen(path)
-            with filefp:
+            if filefp:
                 data = filefp.read().decode(ENCODING).strip()
                 clist = tointlist(data)
                 if str(clist) not in slist:
                     cpulist.append(clist)
                     slist.append(str(clist))
+                filefp.close()
         return cpulist
 
     def update(self):
@@ -1128,8 +1136,9 @@ class PowercapInfoConstraintClass(InfoGroup):
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
         self.name = "Constraint{}".format(ident)
         fptr = fopen(pjoin(base, "constraint_{}_name".format(ident)))
-        with fptr:
+        if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
+            fptr.close()
         if domain >= 0:
             base = pjoin(base, "intel-rapl:{}:{}".format(package, domain))
         names = ["PowerLimitUw",
@@ -1147,8 +1156,9 @@ class PowercapInfoClass(PathMatchInfoGroup):
         base = "/sys/devices/virtual/powercap/intel-rapl"
         base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(package, package, ident))
         fptr = fopen(pjoin(base, "name".format(ident)))
-        with fptr:
+        if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
+            fptr.close()
         self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
         self.searchpath = pjoin(base, "constraint_*_name")
         self.match = r".*/constraint_(\d+)_name"
@@ -1176,8 +1186,9 @@ class PowercapInfoPackage(PathMatchInfoGroup):
         super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
         fptr = fopen(pjoin(base, "name"))
-        with fptr:
+        if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
+            fptr.close()
         self.searchpath = pjoin(base, "intel-rapl:{}:*".format(package))
         self.match = r".*/intel-rapl\:\d+:(\d+)"
         self.package = package

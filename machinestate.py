@@ -174,20 +174,24 @@ def match_data(data, regex_str):
 def process_file(args):
     data = None
     fname, *matchconvert = args
-    filefp = fopen(fname)
-    if filefp:
-        data = filefp.read().decode(ENCODING).strip()
-        if matchconvert:
-            fmatch, *convert = matchconvert
-            if fmatch:
-                data = match_data(data, fmatch)
-            if convert:
-                fconvert, = convert
-                if fconvert:
-                    try:
-                        data = fconvert(data)
-                    except BaseException:
-                        pass
+    try:
+        filefp = fopen(fname)
+    except:
+        return data
+    else:
+        with filefp:
+            data = filefp.read().decode(ENCODING).strip()
+            if matchconvert:
+                fmatch, *convert = matchconvert
+                if fmatch:
+                    data = match_data(data, fmatch)
+                if convert:
+                    fconvert, = convert
+                    if fconvert:
+                        try:
+                            data = fconvert(data)
+                        except BaseException:
+                            pass
     return data
 
 def process_cmd(args):
@@ -890,24 +894,25 @@ class CacheTopologyClass(InfoGroup):
         super(CacheTopologyClass, self).__init__(extended=extended, anon=anon)
         self.name = "L{}".format(ident)
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
-        self.files = {"Size" : (pjoin(base, "size"), r"(\d+)", int),
-                      "Level" : (pjoin(base, "level"), r"(\d+)", int),
-                      "Type" : (pjoin(base, "type"), r"(.+)"),
-                     }
-        self.constants = {"CpuList" : CacheTopologyClass.getcpulist(ident)}
-        if extended:
-            self.files["Sets"] = (pjoin(base, "number_of_sets"), r"(\d+)", int)
-            self.files["Associativity"] = (pjoin(base, "ways_of_associativity"), r"(\d+)", int)
-            self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", int)
-            phys_line_part = pjoin(base, "physical_line_partition")
-            if pexists(phys_line_part):
-                self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", int)
-            alloc_policy = pjoin(base, "allocation_policy")
-            if pexists(alloc_policy):
-                self.files["AllocPolicy"] = (alloc_policy, r"(.+)")
-            write_policy = pjoin(base, "write_policy")
-            if pexists(write_policy):
-                self.files["WritePolicy"] = (write_policy, r"(.+)", int)
+        if pexists(base):
+            self.files = {"Size" : (pjoin(base, "size"), r"(\d+)", int),
+                          "Level" : (pjoin(base, "level"), r"(\d+)", int),
+                          "Type" : (pjoin(base, "type"), r"(.+)"),
+                         }
+            self.constants = {"CpuList" : CacheTopologyClass.getcpulist(ident)}
+            if extended:
+                self.files["Sets"] = (pjoin(base, "number_of_sets"), r"(\d+)", int)
+                self.files["Associativity"] = (pjoin(base, "ways_of_associativity"), r"(\d+)", int)
+                self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", int)
+                phys_line_part = pjoin(base, "physical_line_partition")
+                if pexists(phys_line_part):
+                    self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", int)
+                alloc_policy = pjoin(base, "allocation_policy")
+                if pexists(alloc_policy):
+                    self.files["AllocPolicy"] = (alloc_policy, r"(.+)")
+                write_policy = pjoin(base, "write_policy")
+                if pexists(write_policy):
+                    self.files["WritePolicy"] = (write_policy, r"(.+)", int)
         self.required4equal = self.files.keys()
         #"CpuList" : (pjoin(self.searchpath, "shared_cpu_list"), r"(.+)", tointlist),
     @staticmethod
@@ -920,12 +925,17 @@ class CacheTopologyClass(InfoGroup):
         cpath = "cache/index{}/shared_cpu_list".format(arg)
         for cpu in cpus:
             path = pjoin("/sys/devices/system/cpu/cpu{}".format(cpu), cpath)
-            with open(path, "rb") as filefp:
-                data = filefp.read().decode(ENCODING).strip()
-                clist = tointlist(data)
-                if str(clist) not in slist:
-                    cpulist.append(clist)
-                    slist.append(str(clist))
+            try:
+                filefp = open(path, "rb")
+            except:
+                pass
+            else:
+                with filefp:
+                    data = filefp.read().decode(ENCODING).strip()
+                    clist = tointlist(data)
+                    if str(clist) not in slist:
+                        cpulist.append(clist)
+                        slist.append(str(clist))
         return cpulist
 
     def update(self):

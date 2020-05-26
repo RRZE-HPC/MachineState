@@ -1175,7 +1175,7 @@ class PowercapInfoPackage(PathMatchInfoGroup):
     def __init__(self, package, extended=False, anon=False):
         super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
-        fptr = fopen(pjoin(base, "name".format(ident)))
+        fptr = fopen(pjoin(base, "name"))
         with fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         self.searchpath = pjoin(base, "intel-rapl:{}:*".format(package))
@@ -1232,7 +1232,7 @@ class CompilerInfoClass(InfoGroup):
         self.name = executable
         self.commands = {"Version" : (executable, "--version", r"(\d+\.\d+\.\d+)")}
         abscmd = which(executable)
-        if abscmd and len(abscmd) > 0
+        if abscmd and len(abscmd) > 0:
             self.constants["Path"] = abscmd
         self.required4equal.append("Version")
 
@@ -1519,7 +1519,7 @@ class ExecutableInfoLibraries(InfoGroup):
             self.ldd = "ldd {}; exit 0".format(self.executable)
     def update(self):
         libdict = {}
-            if self.ldd:
+        if self.ldd:
             rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
             data = rawdata.decode(ENCODING)
             libregex = re.compile(r"\s*([^\s]+)\s+.*")

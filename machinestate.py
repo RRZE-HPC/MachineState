@@ -1158,6 +1158,7 @@ class TransparentHugepages(InfoGroup):
 # Infos about powercapping
 #################################################################################
 class PowercapInfoConstraintClass(InfoGroup):
+    '''Class to read information about one powercap constraint'''
     def __init__(self, ident, extended=False, anon=False, package=0, domain=-1):
         super(PowercapInfoConstraintClass, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
@@ -1175,6 +1176,7 @@ class PowercapInfoConstraintClass(InfoGroup):
         self.required4equal = names
 
 class PowercapInfoClass(PathMatchInfoGroup):
+    '''Class to spawn subclasses for each contraint in a powercap domain'''
     def __init__(self, ident, extended=False, anon=False, package=0):
         super(PowercapInfoClass, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl"
@@ -1188,6 +1190,9 @@ class PowercapInfoClass(PathMatchInfoGroup):
         self.subargs = {"package" : package, "domain" : ident}
 
 class PowercapInfoPackageClass(PathMatchInfoGroup):
+    '''Class to spawn subclasses for powercap package domain
+    (/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*)
+    '''
     def __init__(self, ident, extended=False, anon=False):
         super(PowercapInfoPackageClass, self).__init__(name="Package", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(ident)
@@ -1198,6 +1203,9 @@ class PowercapInfoPackageClass(PathMatchInfoGroup):
         self.subargs = {"package" : ident}
 
 class PowercapInfoPackage(PathMatchInfoGroup):
+    '''Class to spawn subclasses for one powercap device/package
+    (/sys/devices/virtual/powercap/intel-rapl/intel-rapl:<package>*:*)
+    '''
     def __init__(self, package, extended=False, anon=False):
         super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
@@ -1216,6 +1224,7 @@ class PowercapInfoPackage(PathMatchInfoGroup):
 
 
 class PowercapInfo(PathMatchInfoGroup):
+    '''Class to spawn subclasses for all powercap devices (/sys/devices/virtual/powercap)'''
     def __init__(self, extended=False, anon=False):
         super(PowercapInfo, self).__init__(name="PowercapInfo", extended=extended, anon=anon)
         self.subclass = PowercapInfoPackage
@@ -1227,6 +1236,7 @@ class PowercapInfo(PathMatchInfoGroup):
 # Infos about hugepages
 ################################################################################
 class HugepagesClass(InfoGroup):
+    '''Class to read information about one size of hugepages'''
     def __init__(self, size, extended=False, anon=False):
         name = "Hugepages-{}".format(size)
         super(HugepagesClass, self).__init__(name=name, extended=extended, anon=anon)
@@ -1237,6 +1247,7 @@ class HugepagesClass(InfoGroup):
                      }
 
 class Hugepages(PathMatchInfoGroup):
+    '''Class to spawn subclasses for all hugepages sizes (/sys/kernel/mm/hugepages/hugepages-*)'''
     def __init__(self, extended=False, anon=False):
         super(Hugepages, self).__init__(extended=extended, anon=anon)
         self.name = "Hugepages"
@@ -1248,6 +1259,7 @@ class Hugepages(PathMatchInfoGroup):
 # Infos about compilers (C, C++ and Fortran)
 ################################################################################
 class CompilerInfoClass(InfoGroup):
+    '''Class to read version and path of a given executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(CompilerInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = executable
@@ -1257,6 +1269,7 @@ class CompilerInfoClass(InfoGroup):
 
 
 class CCompilerInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various C compilers'''
     def __init__(self, extended=False, anon=False):
         super(CCompilerInfo, self).__init__(name="C", extended=extended, anon=anon)
         self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
@@ -1269,6 +1282,7 @@ class CCompilerInfo(ListInfoGroup):
 
 
 class CPlusCompilerInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various C++ compilers'''
     def __init__(self, extended=False, anon=False):
         super(CPlusCompilerInfo, self).__init__(name="C++", extended=extended, anon=anon)
         self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++"]
@@ -1281,6 +1295,7 @@ class CPlusCompilerInfo(ListInfoGroup):
 
 
 class FortranCompilerInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various Fortran compilers'''
     def __init__(self, extended=False, anon=False):
         super(FortranCompilerInfo, self).__init__(name="Fortran", extended=extended, anon=anon)
         self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort"]
@@ -1293,6 +1308,7 @@ class FortranCompilerInfo(ListInfoGroup):
 
 
 class CompilerInfo(MultiClassInfoGroup):
+    '''Class to spawn subclasses for various compilers'''
     def __init__(self, extended=False, anon=False):
         super(CompilerInfo, self).__init__(name="CompilerInfo", extended=extended, anon=anon)
         self.classlist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo]
@@ -1302,6 +1318,7 @@ class CompilerInfo(MultiClassInfoGroup):
 # Infos about Python interpreters
 ################################################################################
 class PythonInfoClass(InfoGroup):
+    '''Class to read information about a Python executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(PythonInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = executable
@@ -1312,6 +1329,7 @@ class PythonInfoClass(InfoGroup):
         self.required4equal.append("Version")
 
 class PythonInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various Python commands'''
     def __init__(self, extended=False, anon=False):
         super(PythonInfo, self).__init__(name="PythonInfo", extended=extended, anon=anon)
         self.interpreters = ["python2", "python3", "python"]
@@ -1322,6 +1340,7 @@ class PythonInfo(ListInfoGroup):
 # Infos about MPI libraries
 ################################################################################
 class MpiInfoClass(InfoGroup):
+    '''Class to read information about an MPI or job scheduler executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(MpiInfoClass, self).__init__(name=executable, extended=extended, anon=anon)
         self.commands = {"Version" : (executable, "--version", r"(.+)", MpiInfoClass.mpiversion),
@@ -1353,6 +1372,7 @@ class MpiInfoClass(InfoGroup):
                 return "{}.{}".format(mat.group(1), mat.group(2))
 
 class MpiInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various MPI/job scheduler commands'''
     def __init__(self, extended=False, anon=False):
         super(MpiInfo, self).__init__(name="MpiInfo", extended=extended)
         self.mpilist = ["mpiexec", "mpiexec.hydra", "mpirun", "srun", "aprun"]
@@ -1364,6 +1384,7 @@ class MpiInfo(ListInfoGroup):
 # Infos about environ variables
 ################################################################################
 class ShellEnvironment(InfoGroup):
+    '''Class to read the shell environment (os.environ)'''
     def __init__(self, extended=False, anon=False):
         super(ShellEnvironment, self).__init__(extended=extended, anon=anon)
         self.name = "ShellEnvironment"
@@ -1392,6 +1413,7 @@ class ShellEnvironment(InfoGroup):
 # Infos about CPU prefetchers (LIKWID only)
 ################################################################################
 class PrefetcherInfoClass(InfoGroup):
+    '''Class to read prefetcher settings for one HW thread (uses the likwid-features command)'''
     def __init__(self, ident, extended=False, anon=False, likwid_base=None):
         super(PrefetcherInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = "Cpu{}".format(ident)
@@ -1406,6 +1428,7 @@ class PrefetcherInfoClass(InfoGroup):
         self.required4equal = names
 
 class PrefetcherInfo(PathMatchInfoGroup):
+    '''Class to spawn subclasses for all HW threads returned by likwid-features'''
     def __init__(self, extended=False, anon=False, likwid_base=None):
         super(PrefetcherInfo, self).__init__(name="PrefetcherInfo", extended=extended, anon=anon)
         cmd = "likwid-features"
@@ -1426,6 +1449,9 @@ class PrefetcherInfo(PathMatchInfoGroup):
 # Infos about the turbo frequencies (LIKWID only)
 ################################################################################
 class TurboInfo(InfoGroup):
+    '''Class to read information about CPU/Uncore frequencies and perf-energy-bias
+    (uses the likwid-powermeter command)
+    '''
     def __init__(self, extended=False, anon=False, likwid_base=None):
         super(TurboInfo, self).__init__(name="TurboInfo", extended=extended, anon=anon)
         cmd = "likwid-powermeter"
@@ -1467,6 +1493,7 @@ class TurboInfo(InfoGroup):
 # Infos about the clock sources provided by the kernel
 ################################################################################
 class ClocksourceInfoClass(InfoGroup):
+    '''Class to read information for one clocksource device'''
     def __init__(self, ident, extended=False, anon=False):
         super(ClocksourceInfoClass, self).__init__(anon=anon, extended=extended)
         self.name = "Clocksource{}".format(ident)
@@ -1477,6 +1504,9 @@ class ClocksourceInfoClass(InfoGroup):
         self.required4equal = ["Current"]
 
 class ClocksourceInfo(PathMatchInfoGroup):
+    '''Class to spawn subclasses for all clocksourse devices
+    /sys/devices/system/clocksource/clocksource*
+    '''
     def __init__(self, extended=False, anon=False):
         super(ClocksourceInfo, self).__init__(anon=anon, extended=extended)
         self.name = "ClocksourceInfo"
@@ -1488,6 +1518,7 @@ class ClocksourceInfo(PathMatchInfoGroup):
 # Infos about the executable (if given on cmdline)
 ################################################################################
 class ExecutableInfoExec(InfoGroup):
+    '''Class to read basic information of given executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(ExecutableInfoExec, self).__init__(anon=anon, extended=extended)
         self.name = "ExecutableInfo"
@@ -1508,6 +1539,7 @@ class ExecutableInfoExec(InfoGroup):
         return hash_md5.hexdigest()
 
 class ExecutableInfoLibraries(InfoGroup):
+    '''Class to read all libraries linked with given executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(ExecutableInfoLibraries, self).__init__(anon=anon, extended=extended)
         self.name = "LinkedLibraries"
@@ -1534,6 +1566,7 @@ class ExecutableInfoLibraries(InfoGroup):
         self._data = libdict
 
 class ExecutableInfo(MultiClassInfoGroup):
+    '''Class to spawn subclasses for analyzing a given executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(ExecutableInfo, self).__init__(extended=extended, anon=anon)
         self.name = "ExecutableInfo"
@@ -1546,6 +1579,7 @@ class ExecutableInfo(MultiClassInfoGroup):
 # Infos about the temperature using coretemp
 ################################################################################
 class CoretempInfoHwmonClassX86(InfoGroup):
+    '''Class to read information for one X86 coretemps sensor inside one hwmon entry and device'''
     def __init__(self, sensor, extended=False, anon=False, socket=0, hwmon=0):
         super(CoretempInfoHwmonClassX86, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
@@ -1557,6 +1591,7 @@ class CoretempInfoHwmonClassX86(InfoGroup):
             self.files["Max"] = (pjoin(base, "temp{}_max".format(sensor)), r"(\d+)", int)
 
 class CoretempInfoHwmonX86(PathMatchInfoGroup):
+    '''Class to spawn subclasses for one hwmon entry inside a X86 coretemps device'''
     def __init__(self, hwmon, extended=False, anon=False, socket=0):
         super(CoretempInfoHwmonX86, self).__init__(extended=extended, anon=anon)
         self.name = "Hwmon{}".format(hwmon)
@@ -1567,6 +1602,7 @@ class CoretempInfoHwmonX86(PathMatchInfoGroup):
         self.match = r".*/temp(\d+)_label$"
 
 class CoretempInfoSocketX86(PathMatchInfoGroup):
+    '''Class to spawn subclasses for one X86 coretemps device'''
     def __init__(self, socket, extended=False, anon=False):
         super(CoretempInfoSocketX86, self).__init__(extended=extended, anon=anon)
         self.name = "Package{}".format(socket)
@@ -1577,6 +1613,7 @@ class CoretempInfoSocketX86(PathMatchInfoGroup):
         self.match = r".*/hwmon(\d+)$"
 
 class CoretempInfoHwmonClassARM(InfoGroup):
+    '''Class to read information for one ARM coretemps sensor inside one hwmon entry'''
     def __init__(self, sensor, extended=False, anon=False, hwmon=0):
         super(CoretempInfoHwmonClassARM, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/hwmon/hwmon{}".format(hwmon)
@@ -1586,6 +1623,7 @@ class CoretempInfoHwmonClassARM(InfoGroup):
             self.files["Critical"] = (pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
 
 class CoretempInfoSocketARM(PathMatchInfoGroup):
+    '''Class to spawn subclasses for ARM coretemps for one hwmon entry'''
     def __init__(self, hwmon, extended=False, anon=False):
         super(CoretempInfoSocketARM, self).__init__(extended=extended, anon=anon)
         self.name = "Hwmon{}".format(hwmon)
@@ -1595,6 +1633,10 @@ class CoretempInfoSocketARM(PathMatchInfoGroup):
         self.subargs = {"hwmon" : hwmon}
 
 class CoretempInfo(PathMatchInfoGroup):
+    '''Class to spawn subclasses to get all information for coretemps
+    X86 path: /sys/devices/platform/coretemp.*
+    ARM64 path: /sys/devices/virtual/hwmon/hwmon*
+    '''
     def __init__(self, extended=False, anon=False):
         super(CoretempInfo, self).__init__(name="CoretempInfo", extended=extended, anon=anon)
         machine = platform.machine()
@@ -1612,6 +1654,7 @@ class CoretempInfo(PathMatchInfoGroup):
 # Infos about the BIOS
 ################################################################################
 class BiosInfo(InfoGroup):
+    '''Class to read BIOS information (/sys/devices/virtual/dmi/id)'''
     def __init__(self, extended=False, anon=False):
         super(BiosInfo, self).__init__(name="BiosInfo", extended=extended, anon=anon)
         base = "/sys/devices/virtual/dmi/id"
@@ -1629,6 +1672,7 @@ class BiosInfo(InfoGroup):
 # Infos about the thermal zones
 ################################################################################
 class ThermalZoneInfoClass(InfoGroup):
+    '''Class to read information for one thermal zone'''
     def __init__(self, zone, extended=False, anon=False):
         name = "ThermalZone{}".format(zone)
         super(ThermalZoneInfoClass, self).__init__(name=name, extended=extended, anon=anon)
@@ -1644,6 +1688,7 @@ class ThermalZoneInfoClass(InfoGroup):
             self.files["Type"] = (pjoin(base, "type"), r"(.+)")
 
 class ThermalZoneInfo(PathMatchInfoGroup):
+    '''Class to read information for thermal zones (/sys/devices/virtual/thermal/thermal_zone*)'''
     def __init__(self, extended=False, anon=False):
         super(ThermalZoneInfo, self).__init__(name="ThermalZoneInfo", extended=extended, anon=anon)
         self.searchpath = "/sys/devices/virtual/thermal/thermal_zone*"
@@ -1654,6 +1699,7 @@ class ThermalZoneInfo(PathMatchInfoGroup):
 # Infos about CPU vulnerabilities
 ################################################################################
 class VulnerabilitiesInfo(InfoGroup):
+    '''Class to read vulnerabilities information (/sys/devices/system/cpu/vulnerabilities)'''
     def __init__(self, extended=False, anon=False):
         super(VulnerabilitiesInfo, self).__init__(extended=extended, anon=anon)
         self.name = "VulnerabilitiesInfo"
@@ -1667,6 +1713,7 @@ class VulnerabilitiesInfo(InfoGroup):
 # Infos about logged in users (only count to avoid logging user names)
 ################################################################################
 class UsersInfo(InfoGroup):
+    '''Class to get count of logged in users. Does not print out the usernames'''
     def __init__(self, extended=False, anon=False):
         super(UsersInfo, self).__init__(name="UsersInfo", extended=extended, anon=anon)
         self.commands["LoggedIn"] = ("users", "", r"(.*)", UsersInfo.countusers)
@@ -1680,6 +1727,10 @@ class UsersInfo(InfoGroup):
 # Infos from the dmidecode file (if DMIDECODE_FILE is available)
 ################################################################################
 class DmiDecodeFile(InfoGroup):
+    '''Class to read the content of a file containing the output of the dmidecode command which is
+    commonly only usable with sufficient permissions. If a system administrator has dumped the
+    content to a user readable file, this class includes the file.
+    '''
     def __init__(self, dmifile, extended=False, anon=False):
         super(DmiDecodeFile, self).__init__(name="DmiDecodeFile", extended=extended, anon=anon)
         if pexists(dmifile):
@@ -1691,6 +1742,9 @@ class DmiDecodeFile(InfoGroup):
 # If not available, use LIKWID (if allowed)
 ################################################################################
 class CpuAffinity(InfoGroup):
+    '''Class to read information the CPU affinity for the session using Python's
+    os.get_schedaffinity or likwid-pin if available
+    '''
     def __init__(self, extended=False, anon=False):
         super(CpuAffinity, self).__init__(name="CpuAffinity", extended=extended, anon=anon)
         if "get_schedaffinity" in dir(os):
@@ -1705,6 +1759,7 @@ class CpuAffinity(InfoGroup):
 # Infos about loaded modules in the modules system
 ################################################################################
 class ModulesInfo(InfoGroup):
+    '''Class to read information from the modules system'''
     def __init__(self, extended=False, anon=False):
         super(ModulesInfo, self).__init__(name="ModulesInfo", extended=extended, anon=anon)
         parse = ModulesInfo.parsemodules
@@ -1722,6 +1777,7 @@ class ModulesInfo(InfoGroup):
 # Infos about InfiniBand adapters
 ################################################################################
 class InfinibandInfoClassPort(InfoGroup):
+    '''Class to read the information of a single port of an InfiniBand/OmniPath driver.'''
     def __init__(self, port, extended=False, anon=False, driver=""):
         super(InfinibandInfoClassPort, self).__init__(extended=extended, anon=anon)
         self.name = "Port{}".format(port)
@@ -1732,6 +1788,7 @@ class InfinibandInfoClassPort(InfoGroup):
 
 
 class InfinibandInfoClass(PathMatchInfoGroup):
+    '''Class to read the information of an InfiniBand/OmniPath driver.'''
     def __init__(self, driver, extended=False, anon=False):
         super(InfinibandInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = driver
@@ -1751,6 +1808,7 @@ class InfinibandInfoClass(PathMatchInfoGroup):
         self.subargs = {"driver" : driver}
 
 class InfinibandInfo(PathMatchInfoGroup):
+    '''Class to read InfiniBand/OmniPath (/sys/class/infiniband).'''
     def __init__(self, extended=False, anon=False):
         super(InfinibandInfo, self).__init__(extended=extended, anon=anon)
         self.name = "InfinibandInfo"
@@ -1763,6 +1821,7 @@ class InfinibandInfo(PathMatchInfoGroup):
 # Infos from nvidia-smi (Nvidia GPUs)
 ################################################################################
 class NvidiaSmiInfoClass(InfoGroup):
+    '''Class to read information for one Nvidia GPU (uses the nvidia-smi command)'''
     def __init__(self, device, extended=False, anon=False):
         super(NvidiaSmiInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = "Card{}".format(device)
@@ -1788,6 +1847,7 @@ class NvidiaSmiInfoClass(InfoGroup):
                     self.commands[key] = (self.cmd, self.cmd_opts, regex)
 
 class NvidiaSmiInfo(ListInfoGroup):
+    '''Class to spawn subclasses for each NVIDIA GPU device (uses the nvidia-smi command)'''
     def __init__(self, extended=False, anon=False):
         super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo", extended=extended, anon=anon)
         self.cmd = "nvidia-smi"
@@ -1810,6 +1870,7 @@ class NvidiaSmiInfo(ListInfoGroup):
 # Infos from veosinfo (NEC Tsubasa)
 ################################################################################
 class NecTsubasaInfoTemps(InfoGroup):
+    '''Class to read temperature information for one NEC Tsubasa device (uses the vecmd command)'''
     def __init__(self, tempkeys, ve_base="", extended=False, anon=False, device=0):
         super(NecTsubasaInfoTemps, self).__init__(extended=extended, anon=anon)
         self.name = "Temperatures"
@@ -1819,6 +1880,7 @@ class NecTsubasaInfoTemps(InfoGroup):
             self.commands[tempkey] = (vecmd, veargs, r"\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
 
 class NecTsubasaInfoClass(InfoGroup):
+    '''Class to read information for one NEC Tsubasa device (uses the vecmd command)'''
     def __init__(self, device, ve_base="", extended=False, anon=False):
         super(NecTsubasaInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = "Card{}".format(device)
@@ -1849,6 +1911,7 @@ class NecTsubasaInfoClass(InfoGroup):
 
 
 class NecTsubasaInfo(ListInfoGroup):
+    '''Class to spawn subclasses for each NEC Tsubasa device (uses the vecmd command)'''
     def __init__(self, ve_base="", extended=False, anon=False):
         super(NecTsubasaInfo, self).__init__(name="NecTsubasaInfo", extended=extended, anon=anon)
         vecmd = pjoin(ve_base, "vecmd")

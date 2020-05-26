@@ -175,7 +175,7 @@ def process_file(args):
     data = None
     fname, *matchconvert = args
     try:
-        filefp = fopen(fname)
+        filefp = open(fname, "rb")
     except:
         return data
     else:
@@ -717,20 +717,22 @@ class HostInfo(InfoGroup):
 class CpuInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anon=anon)
-        if platform.machine() in ["x86_64", "i386"]:
+        march = platform.machine()
+        self.constants = {"MachineType" : march}
+        if march in ["x86_64", "i386"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
                           "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
                           "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
                           "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
                          }
-        elif platform.machine() in ["aarch64"]:
+        elif march in ["aarch64"]:
             self.files["Vendor"] = ("/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
             self.files["Family"] = ("/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
             self.files["Model"] = ("/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
             self.files["Stepping"] = ("/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
             self.files["Variant"] = ("/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
-        elif platform.machine() in ["ppc64le", "ppc64"]:
+        elif march in ["ppc64le", "ppc64"]:
             self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
                           "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
                           "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
@@ -742,12 +744,12 @@ class CpuInfo(InfoGroup):
             self.files["SMT"] = ("/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
             self.required4equal.append("SMT")
         if extended:
-            if platform.machine() in ["x86_64", "i386"]:
+            if march in ["x86_64", "i386"]:
                 self.files["Flags"] = ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
                 self.files["Microcode"] = ("/proc/cpuinfo", r"microcode\s+:\s(.+)")
                 self.files["Bugs"] = ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
                 self.required4equal.append("Microcode")
-            elif platform.machine() in ["aarch64"]:
+            elif march in ["aarch64"]:
                 self.files["Flags"] = ("/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
 
 
@@ -816,31 +818,31 @@ class CpuFrequency(PathMatchInfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CpuFrequency, self).__init__(extended=extended, anon=anon)
         self.name = "CpuFrequency"
-        if pexists("/sys/devices/system/cpu/cpu0/cpufreq"):
+        base = "/sys/devices/system/cpu/cpu0/cpufreq"
+        if pexists(base):
             self.searchpath = "/sys/devices/system/cpu/cpu*"
             self.match = r".*/cpu(\d+)$"
             self.subclass = CpuFrequencyClass
-        if extended:
-            base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(0)
-            if pexists(pjoin(base, "cpuinfo_transition_latency")):
-                fname = pjoin(base, "cpuinfo_transition_latency")
-                self.files["TransitionLatency"] = (fname, r"(\d+)", int)
-            if pexists(pjoin(base, "cpuinfo_max_freq")):
-                self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
-            if pexists(pjoin(base, "cpuinfo_min_freq")):
-                self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", int)
-            if pexists(pjoin(base, "scaling_driver")):
-                self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
-            if pexists(pjoin(base, "scaling_available_frequencies")):
-                fname = pjoin(base, "scaling_available_frequencies")
-                self.files["AvailFrequencies"] = (fname, r"(.*)", tointlist)
-            if pexists(pjoin(base, "scaling_available_governors")):
-                fname = pjoin(base, "scaling_available_governors")
-                self.files["AvailGovernors"] = (fname, r"(.*)", tostrlist)
-            if pexists(pjoin(base, "energy_performance_available_preferences")):
-                fname = pjoin(base, "energy_performance_available_preferences")
-                self.files["AvailEnergyPerfPreferences"] = (fname, r"(.*)", tostrlist)
-        self.required4equal = ["Driver"]
+            if extended:
+                if pexists(pjoin(base, "cpuinfo_transition_latency")):
+                    fname = pjoin(base, "cpuinfo_transition_latency")
+                    self.files["TransitionLatency"] = (fname, r"(\d+)", int)
+                if pexists(pjoin(base, "cpuinfo_max_freq")):
+                    self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
+                if pexists(pjoin(base, "cpuinfo_min_freq")):
+                    self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", int)
+                if pexists(pjoin(base, "scaling_driver")):
+                    self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
+                if pexists(pjoin(base, "scaling_available_frequencies")):
+                    fname = pjoin(base, "scaling_available_frequencies")
+                    self.files["AvailFrequencies"] = (fname, r"(.*)", tointlist)
+                if pexists(pjoin(base, "scaling_available_governors")):
+                    fname = pjoin(base, "scaling_available_governors")
+                    self.files["AvailGovernors"] = (fname, r"(.*)", tostrlist)
+                if pexists(pjoin(base, "energy_performance_available_preferences")):
+                    fname = pjoin(base, "energy_performance_available_preferences")
+                    self.files["AvailEnergyPerfPreferences"] = (fname, r"(.*)", tostrlist)
+            self.required4equal = ["Driver"]
 
 ################################################################################
 # NUMA Topology

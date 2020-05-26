@@ -1,0 +1,19 @@
+os: linux
+dist: xenial
+language: python
+python:
+- '3.5'
+- '3.6'
+
+before_install:
+- pip install codecov
+- pip install requests
+install:
+- pip install -e .
+script:
+- coverage run -p tests/all_tests.py
+- coverage run -p `which machinestate`
+after_success:
+- coverage combine
+- codecov
+cache: pip

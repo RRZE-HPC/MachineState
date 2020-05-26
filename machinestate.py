@@ -85,17 +85,15 @@ ENCODING = getpreferredencoding()
 # Helper functions
 ################################################################################
 
-# TODO switch to shutil.which
-
-def get_abspath(cmd):
-    '''Returns absoulte path of executable using the which command.'''
-    data = ""
-    try:
-        rawdata = check_output("which {}; exit 0".format(cmd), stderr=DEVNULL, shell=True)
-        data = rawdata.decode(ENCODING).strip()
-    except:
-        raise Exception("Cannot expand filepath of '{}'".format(cmd))
-    return data
+def fopen(filename):
+    if filename and pexists(filename) and os.path.isfile(filename):
+        try:
+            filefp = open(filename, "rb")
+        except PermissionError:
+            return None
+        except BaseException as exce:
+            raise exce
+        return filefp
 
 ################################################################################
 # Parser Functions used in multiple places. If a parser function is used only
@@ -139,16 +137,6 @@ def totitle(value):
     r'''Returns titleized split (string.title()) with _ and whitespaces removed.'''
     return value.title().replace("_", "").replace(" ", "")
 
-def fopen(filename):
-    if filename and pexists(filename) and os.path.isfile(filename):
-        try:
-            filefp = open(filename, "rb")
-        except PermissionError:
-            return None
-        except BaseException as exce:
-            raise exce
-        return filefp
-
 ################################################################################
 # Processing functions for single entries in class attributes files and commands
 # TODO: Write function that processes all entries for a single file/cmd to
@@ -174,24 +162,20 @@ def match_data(data, regex_str):
 def process_file(args):
     data = None
     fname, *matchconvert = args
-    try:
-        filefp = open(fname, "rb")
-    except:
-        return data
-    else:
-        with filefp:
-            data = filefp.read().decode(ENCODING).strip()
-            if matchconvert:
-                fmatch, *convert = matchconvert
-                if fmatch:
-                    data = match_data(data, fmatch)
-                if convert:
-                    fconvert, = convert
-                    if fconvert:
-                        try:
-                            data = fconvert(data)
-                        except BaseException:
-                            pass
+    filefp = fopen(fname)
+    with filefp:
+        data = filefp.read().decode(ENCODING).strip()
+        if matchconvert:
+            fmatch, *convert = matchconvert
+            if fmatch:
+                data = match_data(data, fmatch)
+            if convert:
+                fconvert, = convert
+                if fconvert:
+                    try:
+                        data = fconvert(data)
+                    except BaseException:
+                        pass
     return data
 
 def process_cmd(args):
@@ -368,14 +352,9 @@ class InfoGroup:
         tcase = TestCase()
         if isinstance(other, str):
             if pexists(other):
-                try:
-                    jsonfp = open(other)
-                except BaseException as exce:
-                    print(exce)
-                    sys.exit(1)
-                else:
-                    with jsonfp:
-                        other = json.load(jsonfp)
+                jsonfp = fopen(other)
+                with jsonfp:
+                    other = json.loads(jsonfp.read().decode(ENCODING))
             else:
                 other = json.loads(other)
 
@@ -772,7 +751,8 @@ class CpuTopologyClass(InfoGroup):
     @staticmethod
     def getthreadid(hwthread):
         base = "/sys/devices/system/cpu/cpu{}/topology/thread_siblings_list".format(hwthread)
-        with open(base, "rb") as outfp:
+        outfp = fopen(base)
+        with outfp:
             tid = 0
             data = outfp.read().decode(ENCODING).strip()
             dlist = data.split(",")
@@ -828,28 +808,20 @@ class CpuTopology(PathMatchInfoGroup):
             return len(glist)
         return 0
     def getsmtwidth():
-        try:
-            filefp = open("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list", "rb")
-        except:
-            pass
-        else:
-            with filefp:
-                data = filefp.read().decode(ENCODING).strip()
-                return len(re.split(r",", data))
+        filefp = fopen("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
+        with filefp:
+            data = filefp.read().decode(ENCODING).strip()
+            return len(re.split(r",", data))
         return 1
     def getnumpackages():
         flist = glob("/sys/devices/system/cpu/cpu*/topology/physical_package_id")
         plist = []
         for fname in flist:
-            try:
-                filefp = open(fname, "rb")
-            except:
-                pass
-            else:
-                with filefp:
-                    data = filefp.read().decode(ENCODING).strip()
-                    if data not in plist:
-                        plist.append(data)
+            filefp = fopen(fname)
+            with filefp:
+                data = filefp.read().decode(ENCODING).strip()
+                if data not in plist:
+                    plist.append(data)
         if len(plist) > 0:
             return len(plist)
         return 1
@@ -857,15 +829,11 @@ class CpuTopology(PathMatchInfoGroup):
         flist = glob("/sys/devices/system/cpu/cpu*/topology/core_id")
         plist = []
         for fname in flist:
-            try:
-                filefp = open(fname, "rb")
-            except:
-                pass
-            else:
-                with filefp:
-                    data = filefp.read().decode(ENCODING).strip()
-                    if data not in plist:
-                        plist.append(data)
+            filefp = fopen(fname)
+            with filefp:
+                data = filefp.read().decode(ENCODING).strip()
+                if data not in plist:
+                    plist.append(data)
         return len(plist)
 
 ################################################################################
@@ -1000,17 +968,13 @@ class CacheTopologyClass(InfoGroup):
         cpath = "cache/index{}/shared_cpu_list".format(arg)
         for cpu in cpus:
             path = pjoin("/sys/devices/system/cpu/cpu{}".format(cpu), cpath)
-            try:
-                filefp = open(path, "rb")
-            except:
-                pass
-            else:
-                with filefp:
-                    data = filefp.read().decode(ENCODING).strip()
-                    clist = tointlist(data)
-                    if str(clist) not in slist:
-                        cpulist.append(clist)
-                        slist.append(str(clist))
+            filefp = fopen(path)
+            with filefp:
+                data = filefp.read().decode(ENCODING).strip()
+                clist = tointlist(data)
+                if str(clist) not in slist:
+                    cpulist.append(clist)
+                    slist.append(str(clist))
         return cpulist
 
     def update(self):
@@ -1163,7 +1127,8 @@ class PowercapInfoConstraintClass(InfoGroup):
         super(PowercapInfoConstraintClass, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
         self.name = "Constraint{}".format(ident)
-        with open(pjoin(base, "constraint_{}_name".format(ident)), "rb") as fptr:
+        fptr = fopen(pjoin(base, "constraint_{}_name".format(ident)))
+        with fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         if domain >= 0:
             base = pjoin(base, "intel-rapl:{}:{}".format(package, domain))
@@ -1181,7 +1146,8 @@ class PowercapInfoClass(PathMatchInfoGroup):
         super(PowercapInfoClass, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl"
         base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(package, package, ident))
-        with open(pjoin(base, "name"), "rb") as fptr:
+        fptr = fopen(pjoin(base, "name".format(ident)))
+        with fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
         self.searchpath = pjoin(base, "constraint_*_name")
@@ -1209,7 +1175,8 @@ class PowercapInfoPackage(PathMatchInfoGroup):
     def __init__(self, package, extended=False, anon=False):
         super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
-        with open(pjoin(base, "name"), "rb") as fptr:
+        fptr = fopen(pjoin(base, "name".format(ident)))
+        with fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
         self.searchpath = pjoin(base, "intel-rapl:{}:*".format(package))
         self.match = r".*/intel-rapl\:\d+:(\d+)"
@@ -1264,7 +1231,9 @@ class CompilerInfoClass(InfoGroup):
         super(CompilerInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = executable
         self.commands = {"Version" : (executable, "--version", r"(\d+\.\d+\.\d+)")}
-        self.constants["Path"] = get_abspath(executable)
+        abscmd = which(executable)
+        if abscmd and len(abscmd) > 0
+            self.constants["Path"] = abscmd
         self.required4equal.append("Version")
 
 
@@ -1348,7 +1317,7 @@ class MpiInfoClass(InfoGroup):
                         }
         abscmd = which(executable)
         if abscmd and len(abscmd) > 0:
-            self.constants["Path"] = get_abspath(executable)
+            self.constants["Path"] = abscmd
         self.required4equal = ["Version", "Implementor"]
 
     @staticmethod
@@ -1377,7 +1346,7 @@ class MpiInfo(ListInfoGroup):
         super(MpiInfo, self).__init__(name="MpiInfo", extended=extended)
         self.mpilist = ["mpiexec", "mpiexec.hydra", "mpirun", "srun", "aprun"]
         self.subclass = MpiInfoClass
-        self.userlist = [m for m in self.mpilist if len(get_abspath(m)) > 0]
+        self.userlist = [m for m in self.mpilist if which(m)]
 
 
 ################################################################################
@@ -1523,12 +1492,14 @@ class ExecutableInfoExec(InfoGroup):
         super(ExecutableInfoExec, self).__init__(anon=anon, extended=extended)
         self.name = "ExecutableInfo"
         self.executable = executable
-        abspath = get_abspath(self.executable)
-        self.constants = {"Name" : str(self.executable),
-                          "Abspath" : abspath,
-                          "Size" : psize(abspath)}
-        if extended:
-            self.constants["MD5sum"] = ExecutableInfoExec.getmd5sum(abspath)
+
+        abscmd = which(self.executable)
+        self.constants["Name"] = str(self.executable)
+        if abscmd and len(abscmd) > 0:
+            self.constants["Abspath"] = abscmd
+            self.constants["Size"] = psize(abscmd)
+            if extended:
+                self.constants["MD5sum"] = ExecutableInfoExec.getmd5sum(abscmd)
         self.required4equal = self.constants.keys()
     @staticmethod
     def getmd5sum(filename):
@@ -1543,26 +1514,28 @@ class ExecutableInfoLibraries(InfoGroup):
     def __init__(self, executable, extended=False, anon=False):
         super(ExecutableInfoLibraries, self).__init__(anon=anon, extended=extended)
         self.name = "LinkedLibraries"
-        self.executable = get_abspath(executable)
-        self.ldd = "ldd {}; exit 0".format(self.executable)
+        self.executable = which(executable)
+        if self.executable and len(self.executable) > 0:
+            self.ldd = "ldd {}; exit 0".format(self.executable)
     def update(self):
         libdict = {}
-        rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
-        data = rawdata.decode(ENCODING)
-        libregex = re.compile(r"\s*([^\s]+)\s+.*")
-        pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
-        for line in data.split("\n"):
-            libmat = libregex.search(line)
-            if libmat:
-                lib = libmat.group(1)
-                pathmat = pathregex.search(line)
-                if pathmat:
-                    libdict.update({lib : pathmat.group(1)})
-                elif pexists(lib):
-                    libdict.update({lib : lib})
-                else:
-                    libdict.update({lib : None})
-        self.required4equal = libdict.keys()
+            if self.ldd:
+            rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
+            data = rawdata.decode(ENCODING)
+            libregex = re.compile(r"\s*([^\s]+)\s+.*")
+            pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
+            for line in data.split("\n"):
+                libmat = libregex.search(line)
+                if libmat:
+                    lib = libmat.group(1)
+                    pathmat = pathregex.search(line)
+                    if pathmat:
+                        libdict.update({lib : pathmat.group(1)})
+                    elif pexists(lib):
+                        libdict.update({lib : lib})
+                    else:
+                        libdict.update({lib : None})
+            self.required4equal = libdict.keys()
         self._data = libdict
 
 class ExecutableInfo(MultiClassInfoGroup):
@@ -1765,8 +1738,9 @@ class ModulesInfo(InfoGroup):
         parse = ModulesInfo.parsemodules
         cmd_opts = "{} sh list -t 2>&1".format(MODULECMD_TCL_PATH)
         cmd = "tclsh"
-        if len(get_abspath(cmd)) > 0 and pexists(MODULECMD_TCL_PATH):
-            self.commands["Loaded"] = (cmd, cmd_opts, None, parse)
+        abscmd = which(cmd)
+        if abscmd and len(abscmd) > 0 and pexists(MODULECMD_TCL_PATH):
+            self.commands["Loaded"] = (abscmd, cmd_opts, None, parse)
             self.required4equal.append("Loaded")
     @staticmethod
     def parsemodules(value):

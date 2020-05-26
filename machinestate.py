@@ -793,7 +793,80 @@ class CpuTopology(PathMatchInfoGroup):
         self.searchpath = "/sys/devices/system/cpu/cpu*"
         self.match = r".*/cpu(\d+)$"
         self.subclass = CpuTopologyClass
+        self.constants["NumHWThreads"] = CpuTopology.getnumcpus()
+        self.constants["NumNUMANodes"] = CpuTopology.getnumnumanodes()
+        self.constants["SMTWidth"] = CpuTopology.getsmtwidth()
+        self.constants["NumSockets"] = CpuTopology.getnumpackages()
+        self.constants["NumCores"] = CpuTopology.getnumcores()
 
+    @staticmethod
+    def getnumcpus():
+        searchpath = "/sys/devices/system/cpu/cpu*"
+        match = r".*/cpu(\d+)$"
+        if searchpath and match and pexists(os.path.dirname(searchpath)):
+            mat = re.compile(match)
+            base = searchpath
+            glist = []
+            try:
+                glist += sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
+            except ValueError:
+                glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
+            return len(glist)
+        return 0
+    @staticmethod
+    def getnumnumanodes():
+        searchpath = "/sys/devices/system/node/node*"
+        match = r".*/node(\d+)$"
+        if searchpath and match and pexists(os.path.dirname(searchpath)):
+            mat = re.compile(match)
+            base = searchpath
+            glist = []
+            try:
+                glist += sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
+            except ValueError:
+                glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
+            return len(glist)
+        return 0
+    def getsmtwidth():
+        try:
+            filefp = open("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list", "rb")
+        except:
+            pass
+        else:
+            with filefp:
+                data = filefp.read().decode(ENCODING).strip()
+                return len(re.split(r",", data))
+        return 1
+    def getnumpackages():
+        flist = glob("/sys/devices/system/cpu/cpu*/topology/physical_package_id")
+        plist = []
+        for fname in flist:
+            try:
+                filefp = open(fname, "rb")
+            except:
+                pass
+            else:
+                with filefp:
+                    data = filefp.read().decode(ENCODING).strip()
+                    if data not in plist:
+                        plist.append(data)
+        if len(plist) > 0:
+            return len(plist)
+        return 1
+    def getnumcores():
+        flist = glob("/sys/devices/system/cpu/cpu*/topology/core_id")
+        plist = []
+        for fname in flist:
+            try:
+                filefp = open(fname, "rb")
+            except:
+                pass
+            else:
+                with filefp:
+                    data = filefp.read().decode(ENCODING).strip()
+                    if data not in plist:
+                        plist.append(data)
+        return len(plist)
 
 ################################################################################
 # CPU Frequency
@@ -1791,7 +1864,7 @@ class NecTsubasaInfo(ListInfoGroup):
 # Skript code
 ################################################################################
 
-def read_cli():
+def read_cli(cliargs):
     desc = 'Reads and outputs system information as JSON document'
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('-e', '--extended', action='store_true', default=False,
@@ -1808,12 +1881,12 @@ def read_cli():
                         help='indention in JSON output (default: 4)')
     parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
-    pargs = vars(parser.parse_args(sys.argv[1:]))
+    pargs = vars(parser.parse_args(cliargs))
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
 def main():
-    cliargs = read_cli()
+    cliargs = read_cli(sys.argv[1:])
     mstate = MachineState(extended=cliargs["extended"],
                           executable=cliargs["executable"],
                           anon=cliargs["anonymous"])
@@ -1834,7 +1907,7 @@ def main():
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-#    n = ThermalZoneInfo(extended=cliargs["extended"])
+#    n = CpuTopology(extended=cliargs["extended"])
 #    n.generate()
 #    n.update()
 #    ndict = n.get()

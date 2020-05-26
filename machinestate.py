@@ -47,6 +47,8 @@ import argparse
 from copy import deepcopy
 from unittest import TestCase
 from shutil import which
+from getpass import getuser
+from grp import getgrgid
 
 ################################################################################
 # Configuration
@@ -199,7 +201,7 @@ def process_cmd(args):
                 cmd_opts, *matchconvert = optsmatchconvert
                 exe = "{} {}; exit 0;".format(cmd, cmd_opts)
                 data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
-                if data and len(data) >= 0:
+                if data and len(data) >= 0 and len(matchconvert) > 0:
                     cmatch, *convert = matchconvert
                     if cmatch:
                         data = match_data(data, cmatch)
@@ -230,10 +232,10 @@ def get_config_file(args):
             fmatch, *convert = matchconvert
             if fmatch:
                 outdict["Regex"] = str(fmatch)
-                if convert:
-                    fconvert, = convert
-                    if fconvert:
-                        outdict["Parser"] = str(fconvert)
+            if convert:
+                fconvert, = convert
+                if fconvert:
+                    outdict["Parser"] = str(fconvert)
     return outdict
 
 def get_config_cmd(args):
@@ -249,10 +251,10 @@ def get_config_cmd(args):
                     cmatch, *convert = matchconvert
                     if cmatch:
                         outdict["Regex"] = str(cmatch)
-                        if convert:
-                            cconvert, = convert
-                            if cconvert:
-                                outdict["Parser"] = str(cconvert)
+                    if convert:
+                        cconvert, = convert
+                        if cconvert:
+                            outdict["Parser"] = str(cconvert)
     return outdict
 
 ################################################################################
@@ -281,9 +283,18 @@ class InfoGroup:
         self.constants = {}
         # Keys in the group that are required to check equality
         self.required4equal = []
-        self.name = name
-        self.extended = extended
-        self.anon = anon
+        if isinstance(name, str):
+            self.name = name
+        else:
+            self.name = None
+        if isinstance(extended, bool):
+            self.extended = extended
+        else:
+            self.extended = False
+        if isinstance(anon, bool):
+            self.anon = anon
+        else:
+            self.anon = False
 
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
@@ -414,10 +425,25 @@ class PathMatchInfoGroup(InfoGroup):
                  subclass=None,
                  subargs={}):
         super(PathMatchInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
-        self.searchpath = searchpath
-        self.match = match
-        self.subclass = subclass
-        self.subargs = subargs
+        self.searchpath = None
+        self.match = None
+        self.subargs = {}
+        self.subclass = None
+
+        if searchpath and isinstance(searchpath, str):
+            if os.path.exists(os.path.basename(searchpath)):
+                self.searchpath = searchpath
+        if match and isinstance(match, str):
+            self.match = match
+
+        if subargs and isinstance(subargs, dict):
+            self.subargs = subargs
+
+        if subclass:
+            if callable(subclass) and type(subclass) == type(InfoGroup):
+                self.subclass = subclass
+
+
     def generate(self):
         glist = []
         if self.searchpath and self.match and self.subclass:
@@ -466,11 +492,20 @@ class ListInfoGroup(InfoGroup):
                  anon=False,
                  userlist=None,
                  subclass=None,
-                 subargs={}):
+                 subargs=None):
         super(ListInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
-        self.userlist = userlist or []
-        self.subclass = subclass
-        self.subargs = subargs
+        self.userlist = []
+        self.subclass = None
+        self.subargs = {}
+
+        if userlist and isinstance(userlist, list):
+            self.userlist = userlist
+        if subargs and isinstance(subargs, dict):
+            self.subargs = subargs
+        if subclass:
+            if callable(subclass) and type(subclass) == type(InfoGroup):
+                self.subclass = subclass
+
     def generate(self):
         if self.userlist and self.subclass:
             for item in self.userlist:
@@ -506,11 +541,28 @@ class MultiClassInfoGroup(InfoGroup):
                  name=None,
                  extended=False,
                  anon=False,
-                 classlist=None,
+                 classlist=[],
                  classargs=[]):
         super(MultiClassInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
-        self.classlist = classlist
-        self.classargs = classargs
+        self.classlist = []
+        self.classargs = []
+        if len(classlist) == len(classargs):
+            if classlist:
+                valid = True
+                for cls in classlist:
+                    if not (callable(cls) and type(cls) == type(InfoGroup)):
+                        valid = False
+                        break
+                if valid:
+                    self.classlist = classlist
+            if classargs:
+                valid = True
+                for cls in classargs:
+                    if not isinstance(cls, dict):
+                        valid = False
+                        break
+                    if valid:
+                        self.classargs = classargs
 
     def generate(self):
         for cltype, clargs in zip(self.classlist, self.classargs):
@@ -1233,8 +1285,22 @@ class ShellEnvironment(InfoGroup):
         super(ShellEnvironment, self).update()
         outdict = {}
         for key in os.environ:
-            outdict.update({key : os.environ[key]})
+            value = os.environ[key]
+            if self.anon:
+                value = ShellEnvironment.anon_shell_var(key, value)
+            outdict.update({key : value})
         self._data.update(outdict)
+    @staticmethod
+    def anon_shell_var(key, value):
+        out = value
+        ipregex = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+        for ipaddr in ipregex.findall(value):
+            out = out.replace(ipaddr, "XXX.XXX.XXX.XXX")
+        out = out.replace(getuser(), "anonuser")
+        for i, group in enumerate(os.getgroups()):
+            gname = getgrgid(group)
+            out = out.replace(gname.gr_name, "group{}".format(i))
+        return out
 
 ################################################################################
 # Infos about CPU prefetchers (LIKWID only)

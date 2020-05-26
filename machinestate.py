@@ -73,6 +73,7 @@ VEOS_BASE = "/opt/nec/ve/bin"
 # Version information
 ################################################################################
 MACHINESTATE_VERSION = "0.1"
+__version__ = MACHINESTATE_VERSION
 
 ################################################################################
 # Constants

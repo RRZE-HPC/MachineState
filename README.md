@@ -6,12 +6,9 @@ current system settings and the execution enviroment.
 
 Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
-`veosinfo`, `modules`) and some basic tools (`hostname`, `users`, ...).
+`vecmd`, `modules`) and some basic tools (`hostname`, `users`, ...).
 
-.. image:: https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master
-    :target: https://travis-ci.org/RRZE-HPC/Artifact-description?branch=master
-.. image:: https://codecov.io/github/RRZE-HPC/Artifact-description/coverage.svg?branch=master
-    :target: https://codecov.io/github/RRZE-HPC/Artifact-description?branch=master
+[![Build Status](https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master)](https://travis-ci.org/RRZE-HPC/Artifact-description) [![Codecov](https://codecov.io/github/RRZE-HPC/Artifact-description/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/Artifact-description?branch=mastern) 
 --------------------------------------------------------------------------------
 Differences between Shell and Python version
 --------------------------------------------------------------------------------

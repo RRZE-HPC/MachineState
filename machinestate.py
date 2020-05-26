@@ -1202,12 +1202,28 @@ class PowercapInfoPackage(PathMatchInfoGroup):
 
 
 class PowercapInfo(PathMatchInfoGroup):
-    '''Class to spawn subclasses for all powercap devices (/sys/devices/virtual/powercap)'''
+    '''Class to spawn subclasses for all powercap devices
+    X86 path: /sys/devices/virtual/powercap
+    POWER path: /sys/firmware/opal/powercap/system-powercap
+    '''
     def __init__(self, extended=False, anon=False):
         super(PowercapInfo, self).__init__(name="PowercapInfo", extended=extended, anon=anon)
-        self.subclass = PowercapInfoPackage
-        self.searchpath = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*"
-        self.match = r".*/intel-rapl\:(\d+)"
+        if platform.machine() in ["x86_64", "i386"]:
+            self.subclass = PowercapInfoPackage
+            self.searchpath = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*"
+            self.match = r".*/intel-rapl\:(\d+)"
+        else:
+            base = "/sys/firmware/opal/powercap/system-powercap"
+            if pexists(base):
+                self.files["PowerLimit"] = (pjoin(base, "powercap-current", r"(\d+)", int))
+                if extended:
+                    self.files["PowerLimitMax"] = (pjoin(base, "powercap-max", r"(\d+)", int))
+                    self.files["PowerLimitMin"] = (pjoin(base, "powercap-min", r"(\d+)", int))
+            base = "/sys/firmware/opal/psr"
+            if pexists(base):
+                for i, fname in enumerate(glob(pjoin(base, "cpu_to_gpu_*"))):
+                    key = "CpuToGpu{}".format(i)
+                    self.files[key] = (fname, r"(\d+)", int)
 
 
 ################################################################################

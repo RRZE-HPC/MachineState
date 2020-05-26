@@ -1,9 +1,5 @@
 os: linux
-dist:
-- xenial
-- trusty
-- precise
-- bionic
+dist: trusty
 arch:
   - amd64
   - ppc64le
@@ -21,7 +17,10 @@ install:
 - pip install -e .
 script:
 - coverage run -p tests/all_tests.py
-- coverage run -p `which machinestate` -e -s
+- coverage run -p `which machinestate` -e -s -i 4 -o output.json
+- coverage run -p `which machinestate` -c
+- coverage run -p `which machinestate` -a
+- coverage run -p `which machinestate` -j output.json
 after_success:
 - coverage combine
 - codecov

@@ -321,7 +321,6 @@ class InfoGroup:
         return json.dumps(outdict, sort_keys=sort, indent=intend)
     def get_config(self):
         outdict = {}
-        #outdict["Name"] = self.name
         selfdict = {}
         selfdict["Type"] = str(self.__class__.__name__)
         selfdict["ClassType"] = "InfoGroup"
@@ -573,6 +572,7 @@ class MultiClassInfoGroup(InfoGroup):
         return arglist
 
 class MachineState(MultiClassInfoGroup):
+    '''Main MachineState Class spawning all configuration specific subclasses'''
     def __init__(self,
                  extended=False,
                  executable=None,
@@ -712,11 +712,11 @@ class CpuInfo(InfoGroup):
             self.files["Stepping"] = ("/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
             self.files["Variant"] = ("/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
         elif march in ["ppc64le", "ppc64"]:
-            self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
-                          "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
-                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
-                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
+            self.files = {"Platform" : ("/proc/cpuinfo", r"platform\s+:\s(.*)"),
+                          "Name" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
+                          "Family" : ("/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*"),
+                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
+                          "Stepping" : ("/proc/cpuinfo", r"revision\s+:\s(.+)"),
                          }
         self.required4equal = ["Vendor", "Family", "Model", "Stepping"]
         if pexists("/sys/devices/system/cpu/smt/active"):

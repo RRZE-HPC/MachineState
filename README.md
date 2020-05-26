@@ -8,6 +8,8 @@ Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `veosinfo`, `modules`) and some basic tools (`hostname`, `users`, ...).
 
+[![Build Status](https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master)](https://travis-ci.org/RRZE-HPC/Artifact-description)
+
 --------------------------------------------------------------------------------
 Differences between Shell and Python version
 --------------------------------------------------------------------------------

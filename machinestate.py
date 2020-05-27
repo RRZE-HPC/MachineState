@@ -529,7 +529,7 @@ class InfoGroup:
                     print("       Maybe key only available in extended mode.")
                     return False
             else:
-                print("ERROR: Required key '{}' for class {} not found in input").format(rkey, str(self.__class__.__name__)))
+                print("ERROR: Required key '{}' for class {} not found in input".format(rkey, str(self.__class__.__name__)))
         for inst in self._instances:
             if inst.name in other:
                 instout = (inst.__eq__(other[inst.name]))

@@ -521,7 +521,7 @@ class InfoGroup:
                                 print("ERROR: Equality check failed for key '{}' for class {} with delta +/- 20% of state value: {}".format(key, str(self.__class__.__name__), exce))
                                 return False
                     elif selfval != otherval:
-                        print("ERROR: Equality check failed for key '{}' for class {}".format(key, str(self.__class__.__name__)))
+                        print("ERROR: Equality check failed for key '{}' for class {}".format(rkey, str(self.__class__.__name__)))
                         return False
 
                 else:
@@ -529,7 +529,7 @@ class InfoGroup:
                     print("       Maybe key only available in extended mode.")
                     return False
             else:
-                print("ERROR: Required key '{}' for class {} not found in input")
+                print("ERROR: Required key '{}' for class {} not found in input").format(rkey, str(self.__class__.__name__)))
         for inst in self._instances:
             if inst.name in other:
                 instout = (inst.__eq__(other[inst.name]))
@@ -806,7 +806,7 @@ class OSInfo(InfoGroup):
                       "Version" : ("/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"),
                      }
         self.addf("Name","/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
-        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"))
+        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
         self.required4equal = self.files.keys()
         if extended:
             self.files["URL"] = ("/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")

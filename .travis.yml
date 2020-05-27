@@ -15,7 +15,7 @@ env:
 before_install:
 - pip install codecov
 - pip install requests
-- sudo apt-get install openmpi-bin likwid
+- sudo apt-get install openmpi-bin
 install:
 - pip install -e .
 script:

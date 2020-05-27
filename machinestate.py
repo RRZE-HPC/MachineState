@@ -26,6 +26,11 @@
 # =======================================================================================
 
 # TODO: Should sizes like "32654660 kB" be transformed to number in bytes?
+# TODO: Should keys be available in all cases?
+# TODO: Expand bitmasks to lists?
+# TODO: More analysis by ExecutableInfo?
+# TODO: Config file for constant paths?
+# TODO: Add cli opts or environment variables for LIKWID, VEOS, DmiDecodeFile, ...
 
 ################################################################################
 # Imports
@@ -359,29 +364,37 @@ class InfoGroup:
             else:
                 other = json.loads(other)
 
-        for key in self.required4equal:
-            if key in other:
-                selfval = selfdict[key]
-                otherval = other[key]
-                if isinstance(selfval, str) and re.match(r"^([\d\.]+).*", str(selfval)):
-                    smatch = re.match(r"^([\d\.]+).*", selfval).group(1)
-                    omatch = re.match(r"^([\d\.]+).*", otherval).group(1)
-                    try:
-                        selfval = float(smatch)
-                        otherval = float(omatch)
-                    except:
-                        pass
-
-                if isinstance(selfval, int) or isinstance(selfval, float):
-                    if selfval != otherval:
+        for rkey in self.required4equal:
+            if rkey in other:
+                if rkey in selfdict:
+                    selfval = selfdict[rkey]
+                    otherval = other[rkey]
+                    if isinstance(selfval, str) and re.match(r"^([\d\.]+).*", str(selfval)):
+                        smatch = re.match(r"^([\d\.]+).*", selfval).group(1)
+                        omatch = re.match(r"^([\d\.]+).*", otherval).group(1)
                         try:
-                            tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
-                        except BaseException as exce:
-                            print("Equality check failed for key {}: {}".format(key, exce))
-                            return False
-                elif selfval != otherval:
-                    print("Equality check failed for key {}".format(key))
+                            selfval = float(smatch)
+                            otherval = float(omatch)
+                        except:
+                            pass
+
+                    if isinstance(selfval, int) or isinstance(selfval, float):
+                        if selfval != otherval:
+                            try:
+                                tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
+                            except BaseException as exce:
+                                print("ERROR: Equality check failed for key '{}' for class {} with delta +/- 20% of state value: {}".format(key, str(self.__class__.__name__), exce))
+                                return False
+                    elif selfval != otherval:
+                        print("ERROR: Equality check failed for key '{}' for class {}".format(key, str(self.__class__.__name__)))
+                        return False
+
+                else:
+                    print("ERROR: Required key '{}' for class {} not found in current state.".format(rkey, str(self.__class__.__name__)))
+                    print("       Maybe key only available in extended mode.")
                     return False
+            else:
+                print("ERROR: Required key '{}' for class {} not found in input")
         for inst in self._instances:
             if inst.name in other:
                 instout = (inst.__eq__(other[inst.name]))
@@ -581,6 +594,7 @@ class MachineState(MultiClassInfoGroup):
                  anon=False):
         super(MachineState, self).__init__(extended=extended, anon=anon)
         self.constants["MachineStateVersion"] = MACHINESTATE_VERSION
+        self.constants["Timestamp"] = datetime.now().ctime()
         self.classlist = [
             HostInfo,
             CpuInfo,
@@ -871,6 +885,8 @@ class CpuFrequency(PathMatchInfoGroup):
             self.searchpath = "/sys/devices/system/cpu/cpu*"
             self.match = r".*/cpu(\d+)$"
             self.subclass = CpuFrequencyClass
+            if pexists(pjoin(base, "scaling_driver")):
+                self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
             if extended:
                 if pexists(pjoin(base, "cpuinfo_transition_latency")):
                     fname = pjoin(base, "cpuinfo_transition_latency")
@@ -879,8 +895,6 @@ class CpuFrequency(PathMatchInfoGroup):
                     self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
                 if pexists(pjoin(base, "cpuinfo_min_freq")):
                     self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", int)
-                if pexists(pjoin(base, "scaling_driver")):
-                    self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
                 if pexists(pjoin(base, "scaling_available_frequencies")):
                     fname = pjoin(base, "scaling_available_frequencies")
                     self.files["AvailFrequencies"] = (fname, r"(.*)", tointlist)
@@ -1957,7 +1971,10 @@ def main():
     mstate.generate()
     mstate.update()
     if cliargs["json"]:
-        print(mstate == cliargs["json"])
+        if mstate == cliargs["json"]:
+            print("Current state matches with input file")
+        else:
+            print("The current state differs at least in one setting with input file")
         sys.exit(0)
     jsonout = {}
     if not cliargs["config"]:

@@ -10,16 +10,19 @@ python:
 - '3.5'
 - '3.6'
 - '3.7'
+env:
+- CC=testcompiler CXX=testccompiler FC=testfortran
 before_install:
 - pip install codecov
 - pip install requests
+- apt-get install openmpi-bin likwid
 install:
 - pip install -e .
 script:
 - coverage run -p tests/all_tests.py
 - coverage run -p `which machinestate` -e -s -i 4 -o output.json
 - coverage run -p `which machinestate` -c
-- coverage run -p `which machinestate` -a
+- coverage run -p `which machinestate` -a hostname
 - coverage run -p `which machinestate` -j output.json
 after_success:
 - coverage combine

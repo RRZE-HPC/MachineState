@@ -256,6 +256,127 @@ def get_config_cmd(args):
 # Base Classes
 ################################################################################
 
+class InfoGroupEntry:
+    def __init__(self, match=None, parser=None):
+        self.matchstr = r"(.*)"
+        if match and isinstance(match, str) and re.compile(self.match):
+            self.matchstr = match
+        self.regex = re.compile(self.matchstr)
+        self.parser = self._default_parser
+        if parser and callable(parser):
+            self.parser = parser
+    def _default_parser(self, value):
+        return value
+    def _read(self):
+        pass
+    def match(self, data):
+        out = None
+        if data:
+            for line in re.split(r"\n", data):
+                mat = self.regex.match(line)
+                if mat:
+                    out = mat.group(1)
+                    break
+                else:
+                    mat = self.regex.search(line)
+                    if mat:
+                        out = mat.group(1)
+                        break
+        return out
+    def parse(self, data):
+        out = data
+        if data:
+            try:
+                out = self.parser(data)
+            except BaseException as exce:
+                print("Failed to parse '{}'".format(data))
+                pass
+        return out
+    def get(self):
+        data = self._read()
+        if data and self.regex:
+            data = self.match(data)
+        if data:
+            data = self.parse(data)
+        return data
+    def __class_args__(self):
+        arglist = []
+        arglist.append("match=\"{}\"".format(self.matchstr))
+        arglist.append("parser={}".format(self.parser))
+        return arglist
+    def __repr__(self):
+        cls = str(self.__class__.__name__)
+        args = ", ".join(self.__class_args__())
+        return "{}({})".format(cls, args)
+    def __config(self):
+        return {"match" : self.matchstr, "parser" : self.parser}
+    def config(self):
+        return {"match" : self.matchstr, "parser" : self.parser}
+
+class FileInfoGroupEntry(InfoGroupEntry):
+    def __init__(self, filename, match=None, parser=None):
+        super(FileInfoGroupEntry, self).__init__(match=match, parser=parser)
+        self.filename = None
+        if filename and isinstance(filename, str) and pexists(filename):
+            self.filename = filename
+    def _read(self):
+        out = None
+        if self.filename:
+            outfp = fopen(self.filename)
+            if outfp:
+                out = outfp.read().decode(ENCODING).strip()
+                outfp.close()
+        return out
+    def __class_args__(self):
+        arglist = super(FileInfoGroupEntry, self).__class_args__()
+        arglist.append("filename=\"{}\"".format(self.filename))
+    def config(self):
+        outdict = super(FileInfoGroupEntry, self).config()
+        outdict.update({"filename" : self.filename})
+        return outdict
+
+class CommandInfoGroupEntry(InfoGroupEntry):
+    def __init__(self, command, cmd_opts=None, match=None, parser=None):
+        super(CommandInfoGroupEntry, self).__init__(match=match, parser=parser)
+        self.command = None
+        if command and isinstance(command, str) and which(command):
+            self.command = which(command)
+        self.cmd_opts = None
+        if cmd_opts and isinstance(cmd_opts, str):
+            self.cmd_opts = cmd_opts
+    def _read(self):
+        out = None
+        if self.command:
+            cmd = "{} {}; exit 0".format(self.command, self.cmd_opts or "")
+            try:
+                out = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+            except:
+                print("Failed to execute command sequence '{}'".format(cmd))
+        return out
+    def __class_args__(self):
+        arglist = super(CommandInfoGroupEntry, self).__class_args__()
+        arglist.append("command=\"{}\"".format(self.command))
+        arglist.append("cmd_opts=\"{}\"".format(self.cmd_opts))
+    def config(self):
+        outdict = super(CommandInfoGroupEntry, self).config()
+        outdict.update({"command" : self.command, "cmd_opts" : self.cmd_opts})
+        return outdict
+
+class ConstantInfoGroupEntry(InfoGroupEntry):
+    def __init__(self, entry, match=None, parser=None):
+        super(FileInfoGroupEntry, self).__init__(match=match, parser=parser)
+        self.entry = None
+        if entry:
+            self.entry = entry
+    def _read(self):
+        return self.entry
+    def __class_args__(self):
+        arglist = super(ConstantInfoGroupEntry, self).__class_args__()
+        arglist.append("entry=\"{}\"".format(self.entry))
+    def config(self):
+        outdict = super(ConstantInfoGroupEntry, self).config()
+        outdict.update({"entry" : self.entry})
+        return outdict
 
 class InfoGroup:
     def __init__(self, name=None, extended=False, anon=False):
@@ -278,6 +399,8 @@ class InfoGroup:
         self.constants = {}
         # Keys in the group that are required to check equality
         self.required4equal = []
+        # Dict of key to entries (file, cmd)
+        self._entries = {}
         if isinstance(name, str):
             self.name = name
         else:
@@ -294,6 +417,13 @@ class InfoGroup:
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
         pass
+    def addf(self, key, filename, match=None, parser=None):
+        self._entries[key] = FileInfoGroupEntry(match=match, parser=parser, filename=filename)
+    def addc(self, key, command, cmd_opts=None, match=None, parser=None):
+        self._entries[key] = CommandInfoGroupEntry(match=match, parser=parser,
+                                                   command=command, cmd_opts=cmd_opts)
+    def const(self, key, entry):
+        self._entries[key] = ConstantInfoGroupEntry(entry)
 
     def update(self):
         outdict = {}
@@ -315,6 +445,11 @@ class InfoGroup:
         for inst in self._instances:
             inst.update()
         self._data.update(outdict)
+    def get_entries(self):
+        outdict = {}
+        for ekey, ecls in self._entries.items():
+            outdict[ekey] = ecls.get()
+        return outdict
     def get(self):
         outdict = {}
         for inst in self._instances:
@@ -670,9 +805,12 @@ class OSInfo(InfoGroup):
         self.files = {"Name" : ("/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*"),
                       "Version" : ("/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"),
                      }
+        self.addf("Name","/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
+        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"))
         self.required4equal = self.files.keys()
         if extended:
             self.files["URL"] = ("/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
+            self.addf("URL","/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
             #self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\n]+)[\"]*")
 
 ################################################################################

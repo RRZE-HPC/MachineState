@@ -31,16 +31,16 @@ Checks
 --------------------------------------------------------------------------------
 - Hostname, operating system and kernel version
 - Users that are logged into the system that might disturb the runs
-- CPUset
-- CPU and NUMA topology
+- CPU information (family, model, vulnerabilities, ...) and cpuset
+- CPU, cache and NUMA topology
 - CPU/Uncore frequency settings
 - Prefetchers
 - The current load of the system
-- OS settings (NUMA balancing, huge pages, ...)
+- OS settings (NUMA balancing, huge pages, transparent huge pages, ...)
 - Power contraints (RAPL limits)
 - Module system
 - Installed compilers and MPI implementations
-- Runtime enviroment
+- Shell enviroment
 - Accelerator information (Nvidida GPUs and NEC Tsubasa)
 - Dmidecode system configuration (if available)
 - Information about the executable (if cmd is passed as cli argument)

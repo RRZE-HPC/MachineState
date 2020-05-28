@@ -15,14 +15,14 @@ env:
 before_install:
 - pip install codecov
 - pip install requests
-- sudo apt-get install openmpi-bin
+- sudo apt-get install openmpi-bin slurm slurm-client
 install:
 - pip install -e .
 script:
 - coverage run -p tests/all_tests.py
 - coverage run -p `which machinestate` -e -s -i 4 -o output.json
 - coverage run -p `which machinestate` -c
-- coverage run -p `which machinestate` -a hostname
+- coverage run -p `which machinestate` -e -s -a hostname
 - coverage run -p `which machinestate` -j output.json
 after_success:
 - coverage combine

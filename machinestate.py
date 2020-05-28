@@ -115,6 +115,8 @@ def tostrlist(value):
     :rtype: [str]
     '''
     if value:
+        if isinstance(value, int):
+            value = str(value)
         return re.split(r"[,\s]", value)
 
 def tointlist(value):
@@ -126,21 +128,38 @@ def tointlist(value):
     :returns: Expanded list
     :rtype: [int]
     '''
-    outlist = []
-    try:
+    if value and isinstance(value, int):
+        return [value]
+
+    if value and isinstance(value, str):
+        outlist = []
         for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
             if '-' in part:
                 start, end = part.split("-")
-                outlist += [int(i) for i in range(int(start), int(end)+1)]
+                try:
+                    start = int(start)
+                    end = int(end)
+                except BaseException as exce:
+                    raise ValueError("Unable to cast value '{}' to intlist: {}".format(value, exce))
+                    return None    
+                outlist += [i for i in range(int(start), int(end)+1)]
             else:
-                outlist += [int(part)]
-    except Exception:
-        raise ValueError("Unable to cast value '{}' to intlist".format(value))
-    return outlist
+                ipart = None
+                try:
+                    ipart = int(part)
+                except BaseException as exce:
+                    raise ValueError("Unable to cast value '{}' to intlist: {}".format(value, exce))
+                    return None
+                if ipart:
+                    outlist.append(ipart)
+        return outlist
+    return None
 
 def totitle(value):
     r'''Returns titleized split (string.title()) with _ and whitespaces removed.'''
-    return value.title().replace("_", "").replace(" ", "")
+    if value and isinstance(value, str):
+        return value.title().replace("_", "").replace(" ", "")
+    return str(value)
 
 def tobytes(value):
     r'''Returns a size value (XXXX kB or XXXGB) to size in bytes
@@ -150,19 +169,24 @@ def tobytes(value):
     :returns: size in bytes
     :rtype: int
     '''
-    mat = re.match("(\d+)\s*([kKMG][i]*[B]*)", value)
-    if mat:
-        count = int(mat.group(1))
-        mult = 1024
-        if 'i' in mat.group(2):
-            mult = 1000
-        if mat.group(2).lower().startswith("k"):
-            count *= mult
-        elif mat.group(2).lower().startswith("m"):
-            count *= (mult * mult)
-        elif mat.group(2).lower().startswith("g"):
-            count *= (mult * mult * mult)
-        return count
+    if value and isinstance(value, int):
+        return value
+    if value and isinstance(value, str):
+        mat = re.match("(\d+)\s*([kKmMgG]*[i]*[bB]*)", value)
+        if mat:
+            count = int(mat.group(1))
+            mult = 1024
+            if 'i' in mat.group(2):
+                mult = 1000
+            if mat.group(2).lower().startswith("k"):
+                count *= mult
+            elif mat.group(2).lower().startswith("m"):
+                count *= (mult * mult)
+            elif mat.group(2).lower().startswith("g"):
+                count *= (mult * mult * mult)
+            return count
+        else:
+            value = None
     return value
 
 def masktolist(value):
@@ -173,13 +197,23 @@ def masktolist(value):
     :returns: List of set bits in bitmask
     :rtype: [int]
     '''
-    mask = str(value).replace(",", "")
-    bits = len(mask) * 4
-    imask = int("0x{}".format(mask), 16)
-    outlist = []
-    for bit in range(bits):
-        if (1<<bit) & imask:
-            outlist.append(bit)
+    outlist = None
+    if value:
+        bits = 0
+        if isinstance(value, str):
+            mask = str(value).replace(",", "")
+            bits = len(mask) * 4
+            imask = int(mask, 16)
+        elif isinstance(value, int):
+            imask = value
+            bits = 0
+            while value > 0:
+                value >>= 1
+                bits += 1
+        outlist = []
+        for bit in range(bits):
+            if (1<<bit) & imask:
+                outlist.append(bit)
     return outlist
 
 

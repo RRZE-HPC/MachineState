@@ -216,6 +216,42 @@ def masktolist(value):
                 outlist.append(bit)
     return outlist
 
+def kHztoHz(value):
+    outvalue = None
+    if value:
+        if isinstance(value, int) or isinstance(value, float):
+            outvalue = int(value)
+        elif isinstance(value, str):
+            mat = re.match(r"([\d\.]+)\s*([kKmMgG]*[Hh]*[z]*)", value)
+            if mat:
+                outvalue = float(mat.group(1))
+                if mat.group(2).lower().startswith("m"):
+                    #print("MegaHertz")
+                    outvalue *= 1000 * 1000
+                elif mat.group(2).lower().startswith("g"):
+                    #print("GigaHertz")
+                    outvalue *= 1000 * 1000 * 1000
+                else:
+                    # We assume all other frequencies are in kHz
+                    #print("KiloHertz")
+                    outvalue *= 1000
+                outvalue = int(outvalue)
+    #print("kHztoHz", type(value), value, outvalue)
+    return outvalue
+
+def kHzlisttoHzlist(value):
+    outlist = []
+    try:
+        for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
+            if '-' in part:
+                start, end = part.split("-")
+                outlist += [kHztoHz(i) for i in range(int(start), int(end)+1)]
+            else:
+                outlist += [kHztoHz(part)]
+    except BaseException as exce:
+        raise ValueError("Unable to cast value '{}' to kHzlisttoHzlist: {}".format(value, exce))
+    return outlist
+
 
 ################################################################################
 # Processing functions for single entries in class attributes files and commands
@@ -992,23 +1028,6 @@ class CpuFrequency(PathMatchInfoGroup):
                     self.files["AvailEnergyPerfPreferences"] = (fname, r"(.*)", tostrlist)
             self.required4equal = ["Driver"]
 
-def kHztoHz(value):
-    khz_value = int(value)
-    return khz_value*1000
-
-def kHzlisttoHzlist(value):
-    outlist = []
-    try:
-        for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
-            if '-' in part:
-                start, end = part.split("-")
-                outlist += [kHztoHz(i) for i in range(int(start), int(end)+1)]
-            else:
-                outlist += [kHztoHz(part)]
-    except Exception:
-        raise ValueError("Unable to cast value '{}' to kHzlisttoHzlist".format(value))
-    return outlist
-
 ################################################################################
 # NUMA Topology
 ################################################################################
@@ -1590,7 +1609,7 @@ class TurboInfo(InfoGroup):
             data = process_cmd((abscmd, cmd_opts, matches[0]))
             if len(data) > 0 and not re.match(error_match, data):
                 for name, regex in zip(names, matches):
-                    self.commands[name] = (abscmd, cmd_opts, regex)
+                    self.commands[name] = (abscmd, cmd_opts, regex, kHztoHz)
                 regex = r"Performance energy bias:\s+(\d+)\s.*"
                 self.commands["PerfEnergyBias"] = (abscmd, cmd_opts, regex, int)
                 regex = r"C(\d+) ([\d\.]+ MHz)"
@@ -1600,10 +1619,10 @@ class TurboInfo(InfoGroup):
     @staticmethod
     def getactivecores(indata):
         freqs = []
-        for line in indata.split("\n"):
-            mat = re.match(r"C(\d+) ([\d\.]+ MHz)", line)
+        for line in re.split(r"\n", indata):
+            mat = re.match(r"C(\d+)\s+([\d\.]+ MHz)", line)
             if mat:
-                freqs.append(mat.group(2))
+                freqs.append(kHztoHz(mat.group(2)))
         return freqs
 
 ################################################################################
@@ -2095,7 +2114,7 @@ def main():
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-    # n = Writeback(extended=cliargs["extended"])
+    # n = TurboInfo(extended=cliargs["extended"])
     # n.generate()
     # n.update()
     # ndict = n.get()

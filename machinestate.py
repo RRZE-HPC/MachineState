@@ -142,6 +142,47 @@ def totitle(value):
     r'''Returns titleized split (string.title()) with _ and whitespaces removed.'''
     return value.title().replace("_", "").replace(" ", "")
 
+def tobytes(value):
+    r'''Returns a size value (XXXX kB or XXXGB) to size in bytes
+
+    :param value: size value (XXXX kB or XXXGB)
+
+    :returns: size in bytes
+    :rtype: int
+    '''
+    mat = re.match("(\d+)\s*([kKMG][i]*[B]*)", value)
+    if mat:
+        count = int(mat.group(1))
+        mult = 1024
+        if 'i' in mat.group(2):
+            mult = 1000
+        if mat.group(2).lower().startswith("k"):
+            count *= mult
+        elif mat.group(2).lower().startswith("m"):
+            count *= (mult * mult)
+        elif mat.group(2).lower().startswith("g"):
+            count *= (mult * mult * mult)
+        return count
+    return value
+
+def masktolist(value):
+    '''Returns a integer list with the set bits in a bitmask like 0xff
+
+    :param value: bitmask like ff,ffffffff
+
+    :returns: List of set bits in bitmask
+    :rtype: [int]
+    '''
+    mask = str(value).replace(",", "")
+    bits = len(mask) * 4
+    imask = int("0x{}".format(mask), 16)
+    outlist = []
+    for bit in range(bits):
+        if (1<<bit) & imask:
+            outlist.append(bit)
+    return outlist
+
+
 ################################################################################
 # Processing functions for single entries in class attributes files and commands
 # TODO: Write function that processes all entries for a single file/cmd to
@@ -1063,19 +1104,19 @@ class NumaInfoClass(PathMatchInfoGroup):
         self.name = "NumaNode{}".format(node)
         base = "/sys/devices/system/node/node{}".format(node)
         self.files = {"MemTotal" : (pjoin(base, "meminfo"),
-                                    r"Node {} MemTotal:\s+(\d+\s[kKMG][B])".format(node)),
+                                    r"Node {} MemTotal:\s+(\d+\s[kKMG][B])".format(node), tobytes),
                       "MemFree" : (pjoin(base, "meminfo"),
-                                   r"Node {} MemFree:\s+(\d+\s[kKMG][B])".format(node)),
+                                   r"Node {} MemFree:\s+(\d+\s[kKMG][B])".format(node), tobytes),
                       "MemUsed" : (pjoin(base, "meminfo"),
-                                   r"Node {} MemUsed:\s+(\d+\s[kKMG][B])".format(node)),
+                                   r"Node {} MemUsed:\s+(\d+\s[kKMG][B])".format(node), tobytes),
                       "Distances" : (pjoin(base, "distance"), r"(.*)", tointlist),
                       "CpuList" : (pjoin(base, "cpulist"), r"(.*)", tointlist),
                      }
         if extended:
             if extended:
                 self.files["Writeback"] = (pjoin(base, "meminfo"),
-                                           r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node))
-        self.required4equal = ["MemFree", "CpuList"]
+                                           r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node), tobytes)
+        self.required4equal = ["MemTotal", "MemFree", "CpuList"]
         self.searchpath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(node)
         self.match = r".*/hugepages-(\d+[kKMG][B])$"
         self.subclass = NumaInfoHugepagesClass
@@ -1097,7 +1138,7 @@ class CacheTopologyClass(InfoGroup):
         self.name = "L{}".format(ident)
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
         if pexists(base):
-            self.files = {"Size" : (pjoin(base, "size"), r"(\d+)", int),
+            self.files = {"Size" : (pjoin(base, "size"), r"(\d+)", CacheTopologyClass.kBtoB),
                           "Level" : (pjoin(base, "level"), r"(\d+)", int),
                           "Type" : (pjoin(base, "type"), r"(.+)"),
                          }
@@ -1105,10 +1146,10 @@ class CacheTopologyClass(InfoGroup):
             if extended:
                 self.files["Sets"] = (pjoin(base, "number_of_sets"), r"(\d+)", int)
                 self.files["Associativity"] = (pjoin(base, "ways_of_associativity"), r"(\d+)", int)
-                self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", int)
+                self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", CacheTopologyClass.kBtoB)
                 phys_line_part = pjoin(base, "physical_line_partition")
                 if pexists(phys_line_part):
-                    self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", int)
+                    self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", CacheTopologyClass.kBtoB)
                 alloc_policy = pjoin(base, "allocation_policy")
                 if pexists(alloc_policy):
                     self.files["AllocPolicy"] = (alloc_policy, r"(.+)")
@@ -1136,7 +1177,10 @@ class CacheTopologyClass(InfoGroup):
                     slist.append(str(clist))
                 filefp.close()
         return cpulist
-
+    @staticmethod
+    def kBtoB(value):
+        size = int(value)
+        return size * 1024
     def update(self):
         super(CacheTopologyClass, self).update()
         if "Level" in self._data:
@@ -1210,15 +1254,15 @@ class LoadAvg(InfoGroup):
 class MemInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(MemInfo, self).__init__(name="MemInfo", extended=extended, anon=anon)
-        self.files = {"MemTotal" : ("/proc/meminfo", r"MemTotal:\s+(\d+\s[kKMG][B])"),
-                      "MemFree" : ("/proc/meminfo", r"MemFree:\s+(\d+\s[kKMG][B])"),
-                      "MemAvailable" : ("/proc/meminfo", r"MemAvailable:\s+(\d+\s[kKMG][B])"),
-                      "SwapTotal" : ("/proc/meminfo", r"SwapTotal:\s+(\d+\s[kKMG][B])"),
-                      "SwapFree" : ("/proc/meminfo", r"SwapFree:\s+(\d+\s[kKMG][B])"),
+        self.files = {"MemTotal" : ("/proc/meminfo", r"MemTotal:\s+(\d+\s[kKMG][B])", tobytes),
+                      "MemFree" : ("/proc/meminfo", r"MemFree:\s+(\d+\s[kKMG][B])", tobytes),
+                      "MemAvailable" : ("/proc/meminfo", r"MemAvailable:\s+(\d+\s[kKMG][B])", tobytes),
+                      "SwapTotal" : ("/proc/meminfo", r"SwapTotal:\s+(\d+\s[kKMG][B])", tobytes),
+                      "SwapFree" : ("/proc/meminfo", r"SwapFree:\s+(\d+\s[kKMG][B])", tobytes),
                      }
         if extended:
-            self.files.update({"Buffers" : ("/proc/meminfo", r"Buffers:\s+(\d+\s[kKMG][B])"),
-                               "Cached" : ("/proc/meminfo", r"Cached:\s+(\d+\s[kKMG][B])"),
+            self.files.update({"Buffers" : ("/proc/meminfo", r"Buffers:\s+(\d+\s[kKMG][B])", tobytes),
+                               "Cached" : ("/proc/meminfo", r"Cached:\s+(\d+\s[kKMG][B])", tobytes),
                               })
         self.required4equal = ["MemFree"]
 
@@ -1260,9 +1304,10 @@ class Writeback(InfoGroup):
         super(Writeback, self).__init__(name="Writeback", extended=extended, anon=anon)
         base = "/sys/bus/workqueue/devices/writeback"
         self.files = {"CPUmask" : (pjoin(base, "cpumask"), r"(.+)"),
+                      #"CPUlist" : (pjoin(base, "cpumask"), r"(.+)", masktolist),
                       "MaxActive" : (pjoin(base, "max_active"), r"(\d+)", int),
                      }
-        self.required4equal = self.files.keys()
+        self.required4equal = ["CPUmask", "MaxActive"]
 
 ################################################################################
 # Infos about transparent hugepages
@@ -2126,13 +2171,13 @@ def main():
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-#    n = CpuTopology(extended=cliargs["extended"])
-#    n.generate()
-#    n.update()
-#    ndict = n.get()
-#    copydict = deepcopy(ndict)
-#    print(n == copydict)
-#    print(n.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+    # n = Writeback(extended=cliargs["extended"])
+    # n.generate()
+    # n.update()
+    # ndict = n.get()
+    # copydict = deepcopy(ndict)
+    # print(n == copydict)
+    # print(n.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
 
 __main__ = main
 if __name__ == "__main__":

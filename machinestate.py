@@ -502,7 +502,7 @@ class InfoGroup:
                             try:
                                 tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
                             except BaseException as exce:
-                                print("ERROR: Equality check failed for key '{}' for class {} with delta +/- 20% of state value: {}".format(key, str(self.__class__.__name__), exce))
+                                print("ERROR: Equality check failed for key '{}' for class {} with delta +/- 20% of state value: {}".format(rkey, str(self.__class__.__name__), exce))
                                 return False
                     elif selfval != otherval:
                         print("ERROR: Equality check failed for key '{}' for class {}".format(rkey, str(self.__class__.__name__)))

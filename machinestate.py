@@ -769,8 +769,11 @@ class MachineState(MultiClassInfoGroup):
                  executable=None,
                  anon=False):
         super(MachineState, self).__init__(extended=extended, anon=anon)
-        self.constants["MachineStateVersion"] = MACHINESTATE_VERSION
-        self.constants["Timestamp"] = datetime.now().ctime()
+        self.constants["MachineState"] = {"Extended" : self.extended,
+                                          "Anonymous" : self.anon,
+                                          "Version" : MACHINESTATE_VERSION,
+                                          "Timestamp" : datetime.now().ctime()
+                                         }
         self.classlist = [
             HostInfo,
             CpuInfo,

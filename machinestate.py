@@ -458,10 +458,10 @@ class InfoGroup:
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
         pass
-    def addf(self, key, filename, match=None, parser=None):
-        self._entries[key] = FileInfoGroupEntry(match=match, parser=parser, filename=filename)
-    def addc(self, key, command, cmd_opts=None, match=None, parser=None):
-        self._entries[key] = CommandInfoGroupEntry(match=match, parser=parser,
+    def addf(self, key, filename, matchstr=None, parser=None):
+        self._entries[key] = FileInfoGroupEntry(match=matchstr, parser=parser, filename=filename)
+    def addc(self, key, command, cmd_opts=None, matchstr=None, parser=None):
+        self._entries[key] = CommandInfoGroupEntry(matchstr=match, parser=parser,
                                                    command=command, cmd_opts=cmd_opts)
     def const(self, key, entry):
         self._entries[key] = ConstantInfoGroupEntry(entry)
@@ -742,10 +742,11 @@ class MultiClassInfoGroup(InfoGroup):
         for cltype, clargs in zip(self.classlist, self.classargs):
             try:
                 cls = cltype(extended=self.extended, anon=self.anon, **clargs)
+                if cls:
+                    cls.generate()
+                    self._instances.append(cls)
             except BaseException as exce:
-                print("{}.generate: {}".format(self.__class__.__name__, exce))
-            cls.generate()
-            self._instances.append(cls)
+                print("{}.generate: {}".format(cls.__class__.__name__, exce))
     def get_config(self):
         outdict = super(MultiClassInfoGroup, self).get_config()
         outdict["Type"] = str(self.__class__.__name__)
@@ -804,7 +805,6 @@ class MachineState(MultiClassInfoGroup):
             UsersInfo,
             CpuAffinity,
             ModulesInfo,
-            NvidiaSmiInfo,
         ]
         if which("nvidia-smi"):
             self.classlist.append(NvidiaSmiInfo)
@@ -849,12 +849,12 @@ class OSInfo(InfoGroup):
         self.files = {"Name" : ("/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*"),
                       "Version" : ("/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"),
                      }
-        self.addf("Name","/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
-        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
+        # self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
+        # self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
         self.required4equal = self.files.keys()
         if extended:
             self.files["URL"] = ("/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
-            self.addf("URL","/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
+            # self.addf("URL","/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
             #self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\n]+)[\"]*")
 
 ################################################################################
@@ -1715,7 +1715,7 @@ class ClocksourceInfo(PathMatchInfoGroup):
 ################################################################################
 class ExecutableInfoExec(InfoGroup):
     '''Class to read basic information of given executable'''
-    def __init__(self, executable, extended=False, anon=False):
+    def __init__(self, extended=False, anon=False, executable=""):
         super(ExecutableInfoExec, self).__init__(anon=anon, extended=extended)
         self.name = "ExecutableInfo"
         self.executable = executable

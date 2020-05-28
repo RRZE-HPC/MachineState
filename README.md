@@ -8,52 +8,44 @@ Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modules`) and some basic tools (`hostname`, `users`, ...).
 
-[![Build Status](https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master)](https://travis-ci.org/RRZE-HPC/Artifact-description) [![Codecov](https://codecov.io/github/RRZE-HPC/Artifact-description/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/Artifact-description?branch=mastern) 
---------------------------------------------------------------------------------
-Differences between Shell and Python version
---------------------------------------------------------------------------------
-The Shell version (`machine-state.sh`) executes some commands and just dumps the
-output to stdout.
+[![Build Status](https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master)](https://travis-ci.org/RRZE-HPC/Artifact-description) [![Codecov](https://codecov.io/github/RRZE-HPC/Artifact-description/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/Artifact-description?branch=mastern)
 
-The Python version (`machine-state.py`) collects all data and outputs it in JSON
-format. This version is currently under development.
+--------------------------------------------------------------------------------
+Installation
+--------------------------------------------------------------------------------
+MachineState is written as Python3 module but it's not yet in the PIP index.
+So, in order to install it, use pip's local feature:
+
+```
+$ git clone https://github.com/RRZE-HPC/Artifact-description
+$ cd Artifact-description
+$ pip3 install (--user) .
+```
+
+The module cannot be used with Python2!
+
+
 
 --------------------------------------------------------------------------------
 Checks
 --------------------------------------------------------------------------------
-- Shell version  (`machine-state.sh`)
-    - Hostname, operating system and kernel version
-    - Users that are logged into the system that might disturb the runs
-    - CPUset
-    - CPU and NUMA topology
-    - CPU/Uncore frequency settings
-    - Prefetchers
-    - The current load of the system
-    - OS settings (NUMA balancing, huge pages, ...)
-    - Power contraints (RAPL limits)
-    - Module system
-    - Installed compilers and MPI implementations
-    - Accelerator information (Nvidida GPUs and NEC Tsubasa)
-    - Runtime enviroment
-    - Dmidecode system configuration (if available)
-    - Information about the benchmark (if cmd given as first argument)
+- Hostname, operating system and kernel version
+- Users that are logged into the system that might disturb the runs
+- CPUset
+- CPU and NUMA topology
+- CPU/Uncore frequency settings
+- Prefetchers
+- The current load of the system
+- OS settings (NUMA balancing, huge pages, ...)
+- Power contraints (RAPL limits)
+- Module system
+- Installed compilers and MPI implementations
+- Runtime enviroment
+- Accelerator information (Nvidida GPUs and NEC Tsubasa)
+- Dmidecode system configuration (if available)
+- Information about the executable (if cmd is passed as cli argument)
 
-- Python version (`machinestate.py`)
-    - Hostname, operating system and kernel version
-    - Users that are logged into the system that might disturb the runs
-    - CPUset
-    - CPU and NUMA topology
-    - CPU/Uncore frequency settings
-    - Prefetchers
-    - The current load of the system
-    - OS settings (NUMA balancing, huge pages, ...)
-    - Power contraints (RAPL limits)
-    - Module system
-    - Installed compilers and MPI implementations
-    - Runtime enviroment
-    - Accelerator information (Nvidida GPUs and NEC Tsubasa)
-    - Dmidecode system configuration (if available)
-    - Information about the benchmark (if cmd is passed as cli argument)
+**All sizes are converted to bytes, all frequencies are converted to Hz**
 
 --------------------------------------------------------------------------------
 Usage (Python version)
@@ -149,3 +141,13 @@ Compare JSON file created with `machinestate.py` with current state
 ```
 $ ./machinestate.py -j oldstate.json
 ```
+
+
+--------------------------------------------------------------------------------
+Differences between Shell and Python version
+--------------------------------------------------------------------------------
+The Shell version (`machine-state.sh`) executes some commands and just dumps the
+output to stdout.
+
+The Python version (`machine-state.py`) collects all data and outputs it in JSON
+format. This version is currently under development.

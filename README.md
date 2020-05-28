@@ -20,6 +20,8 @@ So, in order to install it, use pip's local feature:
 $ git clone https://github.com/RRZE-HPC/Artifact-description
 $ cd Artifact-description
 $ pip3 install (--user) .
+or
+$ ./machinestate.py
 ```
 
 The module cannot be used with Python2!

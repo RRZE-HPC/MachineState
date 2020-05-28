@@ -918,9 +918,9 @@ class CpuFrequencyClass(InfoGroup):
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(ident)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.files["MaxFreq"] = (pjoin(base, "scaling_max_freq"), r"(\d+)", int)
+            self.files["MaxFreq"] = (pjoin(base, "scaling_max_freq"), r"(\d+)", kHztoHz)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.files["MinFreq"] = (pjoin(base, "scaling_min_freq"), r"(\d+)", int)
+            self.files["MinFreq"] = (pjoin(base, "scaling_min_freq"), r"(\d+)", kHztoHz)
         if pexists(pjoin(base, "scaling_governor")):
             self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
         if pexists(pjoin(base, "energy_performance_preference")):
@@ -944,12 +944,12 @@ class CpuFrequency(PathMatchInfoGroup):
                     fname = pjoin(base, "cpuinfo_transition_latency")
                     self.files["TransitionLatency"] = (fname, r"(\d+)", int)
                 if pexists(pjoin(base, "cpuinfo_max_freq")):
-                    self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", int)
+                    self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", kHztoHz)
                 if pexists(pjoin(base, "cpuinfo_min_freq")):
-                    self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", int)
+                    self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", kHztoHz)
                 if pexists(pjoin(base, "scaling_available_frequencies")):
                     fname = pjoin(base, "scaling_available_frequencies")
-                    self.files["AvailFrequencies"] = (fname, r"(.*)", tointlist)
+                    self.files["AvailFrequencies"] = (fname, r"(.*)", kHzlisttoHzlist)
                 if pexists(pjoin(base, "scaling_available_governors")):
                     fname = pjoin(base, "scaling_available_governors")
                     self.files["AvailGovernors"] = (fname, r"(.*)", tostrlist)
@@ -957,6 +957,23 @@ class CpuFrequency(PathMatchInfoGroup):
                     fname = pjoin(base, "energy_performance_available_preferences")
                     self.files["AvailEnergyPerfPreferences"] = (fname, r"(.*)", tostrlist)
             self.required4equal = ["Driver"]
+
+def kHztoHz(value):
+    khz_value = int(value)
+    return khz_value*1000
+
+def kHzlisttoHzlist(value):
+    outlist = []
+    try:
+        for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
+            if '-' in part:
+                start, end = part.split("-")
+                outlist += [kHztoHz(i) for i in range(int(start), int(end)+1)]
+            else:
+                outlist += [kHztoHz(part)]
+    except Exception:
+        raise ValueError("Unable to cast value '{}' to kHzlisttoHzlist".format(value))
+    return outlist
 
 ################################################################################
 # NUMA Topology

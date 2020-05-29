@@ -398,18 +398,17 @@ class InfoGroup:
         self.constants = {}
         # Keys in the group that are required to check equality
         self.required4equal = []
+        self.name = None
         if isinstance(name, str):
             self.name = name
-        else:
-            self.name = None
+
+        self.extended = False
         if isinstance(extended, bool):
             self.extended = extended
-        else:
-            self.extended = False
+
+        self.anon = False
         if isinstance(anon, bool):
             self.anon = anon
-        else:
-            self.anon = False
 
     def generate(self):
         '''Generate subclasses, defined by derived classes'''

@@ -139,17 +139,15 @@ def tointlist(value):
                 try:
                     start = int(start)
                     end = int(end)
-                except BaseException as exce:
-                    raise ValueError("Unable to cast value '{}' to intlist: {}".format(value, exce))
-                    return None    
+                except ValueError as exce:
+                    raise exce  
                 outlist += [i for i in range(int(start), int(end)+1)]
             else:
                 ipart = None
                 try:
                     ipart = int(part)
-                except BaseException as exce:
-                    raise ValueError("Unable to cast value '{}' to intlist: {}".format(value, exce))
-                    return None
+                except ValueError as exce:
+                    raise exce 
                 if ipart:
                     outlist.append(ipart)
         return outlist
@@ -409,13 +407,6 @@ class InfoGroup:
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
         pass
-    def addf(self, key, filename, matchstr=None, parser=None):
-        self._entries[key] = FileInfoGroupEntry(match=matchstr, parser=parser, filename=filename)
-    def addc(self, key, command, cmd_opts=None, matchstr=None, parser=None):
-        self._entries[key] = CommandInfoGroupEntry(matchstr=match, parser=parser,
-                                                   command=command, cmd_opts=cmd_opts)
-    def const(self, key, entry):
-        self._entries[key] = ConstantInfoGroupEntry(entry)
 
     def update(self):
         outdict = {}

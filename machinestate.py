@@ -602,7 +602,10 @@ class PathMatchInfoGroup(InfoGroup):
         arglist = super(PathMatchInfoGroup, self).__class_args__()
         arglist.append("searchpath=\"{}\"".format(self.searchpath))
         arglist.append("match=r\"{}\"".format(self.match))
-        arglist.append("subclass={}".format(self.subclass.__name__))
+        if self.subclass:
+            arglist.append("subclass={}".format(self.subclass.__name__))
+        else:
+            arglist.append("subclass=None")
         arglist.append("subargs={}".format(self.subargs))
         return arglist
 
@@ -654,7 +657,10 @@ class ListInfoGroup(InfoGroup):
     def __class_args__(self):
         arglist = super(ListInfoGroup, self).__class_args__()
         arglist.append("userlist={}".format(self.userlist))
-        arglist.append("subclass={}".format(self.subclass.__name__))
+        if self.subclass:
+            arglist.append("subclass={}".format(self.subclass.__name__))
+        else:
+            arglist.append("subclass=None")
         arglist.append("subargs={}".format(self.subargs))
         return arglist
 
@@ -708,7 +714,7 @@ class MultiClassInfoGroup(InfoGroup):
         return outdict
     def __class_args__(self):
         arglist = super(MultiClassInfoGroup, self).__class_args__()
-        cllist = [str(x.__name__) for x in self.classlist]
+        cllist = [str(x.__name__) for x in self.classlist if x]
         arglist.append("classlist={}".format(cllist))
         arglist.append("classargs={}".format(self.classargs))
         return arglist

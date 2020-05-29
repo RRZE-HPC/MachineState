@@ -47,6 +47,12 @@ class TestParsers(unittest.TestCase):
     def test_tointlistValidComma(self):
         out = machinestate.tointlist("1,2,3")
         self.assertEqual(out, [1, 2, 3])
+    def test_tointlistValidRange(self):
+        out = machinestate.tointlist("1-3")
+        self.assertEqual(out, [1, 2, 3])
+    def test_tointlistValidMixed(self):
+        out = machinestate.tointlist("1-3,4")
+        self.assertEqual(out, [1, 2, 3, 4])
     # def test_tostrlistInvalidNoNumbers(self):
     #     self.assertRaises(ValueError, machinestate.tointlist("a b c"))
     # Tests for tobytes
@@ -158,110 +164,110 @@ class TestParsers(unittest.TestCase):
     def test_masktolistStrMaskComma(self):
         out = machinestate.masktolist("ff,FF")
         self.assertEqual(out, [x for x in range(16)])
-    # Tests for kHztoHz
-    def test_kHztoHzNone(self):
-        out = machinestate.kHztoHz(None)
+    # Tests for toHz
+    def test_toHzNone(self):
+        out = machinestate.toHz(None)
         self.assertEqual(out, None)
-    def test_kHztoHzInt(self):
-        out = machinestate.kHztoHz(1000)
+    def test_toHzInt(self):
+        out = machinestate.toHz(1000)
         self.assertEqual(out, 1000)
-    def test_kHztoHzIntStr(self):
+    def test_toHzIntStr(self):
         # string without unit are seen as kHz
-        out = machinestate.kHztoHz("10000")
+        out = machinestate.toHz("10000")
         self.assertEqual(out, 10000000)
-    def test_kHztoHzStrHz(self):
-        out = machinestate.kHztoHz("1234 Hz")
+    def test_toHzStrHz(self):
+        out = machinestate.toHz("1234 Hz")
         self.assertEqual(out, 1234)
-    def test_kHztoHzStrhz(self):
-        out = machinestate.kHztoHz("1234hz")
+    def test_toHzStrhz(self):
+        out = machinestate.toHz("1234hz")
         self.assertEqual(out, 1234)
-    def test_kHztoHzStrkHz(self):
-        out = machinestate.kHztoHz("1234 kHz")
+    def test_toHzStrkHz(self):
+        out = machinestate.toHz("1234 kHz")
         self.assertEqual(out, 1234*1000)
-    def test_kHztoHzStrKHz(self):
-        out = machinestate.kHztoHz("1234KHz")
+    def test_toHzStrKHz(self):
+        out = machinestate.toHz("1234KHz")
         self.assertEqual(out, 1234*1000)
-    def test_kHztoHzStrmHz(self):
-        out = machinestate.kHztoHz("1234 mHz")
+    def test_toHzStrmHz(self):
+        out = machinestate.toHz("1234 mHz")
         self.assertEqual(out, 1234000000)
-    def test_kHztoHzStrMHz(self):
-        out = machinestate.kHztoHz("1234 MHz")
+    def test_toHzStrMHz(self):
+        out = machinestate.toHz("1234 MHz")
         self.assertEqual(out, 1234000000)
-    def test_kHztoHzStrGHz(self):
-        out = machinestate.kHztoHz("1234 GHz")
+    def test_toHzStrGHz(self):
+        out = machinestate.toHz("1234 GHz")
         self.assertEqual(out, 1234000000000)
-    def test_kHztoHzStrgHz(self):
-        out = machinestate.kHztoHz("1234gHz")
+    def test_toHzStrgHz(self):
+        out = machinestate.toHz("1234gHz")
         self.assertEqual(out, 1234000000000)
-    def test_kHztoHzFloat(self):
-        out = machinestate.kHztoHz(1000.00)
+    def test_toHzFloat(self):
+        out = machinestate.toHz(1000.00)
         self.assertEqual(out, 1000)
-    def test_kHztoHzFloatStr(self):
+    def test_toHzFloatStr(self):
         # string without unit are seen as kHz
-        out = machinestate.kHztoHz("10000.00")
+        out = machinestate.toHz("10000.00")
         self.assertEqual(out, 10000000)
-    def test_kHztoHzStrfHz(self):
-        out = machinestate.kHztoHz("1234.00 Hz")
+    def test_toHzStrfHz(self):
+        out = machinestate.toHz("1234.00 Hz")
         self.assertEqual(out, 1234)
-    def test_kHztoHzStrfhz(self):
-        out = machinestate.kHztoHz("1234.00hz")
+    def test_toHzStrfhz(self):
+        out = machinestate.toHz("1234.00hz")
         self.assertEqual(out, 1234)
-    def test_kHztoHzStrfkHz(self):
-        out = machinestate.kHztoHz("1234.00 kHz")
+    def test_toHzStrfkHz(self):
+        out = machinestate.toHz("1234.00 kHz")
         self.assertEqual(out, 1234*1000)
-    def test_kHztoHzStrfKHz(self):
-        out = machinestate.kHztoHz("1234.00KHz")
+    def test_toHzStrfKHz(self):
+        out = machinestate.toHz("1234.00KHz")
         self.assertEqual(out, 1234*1000)
-    def test_kHztoHzStrfmHz(self):
-        out = machinestate.kHztoHz("1234.00 mHz")
+    def test_toHzStrfmHz(self):
+        out = machinestate.toHz("1234.00 mHz")
         self.assertEqual(out, 1234000000)
-    def test_kHztoHzStrfMHz(self):
-        out = machinestate.kHztoHz("1234.00 MHz")
+    def test_toHzStrfMHz(self):
+        out = machinestate.toHz("1234.00 MHz")
         self.assertEqual(out, 1234000000)
-    def test_kHztoHzStrfGHz(self):
-        out = machinestate.kHztoHz("1234.00 GHz")
+    def test_toHzStrfGHz(self):
+        out = machinestate.toHz("1234.00 GHz")
         self.assertEqual(out, 1234000000000)
-    def test_kHztoHzStrfgHz(self):
-        out = machinestate.kHztoHz("1234.00gHz")
+    def test_toHzStrfgHz(self):
+        out = machinestate.toHz("1234.00gHz")
         self.assertEqual(out, 1234000000000)
 
-    # Tests for kHzlisttoHzlist
-    def test_kHzlisttoHzlistNone(self):
-        out = machinestate.kHzlisttoHzlist(None)
+    # Tests for toHzlist
+    def test_toHzlistNone(self):
+        out = machinestate.toHzlist(None)
         self.assertEqual(out, None)
-    def test_kHzlisttoHzlistInt(self):
-        out = machinestate.kHzlisttoHzlist(1000)
+    def test_toHzlistInt(self):
+        out = machinestate.toHzlist(1000)
         self.assertEqual(out, [1000])
-    def test_kHzlisttoHzlistFloatStrSpace(self):
+    def test_toHzlistFloatStrSpace(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000.00 20000.00 30000.00")
+        out = machinestate.toHzlist("10000.00 20000.00 30000.00")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistFloatStrComma(self):
+    def test_toHzlistFloatStrComma(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000.00,20000.00,30000.00")
+        out = machinestate.toHzlist("10000.00,20000.00,30000.00")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistIntStrSpace(self):
+    def test_toHzlistIntStrSpace(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000 20000 30000")
+        out = machinestate.toHzlist("10000 20000 30000")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistIntStrComma(self):
+    def test_toHzlistIntStrComma(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000,20000,30000")
+        out = machinestate.toHzlist("10000,20000,30000")
         self.assertEqual(out, [10000000, 20000000, 30000000])
 
-    def test_kHzlisttoHzlistFloatStrSpacekHz(self):
+    def test_toHzlistFloatStrSpacekHz(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000.00kHz 20000.00kHz 30000.00KHz")
+        out = machinestate.toHzlist("10000.00kHz 20000.00kHz 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistFloatStrCommakHz(self):
+    def test_toHzlistFloatStrCommakHz(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000.00kHz, 20000.00kHz, 30000.00KHz")
+        out = machinestate.toHzlist("10000.00kHz, 20000.00kHz, 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistIntStrSpacekHz(self):
+    def test_toHzlistIntStrSpacekHz(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000khz 20000.00kHz 30000.00KHz")
+        out = machinestate.toHzlist("10000khz 20000.00kHz 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_kHzlisttoHzlistIntStrCommakHz(self):
+    def test_toHzlistIntStrCommakHz(self):
         # string without unit are seen as kHz
-        out = machinestate.kHzlisttoHzlist("10000kHz,20000KHz,30000khz")
+        out = machinestate.toHzlist("10000kHz,20000KHz,30000khz")
         self.assertEqual(out, [10000000, 20000000, 30000000])

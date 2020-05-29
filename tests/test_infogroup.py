@@ -68,7 +68,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
-    def test_filesmatch(self):
+    def test_filesMatch(self):
         resdict = {"File{}".format(x) : "{}".format(x) for x in range(4)}
         match = r"File(\d+)"
         cls = InfoGroup()
@@ -80,7 +80,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
-    def test_filesmatchconvert(self):
+    def test_filesMatchConvert(self):
         resdict = {"File{}".format(x) : x for x in range(4)}
         match = r"File(\d+)"
         cls = InfoGroup()
@@ -92,6 +92,19 @@ class TestInfoGroupFiles(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
+    def test_filesNotExist(self):
+        resdict = {"File{}".format(x) : x for x in range(4)}
+        match = r"File(\d+)"
+        cls = InfoGroup()
+        for tkey in self.temp_files:
+            _, tfname = self.temp_files[tkey]
+            cls.files[tkey] = ("{}1234".format(tfname), match, int)
+        cls.generate()
+        cls.update()
+        outdict = cls.get()
+        for i,tkey in enumerate(resdict):
+            self.assertNotEqual(resdict[tkey], outdict[tkey])
+            self.assertEqual(outdict[tkey], None)
 
 class TestInfoGroupCommands(unittest.TestCase):
     def setUp(self):
@@ -117,7 +130,7 @@ class TestInfoGroupCommands(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
-    def test_commandsmatch(self):
+    def test_commandsMatch(self):
         resdict = {"File{}".format(x) : "{}".format(x) for x in range(4)}
         match = r"File(\d+)"
         cls = InfoGroup()
@@ -129,7 +142,7 @@ class TestInfoGroupCommands(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
-    def test_commandsmatchconvert(self):
+    def test_commandsMatchConvert(self):
         resdict = {"File{}".format(x) : x for x in range(4)}
         match = r"File(\d+)"
         cls = InfoGroup()
@@ -141,3 +154,16 @@ class TestInfoGroupCommands(unittest.TestCase):
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
+    def test_filesNotExist(self):
+        resdict = {"File{}".format(x) : x for x in range(4)}
+        match = r"File(\d+)"
+        cls = InfoGroup()
+        for tkey in self.temp_files:
+            _, tfname = self.temp_files[tkey]
+            cls.files[tkey] = ("echo{}".format(tfname), "{}".format(tkey), match, int)
+        cls.generate()
+        cls.update()
+        outdict = cls.get()
+        for i,tkey in enumerate(resdict):
+            self.assertNotEqual(resdict[tkey], outdict[tkey])
+            self.assertEqual(outdict[tkey], None)

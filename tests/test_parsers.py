@@ -53,8 +53,8 @@ class TestParsers(unittest.TestCase):
     def test_tointlistValidMixed(self):
         out = machinestate.tointlist("1-3,4")
         self.assertEqual(out, [1, 2, 3, 4])
-    # def test_tostrlistInvalidNoNumbers(self):
-    #     self.assertRaises(ValueError, machinestate.tointlist("a b c"))
+    def test_tostrlistInvalidNoNumbers(self):
+        self.assertRaises(ValueError, machinestate.tointlist, ["a b c"])
     # Tests for tobytes
     def test_tobytesNone(self):
         out = machinestate.tobytes(None)

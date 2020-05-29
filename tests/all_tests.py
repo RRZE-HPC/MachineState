@@ -8,7 +8,9 @@ suite = unittest.TestLoader().loadTestsFromNames(
         'test_pathmatchinfo',
         'test_listinfo',
         'test_multiclassinfo',
-        'test_parsers'
+        'test_parsers',
+        'test_helpers',
+        'test_dmidecode_file'
     ]
 )
 

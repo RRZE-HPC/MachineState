@@ -2088,6 +2088,8 @@ def read_cli(cliargs):
                         help='Remove host-specific information (default: False)')
     parser.add_argument('-c', '--config', default=False, action='store_true',
                         help='print configuration as JSON (files, commands, ...)')
+    parser.add_argument('--classes', action='store_true', default=False,
+                        help='Print class tree')
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
     parser.add_argument('-i', '--indent', default=4, type=int,
                         help='indention in JSON output (default: 4)')
@@ -2097,12 +2099,22 @@ def read_cli(cliargs):
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
+def print_classes(baseobj):
+    def print_sub_classes(baseobj, level):
+        print("{}{}".format(level*"\t", repr(baseobj)))
+        for inst in baseobj._instances:
+            print_sub_classes(inst, level+1)
+    print_sub_classes(baseobj, 0)
+
 def main():
     cliargs = read_cli(sys.argv[1:])
     mstate = MachineState(extended=cliargs["extended"],
                           executable=cliargs["executable"],
                           anon=cliargs["anonymous"])
     mstate.generate()
+    if cliargs["classes"]:
+        print_classes(mstate)
+        sys.exit(0)
     mstate.update()
     if cliargs["json"]:
         if mstate == cliargs["json"]:

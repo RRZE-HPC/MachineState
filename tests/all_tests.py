@@ -4,7 +4,7 @@ import sys
 
 suite = unittest.TestLoader().loadTestsFromNames(
     [
-        'test_testinfo',
+        'test_infogroup',
         'test_pathmatchinfo',
         'test_listinfo',
         'test_multiclassinfo',

@@ -172,17 +172,18 @@ def tobytes(value):
     if value and isinstance(value, int):
         return value
     if value and isinstance(value, str):
-        mat = re.match("(\d+)\s*([kKmMgG]*[i]*[bB]*)", value)
+        mat = re.match("([\d\.]+)\s*([kKmMgG]{0,1})([i]{0,1})([bB]{0,1})", value)
         if mat:
             count = int(mat.group(1))
             mult = 1024
-            if 'i' in mat.group(2):
-                mult = 1000
-            if mat.group(2).lower().startswith("k"):
+            if mat.group(4).lower() == "b":
+                if mat.group(3).lower() == "i":
+                    mult = 1000
+            if mat.group(2).lower() == "k":
                 count *= mult
-            elif mat.group(2).lower().startswith("m"):
+            elif mat.group(2).lower() == "m":
                 count *= (mult * mult)
-            elif mat.group(2).lower().startswith("g"):
+            elif mat.group(2).lower() == "g":
                 count *= (mult * mult * mult)
             return count
         else:
@@ -231,6 +232,8 @@ def kHztoHz(value):
                 elif mat.group(2).lower().startswith("g"):
                     #print("GigaHertz")
                     outvalue *= 1000 * 1000 * 1000
+                elif mat.group(2).lower() == "hz":
+                    outvalue *= 1
                 else:
                     # We assume all other frequencies are in kHz
                     #print("KiloHertz")
@@ -241,16 +244,21 @@ def kHztoHz(value):
 
 def kHzlisttoHzlist(value):
     outlist = []
-    try:
-        for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
-            if '-' in part:
-                start, end = part.split("-")
-                outlist += [kHztoHz(i) for i in range(int(start), int(end)+1)]
-            else:
-                outlist += [kHztoHz(part)]
-    except BaseException as exce:
-        raise ValueError("Unable to cast value '{}' to kHzlisttoHzlist: {}".format(value, exce))
-    return outlist
+    if value and isinstance(value, int):
+        return [kHztoHz(value)]
+
+    if value and isinstance(value, str):
+        try:
+            for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
+                if '-' in part:
+                    start, end = part.split("-")
+                    outlist += [kHztoHz(i) for i in range(int(start), int(end)+1)]
+                else:
+                    outlist += [kHztoHz(part)]
+        except BaseException as exce:
+            raise ValueError("Unable to cast value '{}' to kHzlisttoHzlist: {}".format(value, exce))
+        return outlist
+    return None
 
 
 ################################################################################

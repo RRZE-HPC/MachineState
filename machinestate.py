@@ -96,8 +96,8 @@ def fopen(filename):
             filefp = open(filename, "rb")
         except PermissionError:
             return None
-        except BaseException as exce:
-            raise exce
+        except:
+            raise
         return filefp
 
 ################################################################################

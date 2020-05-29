@@ -24,6 +24,7 @@ script:
 - coverage run -p `which machinestate` -c
 - coverage run -p `which machinestate` -e -s -a hostname
 - coverage run -p `which machinestate` -j output.json
+- coverage run -p `which machinestate` --classes
 after_success:
 - coverage combine
 - codecov

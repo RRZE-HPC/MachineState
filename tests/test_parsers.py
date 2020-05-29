@@ -254,7 +254,6 @@ class TestParsers(unittest.TestCase):
         # string without unit are seen as kHz
         out = machinestate.toHzlist("10000,20000,30000")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-
     def test_toHzlistFloatStrSpacekHz(self):
         # string without unit are seen as kHz
         out = machinestate.toHzlist("10000.00kHz 20000.00kHz 30000.00KHz")
@@ -271,3 +270,31 @@ class TestParsers(unittest.TestCase):
         # string without unit are seen as kHz
         out = machinestate.toHzlist("10000kHz,20000KHz,30000khz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
+    # Tests for totitle
+    def test_totitleNone(self):
+        out = machinestate.totitle(None)
+        self.assertEqual(out, "None")
+    def test_totitleInt(self):
+        out = machinestate.totitle(1234)
+        self.assertEqual(out, "1234")
+    def test_totitleFloat(self):
+        out = machinestate.totitle(1234.01)
+        self.assertEqual(out, "1234.01")
+    def test_totitleList(self):
+        out = machinestate.totitle([1234.01, "123"])
+        self.assertEqual(out, str([1234.01, "123"]))
+    def test_totitleEmpty(self):
+        out = machinestate.totitle("")
+        self.assertEqual(out, "")
+    def test_totitleSpace(self):
+        out = machinestate.totitle("abc defg")
+        self.assertEqual(out, "AbcDefg")
+    def test_totitleDash(self):
+        out = machinestate.totitle("abc-defg")
+        self.assertEqual(out, "Abc-Defg")
+    def test_totitleUnderscore(self):
+        out = machinestate.totitle("abc_defg")
+        self.assertEqual(out, "AbcDefg")
+    def test_totitleMixed(self):
+        out = machinestate.totitle("abc_defg-hij")
+        self.assertEqual(out, "AbcDefg-Hij")

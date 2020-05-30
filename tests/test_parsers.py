@@ -55,6 +55,10 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(out, [1, 2, 3, 4])
     def test_tostrlistInvalidNoNumbers(self):
         self.assertRaises(ValueError, machinestate.tointlist, "a b c")
+    def test_tostrlistInvalidNoNumbersRange(self):
+        self.assertRaises(ValueError, machinestate.tointlist, "a-c")
+    def test_tostrlistInvalidNoNumbersMixed(self):
+        self.assertRaises(ValueError, machinestate.tointlist, "a-b,c")
     # Tests for tobytes
     def test_tobytesNone(self):
         out = machinestate.tobytes(None)
@@ -142,9 +146,13 @@ class TestParsers(unittest.TestCase):
     def test_tobytesValidStrGiBNoSpace(self):
         out = machinestate.tobytes("1234GiB")
         self.assertEqual(out, 1234*1000*1000*1000)
-    def test_tobytesNotValid(self):
+    def test_tobytesValidInvalidSuffix(self):
         out = machinestate.tobytes("1234abc")
-        self.assertEqual(out, 1234)
+    def test_tobytesNotValid(self):
+        out = machinestate.tobytes("abc")
+        self.assertEqual(out, None)
+    def test_tobytesAlmostValid(self):
+        self.assertRaises(ValueError, machinestate.tobytes, ". kb")
     # Tests for masktolist
     def test_masktolistNone(self):
         out = machinestate.masktolist(None)
@@ -155,6 +163,9 @@ class TestParsers(unittest.TestCase):
     def test_masktolistIntMask(self):
         out = machinestate.masktolist(0xff)
         self.assertEqual(out, [x for x in range(8)])
+    def test_masktolistIntMask(self):
+        out = machinestate.masktolist(11)
+        self.assertEqual(out, [0, 1, 3])
     def test_masktolistStrMask(self):
         out = machinestate.masktolist("ff")
         self.assertEqual(out, [x for x in range(8)])
@@ -230,6 +241,11 @@ class TestParsers(unittest.TestCase):
     def test_toHzStrfgHz(self):
         out = machinestate.toHz("1234.00gHz")
         self.assertEqual(out, 1234000000000)
+    def test_toHzStrAlmostValid(self):
+        self.assertRaises(ValueError, machinestate.toHz, ".ghz")
+    def test_toHzStrNotValid(self):
+        out = machinestate.toHz("abc")
+        self.assertEqual(out, None)
 
     # Tests for toHzlist
     def test_toHzlistNone(self):

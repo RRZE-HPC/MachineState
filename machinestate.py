@@ -140,14 +140,18 @@ def tointlist(value):
                     start = int(start)
                     end = int(end)
                 except ValueError as exce:
-                    raise exce  
+                    raise exce
+                except:
+                    raise
                 outlist += [i for i in range(int(start), int(end)+1)]
             else:
                 ipart = None
                 try:
                     ipart = int(part)
                 except ValueError as exce:
-                    raise exce 
+                    raise exce
+                except:
+                    raise
                 if ipart:
                     outlist.append(ipart)
         return outlist
@@ -171,7 +175,7 @@ def tobytes(value):
         return value
     if value and isinstance(value, str):
         mat = re.match("([\d\.]+)\s*([kKmMgG]{0,1})([i]{0,1})([bB]{0,1})", value)
-        if mat:
+        if mat is not None:
             count = int(mat.group(1))
             mult = 1024
             if mat.group(4).lower() == "b":
@@ -249,8 +253,8 @@ def toHzlist(value):
         try:
             for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
                 outlist += [toHz(part)]
-        except BaseException as exce:
-            raise ValueError("Unable to cast value '{}' to toHzlist: {}".format(value, exce))
+        except ValueError as exce:
+            raise exce
         return outlist
     return None
 
@@ -542,7 +546,7 @@ class PathMatchInfoGroup(InfoGroup):
         self.subclass = None
 
         if searchpath and isinstance(searchpath, str):
-            if os.path.exists(os.path.basename(searchpath)):
+            if os.path.exists(os.path.dirname(searchpath)):
                 self.searchpath = searchpath
         if match and isinstance(match, str):
             self.match = match

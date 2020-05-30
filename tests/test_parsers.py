@@ -163,7 +163,7 @@ class TestParsers(unittest.TestCase):
     def test_masktolistIntMask(self):
         out = machinestate.masktolist(0xff)
         self.assertEqual(out, [x for x in range(8)])
-    def test_masktolistIntMask(self):
+    def test_masktolistIntValue(self):
         out = machinestate.masktolist(11)
         self.assertEqual(out, [0, 1, 3])
     def test_masktolistStrMask(self):

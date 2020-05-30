@@ -173,7 +173,7 @@ class TestInfoGroupFunction(unittest.TestCase):
         searchpath = os.path.join(self.temp_dir, "*")
         cls = PathMatchInfoGroup(searchpath=searchpath, match=r".*/(\d).*", subclass=unittest.TestCase, subargs={"searchpath": self.temp_dir})
         self.assertRaises(TypeError, cls.generate)
-    def test_validGenerateInvalidClass(self):
+    def test_validUpdateInvalidClass(self):
         searchpath = os.path.join(self.temp_dir, "*")
         cls = PathMatchInfoGroup(searchpath=searchpath, match=r".*/(\d).*", subclass=unittest.TestCase, subargs={"searchpath": self.temp_dir})
         try:
@@ -183,7 +183,7 @@ class TestInfoGroupFunction(unittest.TestCase):
         cls.update()
         self.assertEqual(cls._instances, [])  
         self.assertEqual(cls._data, {})
-    def test_validGenerateInvalidClass(self):
+    def test_validGetInvalidClass(self):
         searchpath = os.path.join(self.temp_dir, "*")
         cls = PathMatchInfoGroup(searchpath=searchpath, match=r".*/(\d).*", subclass=unittest.TestCase, subargs={"searchpath": self.temp_dir})
         try:

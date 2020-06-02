@@ -8,7 +8,7 @@ Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modules`) and some basic tools (`hostname`, `users`, ...).
 
-[![Build Status](https://travis-ci.org/RRZE-HPC/Artifact-description.svg?branch=master)](https://travis-ci.org/RRZE-HPC/Artifact-description) [![Codecov](https://codecov.io/github/RRZE-HPC/Artifact-description/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/Artifact-description?branch=mastern)
+[![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 
 --------------------------------------------------------------------------------
 Installation
@@ -17,8 +17,8 @@ MachineState is written as Python3 module but it's not yet in the PIP index.
 So, in order to install it, use pip's local feature:
 
 ```
-$ git clone https://github.com/RRZE-HPC/Artifact-description
-$ cd Artifact-description
+$ git clone https://github.com/RRZE-HPC/MachineState
+$ cd MachineState
 $ pip3 install (--user) .
 or
 $ ./machinestate.py

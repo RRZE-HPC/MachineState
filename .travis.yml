@@ -15,11 +15,13 @@ env:
 before_install:
 - pip install codecov
 - pip install requests
-- sudo apt-get install openmpi-bin slurm slurm-client
+- sudo apt-get install openmpi-bin slurm slurm-client clang
+- if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
 install:
 - pip install -e .
 script:
 - coverage run -p tests/all_tests.py
+- coverage run -p `which machinestate` -e -s -i 4
 - coverage run -p `which machinestate` -e -s -i 4 -o output-ext.json
 - coverage run -p `which machinestate` -s -i 4 -o output.json
 - coverage run -p `which machinestate` -c

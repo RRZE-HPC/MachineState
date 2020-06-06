@@ -693,7 +693,8 @@ class MultiClassInfoGroup(InfoGroup):
                     cls.generate()
                     self._instances.append(cls)
             except BaseException as exce:
-                print("{}.generate: {}".format(cls.__class__.__name__, exce))
+                #print("{}.generate: {}".format(cltype.__name__, exce))
+                raise exce
     def get_config(self):
         outdict = super(MultiClassInfoGroup, self).get_config()
         outdict["Type"] = str(self.__class__.__name__)

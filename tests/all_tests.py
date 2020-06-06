@@ -11,7 +11,8 @@ suite = unittest.TestLoader().loadTestsFromNames(
         'test_parsers',
         'test_helpers',
         'test_dmidecode_file',
-        'test_machinestate'
+        'test_machinestate',
+        'test_repr',
     ]
 )
 

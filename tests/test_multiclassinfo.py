@@ -8,13 +8,22 @@ import unittest
 import tempfile
 import shutil
 import stat
-from machinestate import MultiClassInfoGroup
+import glob
+from machinestate import MultiClassInfoGroup, InfoGroup
 from locale import getpreferredencoding
 
 ENCODING = getpreferredencoding()
 
 class TestClass:
     pass
+
+class TestInfoGroup(InfoGroup):
+    def __init__(self, name=None, extended=False, anon=False, basepath="", ident=-1):
+        super(TestInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+        self.name = "File{}".format(ident)
+        path = os.path.join(basepath, "{}*".format(ident))
+        files = glob.glob(path)
+        self.files[self.name] = (files[0], r"(.+)")
 
 
 class TestMultiClassInfoGroupBase(unittest.TestCase):
@@ -49,3 +58,145 @@ class TestMultiClassInfoGroupBase(unittest.TestCase):
         cls = MultiClassInfoGroup(classlist=[TestClass, TestClass], classargs=[{}, {}])
         self.assertEqual(cls.classlist, [TestClass, TestClass])
         self.assertEqual(cls.classargs, [{}, {}])
+
+
+class TestMultiClassInfoGroupFunction(unittest.TestCase):
+    def setUp(self):
+        # Create a temporary directory
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_files = {"File{}".format(x) : tempfile.mkstemp(prefix=str(x), dir=self.temp_dir) for x in range(4)}
+        for tkey in self.temp_files:
+            tfp, tfname = self.temp_files[tkey]
+            os.pwrite(tfp, bytes("{}\n".format(tkey), ENCODING), 0)
+            os.close(tfp)
+
+    def tearDown(self):
+        # Remove the directory after the test
+        shutil.rmtree(self.temp_dir)
+
+    def test_validCreate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        self.assertEqual(cls._instances, [])
+        for i in range(4):
+            self.assertEqual(cls.classlist[i], TestInfoGroup)
+            self.assertEqual(cls.classargs[i]["ident"], i)
+            self.assertEqual(cls.classargs[i]["basepath"], self.temp_dir)
+        self.assertEqual(cls._data, {})
+        
+    def test_validGenerate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        cls.generate()
+        self.assertNotEqual(cls._instances, [])
+        self.assertEqual(len(cls._instances), 4)
+        self.assertEqual(cls._data, {})
+        for inst in cls._instances:
+            self.assertEqual(inst._instances, [])
+            self.assertEqual(inst._data, {})
+    def test_validUpdate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        cls.generate()
+        cls.update()
+        self.assertEqual(cls._data, {})
+        for inst in cls._instances:
+            self.assertEqual(inst._instances, [])
+            self.assertNotEqual(inst._data, {})
+    def test_validGet(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        cls.generate()
+        cls.update()
+        outdict = cls.get()
+        self.assertEqual(cls._data, {})
+        for inst in cls._instances:
+            self.assertEqual(inst._instances, [])
+            self.assertNotEqual(inst._data, {})
+        for i, key in enumerate(self.temp_files.keys()):
+            for subkey in outdict[key]:
+                self.assertEqual(key, subkey)
+                self.assertEqual(key, outdict[key][subkey])
+    def test_invalidCreate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x+100, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        self.assertEqual(cls._instances, [])
+        self.assertEqual(cls._data, {})
+        for i in range(4):
+            self.assertEqual(cls.classlist[i], TestInfoGroup)
+            self.assertEqual(cls.classargs[i]["ident"], i+100)
+            self.assertEqual(cls.classargs[i]["basepath"], self.temp_dir)
+    def test_invalidGenerate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x+100, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        #cls.generate()
+        self.assertRaises(IndexError, cls.generate)
+        self.assertEqual(cls._instances, [])
+        self.assertEqual(cls._data, {})
+        self.assertEqual(cls.classlist, classlist)
+        self.assertEqual(cls.classargs, classargs)
+    def test_invalidUpdate(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x+100, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        self.assertRaises(IndexError, cls.generate)
+        cls.update()
+        self.assertEqual(cls._instances, [])
+        self.assertEqual(cls._data, {})
+        self.assertEqual(cls.classlist, classlist)
+        self.assertEqual(cls.classargs, classargs)
+    def test_invalidGet(self):
+        classlist = [TestInfoGroup for x in range(4)]
+        classargs = [{"ident" : x+100, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        self.assertRaises(IndexError, cls.generate)
+        cls.update()
+        outdict = cls.get()
+        self.assertEqual(outdict, {})
+        self.assertEqual(cls._instances, [])
+        self.assertEqual(cls._data, {})
+        self.assertEqual(cls.classlist, classlist)
+        self.assertEqual(cls.classargs, classargs)
+    def test_validCreateInvalidClass(self):
+        classlist = [unittest.TestCase for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        for i in range(4):
+            self.assertEqual(cls.classlist[i], unittest.TestCase)
+            self.assertEqual(cls.classargs[i]["ident"], i)
+            self.assertEqual(cls.classargs[i]["basepath"], self.temp_dir)
+    def test_validGenerateInvalidClass(self):
+        classlist = [unittest.TestCase for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        self.assertRaises(TypeError, cls.generate)
+    def test_validUpdateInvalidClass(self):
+        classlist = [unittest.TestCase for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        try:
+            cls.generate()
+        except:
+            pass
+        cls.update()
+        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._data, {})
+    def test_validGetInvalidClass(self):
+        classlist = [unittest.TestCase for x in range(4)]
+        classargs = [{"ident" : x, "basepath" : self.temp_dir} for x in range(4)]
+        cls = MultiClassInfoGroup(classlist=classlist, classargs=classargs)
+        try:
+            cls.generate()
+        except:
+            pass
+        cls.update()
+        outdict = cls.get()
+        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._data, {})
+        self.assertEqual(outdict, {})

@@ -20,7 +20,7 @@ before_install:
 - sudo apt-get install clang
 - sudo apt-get install gfortran
 - sudo apt-get install clinfo
-- if [ $(which mpiexec.hydra 2>/dev/null | wc -l) == "0" ]; then echo "/bin/bash\n\necho \"Intel(R) MPI Library for Linux* OS, Version 2017 Update 4 Build 20170817 (id: 17752)\"" | sudo tee /usr/bin/mpiexec.hydra; sudo chmod +x /usr/bin/mpiexec.hydra; fi
+  #- if [ $(which mpiexec.hydra 2>/dev/null | wc -l) == "0" ]; then echo "/bin/bash\n\necho \"Intel(R) MPI Library for Linux* OS, Version 2017 Update 4 Build 20170817 (id: 17752)\"" | sudo tee /usr/bin/mpiexec.hydra; sudo chmod +x /usr/bin/mpiexec.hydra; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
 install:
 - pip install -e .

@@ -15,7 +15,12 @@ env:
 before_install:
 - pip install codecov
 - pip install requests
-- sudo apt-get install openmpi-bin slurm slurm-client clang
+- sudo apt-get install slurm slurm-client
+- sudo apt-get install openmpi-bin 
+- sudo apt-get install clang
+- sudo apt-get install gfortran
+- sudo apt-get install clinfo
+- if [ $(which mpiexec.hydra 2>/dev/null | wc -l) == "0" ]; then echo "/bin/bash\n\necho \"Intel(R) MPI Library for Linux* OS, Version 2017 Update 4 Build 20170817 (id: 17752)\"" | sudo tee /usr/bin/mpiexec.hydra; sudo chmod +x /usr/bin/mpiexec.hydra; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
 install:
 - pip install -e .
@@ -32,4 +37,5 @@ script:
 after_success:
 - coverage combine
 - codecov
+- if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
 cache: pip

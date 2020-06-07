@@ -96,8 +96,6 @@ def fopen(filename):
             filefp = open(filename, "rb")
         except PermissionError:
             return None
-        except:
-            raise
         return filefp
 
 ################################################################################
@@ -1498,7 +1496,7 @@ class MpiInfoClass(InfoGroup):
             return "OpenMPI"
         elif "Intel" in value and "MPI" in value:
             return "IntelMPI"
-        elif "slurm" in value:
+        elif "slurm" in value.lower():
             return "Slurm"
         return "Unknown"
 

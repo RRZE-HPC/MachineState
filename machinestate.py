@@ -69,8 +69,8 @@ DMIDECODE_FILE = "/etc/dmidecode.txt"
 # Currently unused option. The BiosInfo class uses information from sysfs
 BIOS_XML_FILE = ""
 # The ModulesInfo class requires this path to read the loaded modules. It will
-# call 'tclsh MODULECMD_TCL_PATH' if tclsh and MODULECMD_TCL_PATH exist.
-MODULECMD_TCL_PATH = "/apps/modules/modulecmd.tcl"
+# call 'tclsh MODULECMD_PATH' if tclsh and MODULECMD_PATH exist.
+MODULECMD_PATH = "tclsh /apps/modules/modulecmd.tcl"
 # The NecTsubasaInfo class requires this path to call the vecmd command
 VEOS_BASE = "/opt/nec/ve/bin"
 
@@ -1906,12 +1906,23 @@ class ModulesInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(ModulesInfo, self).__init__(name="ModulesInfo", extended=extended, anon=anon)
         parse = ModulesInfo.parsemodules
-        cmd_opts = "{} sh list -t 2>&1".format(MODULECMD_TCL_PATH)
-        cmd = "tclsh"
-        abscmd = which(cmd)
-        if abscmd and len(abscmd) > 0 and pexists(MODULECMD_TCL_PATH):
+        cmd_opts = "sh list -t 2>&1"
+        cmd = "modulecmd"
+        abspath = which(cmd)
+        if MODULECMD_PATH is not None and len(MODULECMD_PATH) > 0:
+            path = "{}".format(MODULECMD_PATH)
+            path_opts = "{}".format(cmd_opts)
+            if " " in path:
+                tmplist = path.split(" ")
+                path = which(tmplist[0])
+                path_opts = "{} {}".format(" ".join(tmplist[1:]), path_opts)
+            else:
+                path = which(cmd)
+            abscmd = path
+            cmd_opts = path_opts
+        if abscmd and len(abscmd) > 0:
             self.commands["Loaded"] = (abscmd, cmd_opts, None, parse)
-            self.required4equal.append("Loaded")
+            #self.required4equal.append("Loaded")
     @staticmethod
     def parsemodules(value):
         slist = re.split("\n", value)

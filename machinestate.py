@@ -139,8 +139,6 @@ def tointlist(value):
                     end = int(end)
                 except ValueError as exce:
                     raise exce
-                except:
-                    raise
                 outlist += [i for i in range(int(start), int(end)+1)]
             else:
                 ipart = None
@@ -148,8 +146,6 @@ def tointlist(value):
                     ipart = int(part)
                 except ValueError as exce:
                     raise exce
-                except:
-                    raise
                 if ipart:
                     outlist.append(ipart)
         return outlist

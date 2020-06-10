@@ -128,6 +128,8 @@ def tointlist(value):
     '''
     if value and isinstance(value, int):
         return [value]
+    if value and isinstance(value, float):
+        return [int(value)]
 
     if value and isinstance(value, str):
         outlist = []

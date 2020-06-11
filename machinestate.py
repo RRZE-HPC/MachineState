@@ -297,6 +297,57 @@ def process_file(args):
         filefp.close()
     return data
 
+def process_files(filedict):
+    sortdict = {}
+    outdict = {}
+    for key in filedict:
+        fname, fmatch, fparse, *_ = filedict[key]
+        if fname not in sortdict:
+            sortdict[fname] = []
+        sortdict[fname].append((key, fmatch, fparse))
+    for fname in sortdict:
+        filefp = fopen(fname)
+        data = None
+        if filefp:
+            data = filefp.read().decode(ENCODING)
+            for args in sortdict[fname]:
+                key, fmatch, fparse = args
+                tmpdata = str(data.strip()) if data.strip() else ""
+                if fmatch is not None:
+                    tmpdata = match_data(tmpdata, fmatch)
+                if fparse is not None:
+                    try:
+                        tmpdata = fparse(tmpdata)
+                    except BaseException:
+                        pass
+                outdict[key] = tmpdata
+    return outdict
+
+def process_cmds(cmddict):
+    sortdict = {}
+    outdict = {}
+    for key in cmddict:
+        cmd, cmd_opts, cmatch, cparse, *_ = cmddict[key]
+        newkey = " ".join([cmd, cmd_opts])
+        if newkey not in sortdict:
+            sortdict[newkey] = []
+        sortdict[newkey].append((key, cmatch, cparse))
+    for cmd in sortdict:
+        exestr = "{}; exit 0;".format(cmd)
+        data = check_output(exestr, stderr=DEVNULL, shell=True).decode(ENCODING)
+        for args in sortdict[cmd]:
+            key, cmatch, cparse = args
+            tmpdata = str(data.strip()) if data.strip() else ""
+            if cmatch is not None:
+                tmpdata = match_data(tmpdata, cmatch)
+            if cparse is not None:
+                try:
+                    tmpdata = cparse(tmpdata)
+                except BaseException:
+                    pass
+            outdict[key] = tmpdata
+    return outdict
+
 def process_cmd(args):
     data = None
     cmd, *optsmatchconvert = args
@@ -423,17 +474,9 @@ class InfoGroup:
     def update(self):
         outdict = {}
         if len(self.files) > 0:
-            for key in self.files:
-                val = self.files.get(key, None)
-                if val:
-                    fdata = process_file(val)
-                    outdict[key] = fdata
+            outdict.update(process_files(self.files))
         if len(self.commands) > 0:
-            for key in self.commands:
-                val = self.commands.get(key, None)
-                if val:
-                    cdata = process_cmd(val)
-                    outdict[key] = cdata
+            outdict.update(process_cmds(self.commands))
         if len(self.constants) > 0:
             for key in self.constants:
                 outdict[key] = self.constants[key]

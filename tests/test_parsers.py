@@ -175,116 +175,116 @@ class TestParsers(unittest.TestCase):
     def test_masktolistStrMaskComma(self):
         out = machinestate.masktolist("ff,FF")
         self.assertEqual(out, [x for x in range(16)])
-    # Tests for toHz
-    def test_toHzNone(self):
-        out = machinestate.toHz(None)
+    # Tests for tohertz
+    def test_tohertzNone(self):
+        out = machinestate.tohertz(None)
         self.assertEqual(out, None)
-    def test_toHzInt(self):
-        out = machinestate.toHz(1000)
+    def test_tohertzInt(self):
+        out = machinestate.tohertz(1000)
         self.assertEqual(out, 1000)
-    def test_toHzIntStr(self):
+    def test_tohertzIntStr(self):
         # string without unit are seen as kHz
-        out = machinestate.toHz("10000")
+        out = machinestate.tohertz("10000")
         self.assertEqual(out, 10000000)
-    def test_toHzStrHz(self):
-        out = machinestate.toHz("1234 Hz")
+    def test_tohertzStrHz(self):
+        out = machinestate.tohertz("1234 Hz")
         self.assertEqual(out, 1234)
-    def test_toHzStrhz(self):
-        out = machinestate.toHz("1234hz")
+    def test_tohertzStrhz(self):
+        out = machinestate.tohertz("1234hz")
         self.assertEqual(out, 1234)
-    def test_toHzStrkHz(self):
-        out = machinestate.toHz("1234 kHz")
+    def test_tohertzStrkHz(self):
+        out = machinestate.tohertz("1234 kHz")
         self.assertEqual(out, 1234*1000)
-    def test_toHzStrKHz(self):
-        out = machinestate.toHz("1234KHz")
+    def test_tohertzStrKHz(self):
+        out = machinestate.tohertz("1234KHz")
         self.assertEqual(out, 1234*1000)
-    def test_toHzStrmHz(self):
-        out = machinestate.toHz("1234 mHz")
+    def test_tohertzStrmHz(self):
+        out = machinestate.tohertz("1234 mHz")
         self.assertEqual(out, 1234000000)
-    def test_toHzStrMHz(self):
-        out = machinestate.toHz("1234 MHz")
+    def test_tohertzStrMHz(self):
+        out = machinestate.tohertz("1234 MHz")
         self.assertEqual(out, 1234000000)
-    def test_toHzStrGHz(self):
-        out = machinestate.toHz("1234 GHz")
+    def test_tohertzStrGHz(self):
+        out = machinestate.tohertz("1234 GHz")
         self.assertEqual(out, 1234000000000)
-    def test_toHzStrgHz(self):
-        out = machinestate.toHz("1234gHz")
+    def test_tohertzStrgHz(self):
+        out = machinestate.tohertz("1234gHz")
         self.assertEqual(out, 1234000000000)
-    def test_toHzFloat(self):
-        out = machinestate.toHz(1000.00)
+    def test_tohertzFloat(self):
+        out = machinestate.tohertz(1000.00)
         self.assertEqual(out, 1000)
-    def test_toHzFloatStr(self):
+    def test_tohertzFloatStr(self):
         # string without unit are seen as kHz
-        out = machinestate.toHz("10000.00")
+        out = machinestate.tohertz("10000.00")
         self.assertEqual(out, 10000000)
-    def test_toHzStrfHz(self):
-        out = machinestate.toHz("1234.00 Hz")
+    def test_tohertzStrfHz(self):
+        out = machinestate.tohertz("1234.00 Hz")
         self.assertEqual(out, 1234)
-    def test_toHzStrfhz(self):
-        out = machinestate.toHz("1234.00hz")
+    def test_tohertzStrfhz(self):
+        out = machinestate.tohertz("1234.00hz")
         self.assertEqual(out, 1234)
-    def test_toHzStrfkHz(self):
-        out = machinestate.toHz("1234.00 kHz")
+    def test_tohertzStrfkHz(self):
+        out = machinestate.tohertz("1234.00 kHz")
         self.assertEqual(out, 1234*1000)
-    def test_toHzStrfKHz(self):
-        out = machinestate.toHz("1234.00KHz")
+    def test_tohertzStrfKHz(self):
+        out = machinestate.tohertz("1234.00KHz")
         self.assertEqual(out, 1234*1000)
-    def test_toHzStrfmHz(self):
-        out = machinestate.toHz("1234.00 mHz")
+    def test_tohertzStrfmHz(self):
+        out = machinestate.tohertz("1234.00 mHz")
         self.assertEqual(out, 1234000000)
-    def test_toHzStrfMHz(self):
-        out = machinestate.toHz("1234.00 MHz")
+    def test_tohertzStrfMHz(self):
+        out = machinestate.tohertz("1234.00 MHz")
         self.assertEqual(out, 1234000000)
-    def test_toHzStrfGHz(self):
-        out = machinestate.toHz("1234.00 GHz")
+    def test_tohertzStrfGHz(self):
+        out = machinestate.tohertz("1234.00 GHz")
         self.assertEqual(out, 1234000000000)
-    def test_toHzStrfgHz(self):
-        out = machinestate.toHz("1234.00gHz")
+    def test_tohertzStrfgHz(self):
+        out = machinestate.tohertz("1234.00gHz")
         self.assertEqual(out, 1234000000000)
-    def test_toHzStrAlmostValid(self):
-        self.assertRaises(ValueError, machinestate.toHz, ".ghz")
-    def test_toHzStrNotValid(self):
-        out = machinestate.toHz("abc")
+    def test_tohertzStrAlmostValid(self):
+        self.assertRaises(ValueError, machinestate.tohertz, ".ghz")
+    def test_tohertzStrNotValid(self):
+        out = machinestate.tohertz("abc")
         self.assertEqual(out, None)
 
-    # Tests for toHzlist
-    def test_toHzlistNone(self):
-        out = machinestate.toHzlist(None)
+    # Tests for tohertzlist
+    def test_tohertzlistNone(self):
+        out = machinestate.tohertzlist(None)
         self.assertEqual(out, None)
-    def test_toHzlistInt(self):
-        out = machinestate.toHzlist(1000)
+    def test_tohertzlistInt(self):
+        out = machinestate.tohertzlist(1000)
         self.assertEqual(out, [1000])
-    def test_toHzlistFloatStrSpace(self):
+    def test_tohertzlistFloatStrSpace(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000.00 20000.00 30000.00")
+        out = machinestate.tohertzlist("10000.00 20000.00 30000.00")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistFloatStrComma(self):
+    def test_tohertzlistFloatStrComma(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000.00,20000.00,30000.00")
+        out = machinestate.tohertzlist("10000.00,20000.00,30000.00")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistIntStrSpace(self):
+    def test_tohertzlistIntStrSpace(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000 20000 30000")
+        out = machinestate.tohertzlist("10000 20000 30000")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistIntStrComma(self):
+    def test_tohertzlistIntStrComma(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000,20000,30000")
+        out = machinestate.tohertzlist("10000,20000,30000")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistFloatStrSpacekHz(self):
+    def test_tohertzlistFloatStrSpacekHz(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000.00kHz 20000.00kHz 30000.00KHz")
+        out = machinestate.tohertzlist("10000.00kHz 20000.00kHz 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistFloatStrCommakHz(self):
+    def test_tohertzlistFloatStrCommakHz(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000.00kHz, 20000.00kHz, 30000.00KHz")
+        out = machinestate.tohertzlist("10000.00kHz, 20000.00kHz, 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistIntStrSpacekHz(self):
+    def test_tohertzlistIntStrSpacekHz(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000khz 20000.00kHz 30000.00KHz")
+        out = machinestate.tohertzlist("10000khz 20000.00kHz 30000.00KHz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    def test_toHzlistIntStrCommakHz(self):
+    def test_tohertzlistIntStrCommakHz(self):
         # string without unit are seen as kHz
-        out = machinestate.toHzlist("10000kHz,20000KHz,30000khz")
+        out = machinestate.tohertzlist("10000kHz,20000KHz,30000khz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
     # Tests for totitle
     def test_totitleNone(self):

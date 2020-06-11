@@ -97,6 +97,7 @@ def fopen(filename):
         except PermissionError:
             return None
         return filefp
+    return None
 
 ################################################################################
 # Parser Functions used in multiple places. If a parser function is used only
@@ -144,6 +145,9 @@ def tointlist(value):
                 outlist += [i for i in range(int(start), int(end)+1)]
             else:
                 ipart = None
+                mat = re.match("(\d+)\.\d+", part)
+                if mat:
+                    part = mat.group(1)
                 try:
                     ipart = int(part)
                 except ValueError as exce:
@@ -305,6 +309,7 @@ def process_files(filedict):
         if fname not in sortdict:
             sortdict[fname] = []
         sortdict[fname].append((key, fmatch, fparse))
+        outdict[key] = None
     for fname in sortdict:
         filefp = fopen(fname)
         data = None
@@ -321,24 +326,32 @@ def process_files(filedict):
                     except BaseException:
                         pass
                 outdict[key] = tmpdata
+            filefp.close()
     return outdict
 
 def process_cmds(cmddict):
     sortdict = {}
     outdict = {}
+    bladict = {}
     for key in cmddict:
         cmd, cmd_opts, cmatch, cparse, *_ = cmddict[key]
-        newkey = " ".join([cmd, cmd_opts])
+        newkey = " ".join([cmd, cmd_opts or ""])
         if newkey not in sortdict:
-            sortdict[newkey] = []
-        sortdict[newkey].append((key, cmatch, cparse))
-    for cmd in sortdict:
-        exestr = "{}; exit 0;".format(cmd)
-        data = check_output(exestr, stderr=DEVNULL, shell=True).decode(ENCODING)
-        for args in sortdict[cmd]:
+            sortdict[(cmd, cmd_opts or "")] = []
+        sortdict[(cmd, cmd_opts or "")].append((key, cmatch, cparse))
+        outdict[key] = None
+        bladict[(cmd, cmd_opts or "")] = "bla"
+    for cmdargs in sortdict:
+        cmd, cmd_opts = cmdargs
+        abscmd = which(cmd)
+        data = None
+        if abscmd and len(abscmd) > 0:
+            exestr = "{} {}; exit 0;".format(cmd, cmd_opts)
+            data = check_output(exestr, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+        for args in sortdict[cmdargs]:
             key, cmatch, cparse = args
-            tmpdata = str(data.strip()) if data.strip() else ""
-            if cmatch is not None:
+            tmpdata = data
+            if tmpdata and cmatch is not None:
                 tmpdata = match_data(tmpdata, cmatch)
             if cparse is not None:
                 try:
@@ -464,8 +477,13 @@ class InfoGroup:
     def required(self, *args):
         if args:
             for arg in args:
-                if arg not in self.required4equal:
-                    self.required4equal.append(arg)
+                if isinstance(arg, list):
+                    for subarg in arg:
+                        if subarg not in self.required4equal:
+                            self.required4equal.append(subarg)
+                elif isinstance(arg, str):
+                    if arg not in self.required4equal:
+                        self.required4equal.append(arg)
 
     def generate(self):
         '''Generate subclasses, defined by derived classes'''

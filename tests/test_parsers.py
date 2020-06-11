@@ -44,6 +44,9 @@ class TestParsers(unittest.TestCase):
     def test_tointlistValidTabs(self):
         out = machinestate.tointlist("1\t2\t3")
         self.assertEqual(out, [1, 2, 3])
+    def test_tointlistValidFloats(self):
+        out = machinestate.tointlist("1.0 2.0 3.0")
+        self.assertEqual(out, [1, 2, 3])
     def test_tointlistValidComma(self):
         out = machinestate.tointlist("1,2,3")
         self.assertEqual(out, [1, 2, 3])

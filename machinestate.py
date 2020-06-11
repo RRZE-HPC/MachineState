@@ -1129,7 +1129,7 @@ class NumaInfoClass(PathMatchInfoGroup):
         self.addf("CpuList", pjoin(base, "cpulist"), r"(.*)", tointlist)
 
         if extended:
-            self.addf("Writeback", meminfo, r"{} Writeback:\s+{})".format(prefix, regex), tobytes)
+            self.addf("Writeback", meminfo, r"{} Writeback:\s+{}".format(prefix, regex), tobytes)
 
         self.required("MemTotal", "MemFree", "CpuList")
         self.searchpath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(node)

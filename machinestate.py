@@ -170,7 +170,7 @@ def tobytes(value):
     if value and isinstance(value, int):
         return value
     if value and isinstance(value, str):
-        mat = re.match("([\d\.]+)\s*([kKmMgG]{0,1})([i]{0,1})([bB]{0,1})", value)
+        mat = re.match(r"([\d\.]+)\s*([kKmMgG]{0,1})([i]{0,1})([bB]{0,1})", value)
         if mat is not None:
             count = int(mat.group(1))
             mult = 1024
@@ -404,6 +404,18 @@ class InfoGroup:
         if isinstance(anon, bool):
             self.anon = anon
 
+    def addf(self, key, filename, match=None, parse=None, extended=False):
+        self.files[key] = (filename, match, parse)
+    def addc(self, key, cmd, cmd_opts=None, match=None, parse=None, extended=False):
+        self.commands[key] = (cmd, cmd_opts, match, parse)
+    def const(self, key, value):
+        self.constants[key] = value
+    def required(self, *args):
+        if args:
+            for arg in args:
+                if arg not in self.required4equal:
+                    self.required4equal.append(arg)
+
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
         pass
@@ -468,6 +480,7 @@ class InfoGroup:
     def __eq__(self, other):
         selfdict = self.get()
         tcase = TestCase()
+        cname = str(self.__class__.__name__)
         if isinstance(other, str):
             if pexists(other):
                 jsonfp = fopen(other)
@@ -478,6 +491,7 @@ class InfoGroup:
                 other = json.loads(other)
 
         for rkey in self.required4equal:
+            estr = "key '{}' for class {}".format(rkey, cname)
             if rkey in other:
                 if rkey in selfdict:
                     selfval = selfdict[rkey]
@@ -496,18 +510,19 @@ class InfoGroup:
                             try:
                                 tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
                             except BaseException as exce:
-                                print("ERROR: Equality check failed for key '{}' for class {} with delta +/- 20% of state value: {}".format(rkey, str(self.__class__.__name__), exce))
+                                print("ERROR: Equality check failed for {} with delta +/- 20% of \
+                                        state value: {}".format(estr, exce))
                                 return False
                     elif selfval != otherval:
-                        print("ERROR: Equality check failed for key '{}' for class {}".format(rkey, str(self.__class__.__name__)))
+                        print("ERROR: Equality check failed for {}".format(estr))
                         return False
 
                 else:
-                    print("ERROR: Required key '{}' for class {} not found in current state.".format(rkey, str(self.__class__.__name__)))
+                    print("ERROR: Required {} not found in current state.".format(estr))
                     print("       Maybe key only available in extended mode.")
                     return False
             else:
-                print("ERROR: Required key '{}' for class {} not found in input".format(rkey, str(self.__class__.__name__)))
+                print("ERROR: Required {} not found in input".format(estr))
         for inst in self._instances:
             if inst.name in other:
                 instout = (inst.__eq__(other[inst.name]))
@@ -790,13 +805,12 @@ class OSInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(OSInfo, self).__init__(anon=anon, extended=extended)
         self.name = "OperatingSystemInfo"
-        self.files = {"Name" : ("/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*"),
-                      "Version" : ("/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*"),
-                     }
-        self.required4equal = self.files.keys()
+        self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
+        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
+
+        self.required(["Name", "Version"])
         if extended:
-            self.files["URL"] = ("/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
-            #self.files["Codename"] = ("/etc/os-release", "VERSION_CODENAME=[\"]*([^\"\n]+)[\"]*")
+            self.addf("URL", "/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
 
 ################################################################################
 # Infos about NUMA balancing
@@ -807,14 +821,15 @@ class NumaBalance(InfoGroup):
         self.name = "NumaBalancing"
         base = "/proc/sys/kernel"
         regex = r"(\d+)"
-        self.files = {"Enabled" : (pjoin(base, "numa_balancing"), regex, bool)}
+        self.addf("Enabled", pjoin(base, "numa_balancing"), regex, bool)
+        self.required("Enabled")
         if extended:
             names = ["ScanDelayMs", "ScanPeriodMaxMs", "ScanPeriodMinMs", "ScanSizeMb"]
             files = ["numa_balancing_scan_delay_ms", "numa_balancing_scan_period_max_ms",
                      "numa_balancing_scan_period_min_ms", "numa_balancing_scan_size_mb"]
             for key, fname in zip(names, files):
-                self.files[key] = (pjoin(base, fname), regex, int)
-        self.required4equal = self.files.keys()
+                self.addf(key, pjoin(base, fname), regex, int)
+                self.required(key)
 
 ################################################################################
 # Infos about the host
@@ -824,10 +839,10 @@ class HostInfo(InfoGroup):
         super(HostInfo, self).__init__(anon=anon, extended=extended)
         self.name = "HostInfo"
         if not anon:
-            self.commands = {"Hostname" : ("hostname", "-s", r"(.+)")}
+            self.addc("Hostname", "hostname", "-s", r"(.+)")
             if extended:
-                self.commands.update({"Domainname" : ("hostname", "-d", r"(.+)")})
-                self.commands.update({"FQDN" : ("hostname", "-f", r"(.+)")})
+                self.addc("Domainname", "hostname", "-d", r"(.+)")
+                self.addc("FQDN", "hostname", "-f", r"(.+)")
 
 ################################################################################
 # Infos about the CPU
@@ -836,39 +851,38 @@ class CpuInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anon=anon)
         march = platform.machine()
-        self.constants = {"MachineType" : march}
+        self.const("MachineType", march)
         if march in ["x86_64", "i386"]:
-            self.files = {"Vendor" : ("/proc/cpuinfo", r"vendor_id\s+:\s(.*)"),
-                          "Name" : ("/proc/cpuinfo", r"model name\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"cpu family\s+:\s(.+)", int),
-                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)", int),
-                          "Stepping" : ("/proc/cpuinfo", r"stepping\s+:\s(.+)", int),
-                         }
+            self.addf("Vendor", "/proc/cpuinfo", r"vendor_id\s+:\s(.*)")
+            self.addf("Name", "/proc/cpuinfo", r"model name\s+:\s(.+)")
+            self.addf("Family", "/proc/cpuinfo", r"cpu family\s+:\s(.+)", int)
+            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)", int)
+            self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
         elif march in ["aarch64"]:
-            self.files["Vendor"] = ("/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
-            self.files["Family"] = ("/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
-            self.files["Model"] = ("/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
-            self.files["Stepping"] = ("/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
-            self.files["Variant"] = ("/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
+            self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
+            self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
         elif march in ["ppc64le", "ppc64"]:
-            self.files = {"Platform" : ("/proc/cpuinfo", r"platform\s+:\s(.*)"),
-                          "Name" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
-                          "Family" : ("/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*"),
-                          "Model" : ("/proc/cpuinfo", r"model\s+:\s(.+)"),
-                          "Stepping" : ("/proc/cpuinfo", r"revision\s+:\s(.+)"),
-                         }
-        self.required4equal = ["Vendor", "Family", "Model", "Stepping"]
+            self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
+            self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")
+            self.addf("Family", "/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*")
+            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
+            self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
+
+        self.required(["Vendor", "Family", "Model", "Stepping"])
         if pexists("/sys/devices/system/cpu/smt/active"):
-            self.files["SMT"] = ("/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
-            self.required4equal.append("SMT")
+            self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
+            self.required("SMT")
         if extended:
             if march in ["x86_64", "i386"]:
-                self.files["Flags"] = ("/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
-                self.files["Microcode"] = ("/proc/cpuinfo", r"microcode\s+:\s(.+)")
-                self.files["Bugs"] = ("/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
-                self.required4equal.append("Microcode")
+                self.addf("Flags", "/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
+                self.addf("Microcode", "/proc/cpuinfo", r"microcode\s+:\s(.+)")
+                self.addf("Bugs", "/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
+                self.required("Microcode")
             elif march in ["aarch64"]:
-                self.files["Flags"] = ("/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
+                self.addf("Flags", "/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
 
 
 ################################################################################
@@ -879,13 +893,11 @@ class CpuTopologyClass(InfoGroup):
         super(CpuTopologyClass, self).__init__(anon=anon, extended=extended)
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/topology".format(ident)
-        self.files = {"CoreId" : (pjoin(base, "core_id"), r"(\d+)", int),
-                      "PackageId" : (pjoin(base, "physical_package_id"), r"(\d+)", int),
-                     }
-        self.constants = {"HWThread" : ident,
-                          "ThreadId" : CpuTopologyClass.getthreadid(ident)
-                         }
-        self.required4equal = list(self.files.keys()) + list(self.constants.keys())
+        self.addf("CoreId", pjoin(base, "core_id"), r"(\d+)", int)
+        self.addf("PackageId", pjoin(base, "physical_package_id"), r"(\d+)", int)
+        self.const("HWThread", ident)
+        self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
+        self.required = ["CoreId", "PackageId", "HWThread", "ThreadId"]
 
     @staticmethod
     def getthreadid(hwthread):
@@ -914,11 +926,11 @@ class CpuTopology(PathMatchInfoGroup):
         self.searchpath = "/sys/devices/system/cpu/cpu*"
         self.match = r".*/cpu(\d+)$"
         self.subclass = CpuTopologyClass
-        self.constants["NumHWThreads"] = CpuTopology.getnumcpus()
-        self.constants["NumNUMANodes"] = CpuTopology.getnumnumanodes()
-        self.constants["SMTWidth"] = CpuTopology.getsmtwidth()
-        self.constants["NumSockets"] = CpuTopology.getnumpackages()
-        self.constants["NumCores"] = CpuTopology.getnumcores()
+        self.const("NumHWThreads", CpuTopology.getnumcpus())
+        self.const("NumNUMANodes", CpuTopology.getnumnumanodes())
+        self.const("SMTWidth", CpuTopology.getsmtwidth())
+        self.const("NumSockets", CpuTopology.getnumpackages())
+        self.const("NumCores", CpuTopology.getnumcores())
 
     @staticmethod
     def getnumcpus():
@@ -989,15 +1001,15 @@ class CpuFrequencyClass(InfoGroup):
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(ident)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.files["MaxFreq"] = (pjoin(base, "scaling_max_freq"), r"(\d+)", toHz)
+            self.addf("MaxFreq", pjoin(base, "scaling_max_freq"), r"(\d+)", toHz)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.files["MinFreq"] = (pjoin(base, "scaling_min_freq"), r"(\d+)", toHz)
+            self.addf("MinFreq", pjoin(base, "scaling_min_freq"), r"(\d+)", toHz)
         if pexists(pjoin(base, "scaling_governor")):
-            self.files["Governor"] = (pjoin(base, "scaling_governor"), r"(.+)")
+            self.addf("Governor", pjoin(base, "scaling_governor"), r"(.+)")
         if pexists(pjoin(base, "energy_performance_preference")):
             fname = pjoin(base, "energy_performance_preference")
-            self.files["EnergyPerfPreference"] = (fname, r"(.+)")
-        self.required4equal = self.files.keys()
+            self.addf("EnergyPerfPreference", fname, r"(.+)")
+        self.required(list(self.files.keys()))
 
 class CpuFrequency(PathMatchInfoGroup):
     def __init__(self, extended=False, anon=False):
@@ -1009,25 +1021,25 @@ class CpuFrequency(PathMatchInfoGroup):
             self.match = r".*/cpu(\d+)$"
             self.subclass = CpuFrequencyClass
             if pexists(pjoin(base, "scaling_driver")):
-                self.files["Driver"] = (pjoin(base, "scaling_driver"), r"(.*)")
+                self.addf("Driver", pjoin(base, "scaling_driver"), r"(.*)")
+                self.required("Driver")
             if extended:
                 if pexists(pjoin(base, "cpuinfo_transition_latency")):
                     fname = pjoin(base, "cpuinfo_transition_latency")
-                    self.files["TransitionLatency"] = (fname, r"(\d+)", int)
+                    self.addf("TransitionLatency", fname, r"(\d+)", int)
                 if pexists(pjoin(base, "cpuinfo_max_freq")):
-                    self.files["MaxAvailFreq"] = (pjoin(base, "cpuinfo_max_freq"), r"(\d+)", toHz)
+                    self.addf("MaxAvailFreq", pjoin(base, "cpuinfo_max_freq"), r"(\d+)", toHz)
                 if pexists(pjoin(base, "cpuinfo_min_freq")):
-                    self.files["MinAvailFreq"] = (pjoin(base, "cpuinfo_min_freq"), r"(\d+)", toHz)
+                    self.addf("MinAvailFreq", pjoin(base, "cpuinfo_min_freq"), r"(\d+)", toHz)
                 if pexists(pjoin(base, "scaling_available_frequencies")):
                     fname = pjoin(base, "scaling_available_frequencies")
-                    self.files["AvailFrequencies"] = (fname, r"(.*)", toHzlist)
+                    self.addf("AvailFrequencies", fname, r"(.*)", toHzlist)
                 if pexists(pjoin(base, "scaling_available_governors")):
                     fname = pjoin(base, "scaling_available_governors")
-                    self.files["AvailGovernors"] = (fname, r"(.*)", tostrlist)
+                    self.addf("AvailGovernors", fname, r"(.*)", tostrlist)
                 if pexists(pjoin(base, "energy_performance_available_preferences")):
                     fname = pjoin(base, "energy_performance_available_preferences")
-                    self.files["AvailEnergyPerfPreferences"] = (fname, r"(.*)", tostrlist)
-            self.required4equal = ["Driver"]
+                    self.addf("AvailEnergyPerfPreferences", fname, r"(.*)", tostrlist)
 
 ################################################################################
 # NUMA Topology
@@ -1037,30 +1049,28 @@ class NumaInfoHugepagesClass(InfoGroup):
         name = "Hugepages-{}".format(size)
         super(NumaInfoHugepagesClass, self).__init__(name=name, extended=extended, anon=anon)
         base = "/sys/devices/system/node/node{}/hugepages/hugepages-{}".format(node, size)
-        self.files = {"Count" : (pjoin(base, "nr_hugepages"), r"(\d+)", int),
-                      "Free" : (pjoin(base, "free_hugepages"), r"(\d+)", int),
-                     }
-        self.required4equal = ["Count"]
+        self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
+        self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
+        self.required(["Count", "Free"])
 
 class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, anon=False, extended=False):
         super(NumaInfoClass, self).__init__(anon=anon, extended=extended)
         self.name = "NumaNode{}".format(node)
         base = "/sys/devices/system/node/node{}".format(node)
-        self.files = {"MemTotal" : (pjoin(base, "meminfo"),
-                                    r"Node {} MemTotal:\s+(\d+\s[kKMG][B])".format(node), tobytes),
-                      "MemFree" : (pjoin(base, "meminfo"),
-                                   r"Node {} MemFree:\s+(\d+\s[kKMG][B])".format(node), tobytes),
-                      "MemUsed" : (pjoin(base, "meminfo"),
-                                   r"Node {} MemUsed:\s+(\d+\s[kKMG][B])".format(node), tobytes),
-                      "Distances" : (pjoin(base, "distance"), r"(.*)", tointlist),
-                      "CpuList" : (pjoin(base, "cpulist"), r"(.*)", tointlist),
-                     }
+        meminfo = pjoin(base, "meminfo")
+        prefix = "Node {}".format(node)
+        regex = r"(\d+\s[kKMG][B])"
+        self.addf("MemTotal", meminfo, r"{} MemTotal:\s+{}".format(prefix, regex), tobytes)
+        self.addf("MemFree", meminfo, r"{} MemFree:\s+{}".format(prefix, regex), tobytes)
+        self.addf("MemUsed", meminfo, r"{} MemUsed:\s+{}".format(prefix, regex), tobytes)
+        self.addf("Distances", pjoin(base, "distance"), r"(.*)", tointlist)
+        self.addf("CpuList", pjoin(base, "cpulist"), r"(.*)", tointlist)
+
         if extended:
-            if extended:
-                self.files["Writeback"] = (pjoin(base, "meminfo"),
-                                           r"Node {} Writeback:\s+(\d+\s[kKMG][B])".format(node), tobytes)
-        self.required4equal = ["MemTotal", "MemFree", "CpuList"]
+            self.addf("Writeback", meminfo, r"{} Writeback:\s+{})".format(prefix, regex), tobytes)
+
+        self.required("MemTotal", "MemFree", "CpuList")
         self.searchpath = "/sys/devices/system/node/node{}/hugepages/hugepages-*".format(node)
         self.match = r".*/hugepages-(\d+[kKMG][B])$"
         self.subclass = NumaInfoHugepagesClass
@@ -1081,26 +1091,27 @@ class CacheTopologyClass(InfoGroup):
         super(CacheTopologyClass, self).__init__(extended=extended, anon=anon)
         self.name = "L{}".format(ident)
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
+        fparse = CacheTopologyClass.kBtoB
         if pexists(base):
-            self.files = {"Size" : (pjoin(base, "size"), r"(\d+)", CacheTopologyClass.kBtoB),
-                          "Level" : (pjoin(base, "level"), r"(\d+)", int),
-                          "Type" : (pjoin(base, "type"), r"(.+)"),
-                         }
-            self.constants = {"CpuList" : CacheTopologyClass.getcpulist(ident)}
+            self.addf("Size", pjoin(base, "size"), r"(\d+)", fparse)
+            self.addf("Level", pjoin(base, "level"), r"(\d+)", int)
+            self.addf("Type", pjoin(base, "type"), r"(.+)")
+            self.const("CpuList", CacheTopologyClass.getcpulist(ident))
             if extended:
-                self.files["Sets"] = (pjoin(base, "number_of_sets"), r"(\d+)", int)
-                self.files["Associativity"] = (pjoin(base, "ways_of_associativity"), r"(\d+)", int)
-                self.files["CoherencyLineSize"] = (pjoin(base, "coherency_line_size"), r"(\d+)", CacheTopologyClass.kBtoB)
+                self.addf("Sets", pjoin(base, "number_of_sets"), r"(\d+)", int)
+                self.addf("Associativity", pjoin(base, "ways_of_associativity"), r"(\d+)", int)
+                self.addf("CoherencyLineSize", pjoin(base, "coherency_line_size"), r"(\d+)", fparse)
                 phys_line_part = pjoin(base, "physical_line_partition")
                 if pexists(phys_line_part):
-                    self.files["PhysicalLineSize"] = (phys_line_part, r"(\d+)", CacheTopologyClass.kBtoB)
+
+                    self.addf("PhysicalLineSize", phys_line_part, r"(\d+)", fparse)
                 alloc_policy = pjoin(base, "allocation_policy")
                 if pexists(alloc_policy):
-                    self.files["AllocPolicy"] = (alloc_policy, r"(.+)")
+                    self.addf("AllocPolicy", alloc_policy, r"(.+)")
                 write_policy = pjoin(base, "write_policy")
                 if pexists(write_policy):
-                    self.files["WritePolicy"] = (write_policy, r"(.+)", int)
-        self.required4equal = self.files.keys()
+                    self.addf("WritePolicy", write_policy, r"(.+)", int)
+        self.required(list(self.files.keys()))
         #"CpuList" : (pjoin(self.searchpath, "shared_cpu_list"), r"(.+)", tointlist),
     @staticmethod
     def getcpulist(arg):
@@ -1151,12 +1162,12 @@ class Uptime(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(Uptime, self).__init__(name="Uptime", extended=extended, anon=anon)
         fname = "/proc/uptime"
-        self.files = {"Uptime" : (fname, r"([\d\.]+)\s+[\d\.]+", float),
-                      "UptimeReadable" : (fname, r"([\d\.]+)\s+[\d\.]+", Uptime.totimedelta)
-                     }
-        self.required4equal = ["Uptime"]
+        self.addf("Uptime", fname, r"([\d\.]+)\s+[\d\.]+", float)
+        self.addf("UptimeReadable", fname, r"([\d\.]+)\s+[\d\.]+", Uptime.totimedelta)
+
+        self.required("Uptime")
         if extended:
-            self.files.update({"CpusIdle" : (fname, r"[\d\.]+\s+([\d\.]+)", float)})
+            self.addf("CpusIdle", fname, r"[\d\.]+\s+([\d\.]+)", float)
     @staticmethod
     def totimedelta(value):
         ivalue = int(float(value))
@@ -1180,16 +1191,15 @@ class Uptime(InfoGroup):
 class LoadAvg(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(LoadAvg, self).__init__(name="LoadAvg", extended=extended, anon=anon)
-        self.files = {"LoadAvg1m" : ("/proc/loadavg", r"([\d\.]+)", float),
-                      "LoadAvg5m" : ("/proc/loadavg", r"[\d\.]+\s+([\d+\.]+)", float),
-                      "LoadAvg15m" : ("/proc/loadavg", r"[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float),
-                     }
-        #self.required4equal = ["LoadAvg15m"]
+        self.addf("LoadAvg1m", "/proc/loadavg", r"([\d\.]+)", float)
+        self.addf("LoadAvg5m", "/proc/loadavg", r"[\d\.]+\s+([\d+\.]+)", float)
+        self.addf("LoadAvg15m", "/proc/loadavg", r"[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float)
+        #self.required(["LoadAvg15m"])
         if extended:
             rpmatch = r"[\d+\.]+\s+[\d+\.]+\s+[\d+\.]+\s+(\d+)"
-            self.files["RunningProcesses"] = ("/proc/loadavg", rpmatch, int)
+            self.addf("RunningProcesses", "/proc/loadavg", rpmatch, int)
             apmatch = r"[\d+\.]+\s+[\d+\.]+\s+[\d+\.]+\s+\d+/(\d+)"
-            self.files["AllProcesses"] = ("/proc/loadavg", apmatch, int)
+            self.addf("AllProcesses", "/proc/loadavg", apmatch, int)
 
 
 ################################################################################
@@ -1198,17 +1208,16 @@ class LoadAvg(InfoGroup):
 class MemInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(MemInfo, self).__init__(name="MemInfo", extended=extended, anon=anon)
-        self.files = {"MemTotal" : ("/proc/meminfo", r"MemTotal:\s+(\d+\s[kKMG][B])", tobytes),
-                      "MemFree" : ("/proc/meminfo", r"MemFree:\s+(\d+\s[kKMG][B])", tobytes),
-                      "MemAvailable" : ("/proc/meminfo", r"MemAvailable:\s+(\d+\s[kKMG][B])", tobytes),
-                      "SwapTotal" : ("/proc/meminfo", r"SwapTotal:\s+(\d+\s[kKMG][B])", tobytes),
-                      "SwapFree" : ("/proc/meminfo", r"SwapFree:\s+(\d+\s[kKMG][B])", tobytes),
-                     }
+        fname = "/proc/meminfo"
+        self.addf("MemTotal", fname, r"MemTotal:\s+(\d+\s[kKMG][B])", tobytes)
+        self.addf("MemAvailable", fname, r"MemAvailable:\s+(\d+\s[kKMG][B])", tobytes)
+        self.addf("MemFree", fname, r"MemFree:\s+(\d+\s[kKMG][B])", tobytes)
+        self.addf("SwapTotal", fname, r"SwapTotal:\s+(\d+\s[kKMG][B])", tobytes)
+        self.addf("SwapFree", fname, r"SwapFree:\s+(\d+\s[kKMG][B])", tobytes)
         if extended:
-            self.files.update({"Buffers" : ("/proc/meminfo", r"Buffers:\s+(\d+\s[kKMG][B])", tobytes),
-                               "Cached" : ("/proc/meminfo", r"Cached:\s+(\d+\s[kKMG][B])", tobytes),
-                              })
-        self.required4equal = ["MemFree"]
+            self.addf("Buffers", fname, r"Buffers:\s+(\d+\s[kKMG][B])", tobytes)
+            self.addf("Cached", fname, r"Cached:\s+(\d+\s[kKMG][B])", tobytes)
+        self.required(["MemFree", "MemTotal"])
 
 ################################################################################
 # Infos about the kernel
@@ -1216,10 +1225,9 @@ class MemInfo(InfoGroup):
 class KernelInfo(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(KernelInfo, self).__init__(name="KernelInfo", extended=extended, anon=anon)
-        self.files = {"Version" : ("/proc/sys/kernel/osrelease",),
-                      "CmdLine" : ("/proc/cmdline",),
-                     }
-        self.required4equal = self.files.keys()
+        self.addf("Version", "/proc/sys/kernel/osrelease")
+        self.addf("CmdLine", "/proc/cmdline")
+        self.required = ["Version", "CmdLine"]
 
 ################################################################################
 # Infos about CGroups
@@ -1230,15 +1238,15 @@ class CgroupInfo(InfoGroup):
         csetmat = re.compile(r"\d+\:cpuset\:([/\w\d\-\._]*)")
         cset = process_file(("/proc/self/cgroup", csetmat))
         base = pjoin("/sys/fs/cgroup/cpuset", cset.strip("/"))
-        self.files = {"CPUs" : (pjoin(base, "cpuset.cpus"), r"(.+)", tointlist),
-                      "Mems" : (pjoin(base, "cpuset.mems"), r"(.+)", tointlist),
-                     }
+        self.addf("CPUs", pjoin(base, "cpuset.cpus"), r"(.+)", tointlist)
+        self.addf("Mems", pjoin(base, "cpuset.mems"), r"(.+)", tointlist)
+        self.required("CPUs", "Mems")
         if extended:
             names = ["CPUs.effective", "Mems.effective"]
             files = ["cpuset.effective_cpus", "cpuset.effective_mems"]
             for key, fname in zip(names, files):
-                self.files[key] = (pjoin(base, fname), r"(.+)", tointlist)
-        self.required4equal = self.files.keys()
+                self.addf(key, pjoin(base, fname), r"(.+)", tointlist)
+                self.required(key)
 
 ################################################################################
 # Infos about the writeback workqueue
@@ -1247,11 +1255,9 @@ class Writeback(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(Writeback, self).__init__(name="Writeback", extended=extended, anon=anon)
         base = "/sys/bus/workqueue/devices/writeback"
-        self.files = {"CPUmask" : (pjoin(base, "cpumask"), r"(.+)"),
-                      #"CPUlist" : (pjoin(base, "cpumask"), r"(.+)", masktolist),
-                      "MaxActive" : (pjoin(base, "max_active"), r"(\d+)", int),
-                     }
-        self.required4equal = ["CPUmask", "MaxActive"]
+        self.addf("CPUmask", pjoin(base, "cpumask"), r"(.+)")
+        self.addf("MaxActive", pjoin(base, "max_active"), r"(\d+)", int)
+        self.required(["CPUmask", "MaxActive"])
 
 ################################################################################
 # Infos about transparent hugepages
@@ -1261,10 +1267,9 @@ class TransparentHugepages(InfoGroup):
         super(TransparentHugepages, self).__init__(extended=extended, anon=anon)
         self.name = "TransparentHugepages"
         base = "/sys/kernel/mm/transparent_hugepage"
-        self.files = {"State" : (pjoin(base, "enabled"), r".*\[(.*)\].*"),
-                      "UseZeroPage" : (pjoin(base, "use_zero_page"), r"(\d+)", bool),
-                     }
-        self.required4equal = self.files.keys()
+        self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
+        self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", bool)
+        self.required(["State", "UseZeroPage"])
 
 
 ################################################################################
@@ -1287,8 +1292,8 @@ class PowercapInfoConstraintClass(InfoGroup):
         files = ["constraint_{}_power_limit_uw".format(ident),
                  "constraint_{}_time_window_us".format(ident)]
         for key, fname in zip(names, files):
-            self.files[key] = (pjoin(base, fname), r"(.+)", int)
-        self.required4equal = names
+            self.addf(key, pjoin(base, fname), r"(.+)", int)
+        self.required(names)
 
 class PowercapInfoClass(PathMatchInfoGroup):
     '''Class to spawn subclasses for each contraint in a powercap domain'''
@@ -1300,7 +1305,7 @@ class PowercapInfoClass(PathMatchInfoGroup):
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
             fptr.close()
-        self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
+        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", bool)
         self.searchpath = pjoin(base, "constraint_*_name")
         self.match = r".*/constraint_(\d+)_name"
         self.subclass = PowercapInfoConstraintClass
@@ -1313,7 +1318,7 @@ class PowercapInfoPackageClass(PathMatchInfoGroup):
     def __init__(self, ident, extended=False, anon=False):
         super(PowercapInfoPackageClass, self).__init__(name="Package", extended=extended, anon=anon)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(ident)
-        self.files = {"Enabled" : (pjoin(base, "enabled"), r"(\d+)", bool)}
+        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", bool)
         self.searchpath = pjoin(base, "constraint_*_name")
         self.match = r".*/constraint_(\d+)_name"
         self.subclass = PowercapInfoConstraintClass
@@ -1356,15 +1361,15 @@ class PowercapInfo(PathMatchInfoGroup):
         else:
             base = "/sys/firmware/opal/powercap/system-powercap"
             if pexists(base):
-                self.files["PowerLimit"] = (pjoin(base, "powercap-current", r"(\d+)", int))
+                self.addf("PowerLimit", pjoin(base, "powercap-current"), r"(\d+)", int)
                 if extended:
-                    self.files["PowerLimitMax"] = (pjoin(base, "powercap-max", r"(\d+)", int))
-                    self.files["PowerLimitMin"] = (pjoin(base, "powercap-min", r"(\d+)", int))
+                    self.addf("PowerLimitMax", pjoin(base, "powercap-max"), r"(\d+)", int)
+                    self.addf("PowerLimitMin", pjoin(base, "powercap-min"), r"(\d+)", int)
             base = "/sys/firmware/opal/psr"
             if pexists(base):
                 for i, fname in enumerate(glob(pjoin(base, "cpu_to_gpu_*"))):
                     key = "CpuToGpu{}".format(i)
-                    self.files[key] = (fname, r"(\d+)", int)
+                    self.addf(key, fname, r"(\d+)", int)
 
 
 ################################################################################
@@ -1376,10 +1381,9 @@ class HugepagesClass(InfoGroup):
         name = "Hugepages-{}".format(size)
         super(HugepagesClass, self).__init__(name=name, extended=extended, anon=anon)
         base = "/sys/kernel/mm/hugepages/hugepages-{}".format(size)
-        self.files = {"Count" : (pjoin(base, "nr_hugepages"), r"(\d+)", int),
-                      "Free" : (pjoin(base, "free_hugepages"), r"(\d+)", int),
-                      "Reserved" : (pjoin(base, "resv_hugepages"), r"(\d+)", int),
-                     }
+        self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
+        self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
+        self.addf("Reserved", pjoin(base, "resv_hugepages"), r"(\d+)", int)
 
 class Hugepages(PathMatchInfoGroup):
     '''Class to spawn subclasses for all hugepages sizes (/sys/kernel/mm/hugepages/hugepages-*)'''
@@ -1398,11 +1402,11 @@ class CompilerInfoClass(InfoGroup):
     def __init__(self, executable, extended=False, anon=False):
         super(CompilerInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = executable
-        self.commands = {"Version" : (executable, "--version", r"(\d+\.\d+\.\d+)")}
+        self.addc("Version", executable, "--version", r"(\d+\.\d+\.\d+)")
         abscmd = which(executable)
         if abscmd and len(abscmd) > 0:
-            self.constants["Path"] = abscmd
-        self.required4equal.append("Version")
+            self.const("Path", abscmd)
+        self.required("Version")
 
 
 class CCompilerInfo(ListInfoGroup):
@@ -1461,9 +1465,9 @@ class PythonInfoClass(InfoGroup):
         self.name = executable
         abspath = which(executable)
         if abspath and len(abspath) > 0:
-            self.commands = {"Version" : (abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")}
-            self.constants = {"Path" : abspath}
-        self.required4equal.append("Version")
+            self.addc("Version", abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")
+            self.const("Path", abspath)
+        self.required("Version")
 
 class PythonInfo(ListInfoGroup):
     '''Class to spawn subclasses for various Python commands'''
@@ -1480,13 +1484,12 @@ class MpiInfoClass(InfoGroup):
     '''Class to read information about an MPI or job scheduler executable'''
     def __init__(self, executable, extended=False, anon=False):
         super(MpiInfoClass, self).__init__(name=executable, extended=extended, anon=anon)
-        self.commands = {"Version" : (executable, "--version", r"(.+)", MpiInfoClass.mpiversion),
-                         "Implementor" : (executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
-                        }
+        self.addc("Version", executable, "--version", r"(.+)", MpiInfoClass.mpiversion)
+        self.addc("Implementor", executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
         abscmd = which(executable)
         if abscmd and len(abscmd) > 0:
-            self.constants["Path"] = abscmd
-        self.required4equal = ["Version", "Implementor"]
+            self.const("Path", abscmd)
+        self.required(["Version", "Implementor"])
 
     @staticmethod
     def mpivendor(value):
@@ -1561,8 +1564,8 @@ class PrefetcherInfoClass(InfoGroup):
             abscmd = pjoin(likwid_base, cmd)
         if abscmd:
             for name in names:
-                self.commands[name] = (abscmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
-        self.required4equal = names
+                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
+        self.required(names)
 
 class PrefetcherInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all HW threads returned by likwid-features'''
@@ -1610,12 +1613,14 @@ class TurboInfo(InfoGroup):
             data = process_cmd((abscmd, cmd_opts, matches[0]))
             if len(data) > 0 and not re.match(error_match, data):
                 for name, regex in zip(names, matches):
-                    self.commands[name] = (abscmd, cmd_opts, regex, toHz)
+                    self.addc(name, abscmd, cmd_opts, regex, toHz)
+                    self.required(name)
                 regex = r"Performance energy bias:\s+(\d+)\s.*"
-                self.commands["PerfEnergyBias"] = (abscmd, cmd_opts, regex, int)
+                self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
+                self.required("PerfEnergyBias")
                 regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
-                self.commands["TurboFrequencies"] = (abscmd, cmd_opts, None, freqfunc)
+                self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
         self.required4equal = self.commands.keys()
     @staticmethod
     def getactivecores(indata):
@@ -1635,10 +1640,10 @@ class ClocksourceInfoClass(InfoGroup):
         super(ClocksourceInfoClass, self).__init__(anon=anon, extended=extended)
         self.name = "Clocksource{}".format(ident)
         base = "/sys/devices/system/clocksource/clocksource{}".format(ident)
-        self.files["Current"] = (pjoin(base, "current_clocksource"), r"(\s+)", str)
+        self.addf("Current", pjoin(base, "current_clocksource"), r"(\s+)", str)
         if extended:
-            self.files["Available"] = (pjoin(base, "available_clocksource"), r"(.+)", tostrlist)
-        self.required4equal = ["Current"]
+            self.addf("Available", pjoin(base, "available_clocksource"), r"(.+)", tostrlist)
+        self.required("Current")
 
 class ClocksourceInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all clocksourse devices
@@ -1662,13 +1667,13 @@ class ExecutableInfoExec(InfoGroup):
         self.executable = executable
 
         abscmd = which(self.executable)
-        self.constants["Name"] = str(self.executable)
+        self.const("Name", str(self.executable))
         if abscmd and len(abscmd) > 0:
-            self.constants["Abspath"] = abscmd
-            self.constants["Size"] = psize(abscmd)
+            self.const("Abspath", abscmd)
+            self.const("Size", psize(abscmd))
             if extended:
-                self.constants["MD5sum"] = ExecutableInfoExec.getmd5sum(abscmd)
-        self.required4equal = self.constants.keys()
+                self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
+        self.required(["Name", "Size", "MD5sum"])
     @staticmethod
     def getmd5sum(filename):
         hash_md5 = hashlib.md5()
@@ -1703,7 +1708,7 @@ class ExecutableInfoLibraries(InfoGroup):
                         libdict.update({lib : lib})
                     else:
                         libdict.update({lib : None})
-            self.required4equal = libdict.keys()
+            self.required(list(libdict.keys()))
         self._data = libdict
 
 class ExecutableInfo(MultiClassInfoGroup):
@@ -1725,11 +1730,12 @@ class CoretempInfoHwmonClassX86(InfoGroup):
         super(CoretempInfoHwmonClassX86, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
         self.name = process_file((pjoin(base, "temp{}_label".format(sensor)),))
-        self.files["Input"] = (pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
+        self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
+        self.required("Input")
         if extended:
-            self.files["Critical"] = (pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
-            self.files["Alarm"] = (pjoin(base, "temp{}_crit_alarm".format(sensor)), r"(\d+)", int)
-            self.files["Max"] = (pjoin(base, "temp{}_max".format(sensor)), r"(\d+)", int)
+            self.addf("Critical", pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
+            self.addf("Alarm", pjoin(base, "temp{}_crit_alarm".format(sensor)), r"(\d+)", int)
+            self.addf("Max", pjoin(base, "temp{}_max".format(sensor)), r"(\d+)", int)
 
 class CoretempInfoHwmonX86(PathMatchInfoGroup):
     '''Class to spawn subclasses for one hwmon entry inside a X86 coretemps device'''
@@ -1759,9 +1765,10 @@ class CoretempInfoHwmonClassARM(InfoGroup):
         super(CoretempInfoHwmonClassARM, self).__init__(extended=extended, anon=anon)
         base = "/sys/devices/virtual/hwmon/hwmon{}".format(hwmon)
         self.name = "Core{}".format(sensor)
-        self.files["Input"] = (pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
+        self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
+        self.required("Input")
         if extended:
-            self.files["Critical"] = (pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
+            self.addf("Critical", pjoin(base, "temp{}_crit".format(sensor)), r"(\d+)", int)
 
 class CoretempInfoSocketARM(PathMatchInfoGroup):
     '''Class to spawn subclasses for ARM coretemps for one hwmon entry'''
@@ -1800,14 +1807,14 @@ class BiosInfo(InfoGroup):
         super(BiosInfo, self).__init__(name="BiosInfo", extended=extended, anon=anon)
         base = "/sys/devices/virtual/dmi/id"
         if pexists(base):
-            self.files["BiosDate"] = (pjoin(base, "bios_date"),)
-            self.files["BiosVendor"] = (pjoin(base, "bios_vendor"),)
-            self.files["BiosVersion"] = (pjoin(base, "bios_version"),)
-            self.files["SystemVendor"] = (pjoin(base, "sys_vendor"),)
-            self.files["ProductName"] = (pjoin(base, "product_name"),)
+            self.addf("BiosDate", pjoin(base, "bios_date"))
+            self.addf("BiosVendor", pjoin(base, "bios_vendor"))
+            self.addf("BiosVersion", pjoin(base, "bios_version"))
+            self.addf("SystemVendor", pjoin(base, "sys_vendor"))
+            self.addf("ProductName", pjoin(base, "product_name"))
             if pexists(pjoin(base, "product_vendor")):
-                self.files["ProductVendor"] = (pjoin(base, "product_vendor"),)
-            self.required4equal = self.files.keys()
+                self.addf("ProductVendor", pjoin(base, "product_vendor"))
+            self.required(list(self.files.keys()))
 
 ################################################################################
 # Infos about the thermal zones
@@ -1821,12 +1828,12 @@ class ThermalZoneInfoClass(InfoGroup):
         if pexists(pjoin(base, "device/description")):
             with (open(pjoin(base, "device/description"), "rb")) as filefp:
                 self.name = filefp.read().decode(ENCODING).strip()
-        self.files["Temperature"] = (pjoin(base, "temp"), r"(\d+)", int)
+        self.addf("Temperature", pjoin(base, "temp"), r"(\d+)", int)
         if extended:
-            self.files["Policy"] = (pjoin(base, "policy"), r"(.+)")
+            self.addf("Policy", pjoin(base, "policy"), r"(.+)")
             avpath = pjoin(base, "available_policies")
-            self.files["AvailablePolicies"] = (avpath, r"(.+)", tostrlist)
-            self.files["Type"] = (pjoin(base, "type"), r"(.+)")
+            self.addf("AvailablePolicies", avpath, r"(.+)", tostrlist)
+            self.addf("Type", pjoin(base, "type"), r"(.+)")
 
 class ThermalZoneInfo(PathMatchInfoGroup):
     '''Class to read information for thermal zones (/sys/devices/virtual/thermal/thermal_zone*)'''
@@ -1847,8 +1854,8 @@ class VulnerabilitiesInfo(InfoGroup):
         base = "/sys/devices/system/cpu/vulnerabilities"
         for vfile in glob(pjoin(base, "*")):
             vkey = totitle(os.path.basename(vfile))
-            self.files[vkey] = (vfile,)
-            self.required4equal.append(vkey)
+            self.addf(vkey, vfile)
+            self.required(vkey)
 
 ################################################################################
 # Infos about logged in users (only count to avoid logging user names)
@@ -1857,7 +1864,8 @@ class UsersInfo(InfoGroup):
     '''Class to get count of logged in users. Does not print out the usernames'''
     def __init__(self, extended=False, anon=False):
         super(UsersInfo, self).__init__(name="UsersInfo", extended=extended, anon=anon)
-        self.commands["LoggedIn"] = ("users", "", r"(.*)", UsersInfo.countusers)
+        self.addc("LoggedIn", "users", "", r"(.*)", UsersInfo.countusers)
+        self.required("LoggedIn")
     @staticmethod
     def countusers(value):
         if not value or len(value) == 0:
@@ -1875,7 +1883,7 @@ class DmiDecodeFile(InfoGroup):
     def __init__(self, dmifile, extended=False, anon=False):
         super(DmiDecodeFile, self).__init__(name="DmiDecodeFile", extended=extended, anon=anon)
         if pexists(dmifile):
-            self.files["DmiDecode"] = (dmifile, )
+            self.addf("DmiDecode", dmifile)
 
 ################################################################################
 # Infos about the CPU affinity
@@ -1889,12 +1897,12 @@ class CpuAffinity(InfoGroup):
     def __init__(self, extended=False, anon=False):
         super(CpuAffinity, self).__init__(name="CpuAffinity", extended=extended, anon=anon)
         if "get_schedaffinity" in dir(os):
-            self.constants["Affinity" : os.get_schedaffinity()]
+            self.const("Affinity", os.get_schedaffinity())
         elif DO_LIKWID:
             abscmd = which("likwid-pin")
             if abscmd and len(abscmd) > 0:
-                self.commands["Affinity"] = (abscmd, "-c N -p 2>&1", r"(.*)", tointlist)
-                self.required4equal.append("Affinity")
+                self.addc("Affinity", abscmd, "-c N -p 2>&1", r"(.*)", tointlist)
+                self.required("Affinity")
 
 ################################################################################
 # Infos about loaded modules in the modules system
@@ -1919,7 +1927,7 @@ class ModulesInfo(InfoGroup):
             abscmd = path
             cmd_opts = path_opts
         if abscmd and len(abscmd) > 0:
-            self.commands["Loaded"] = (abscmd, cmd_opts, None, parse)
+            self.addc("Loaded", abscmd, cmd_opts, None, parse)
             #self.required4equal.append("Loaded")
     @staticmethod
     def parsemodules(value):
@@ -1935,9 +1943,9 @@ class InfinibandInfoClassPort(InfoGroup):
         super(InfinibandInfoClassPort, self).__init__(extended=extended, anon=anon)
         self.name = "Port{}".format(port)
         ibpath = "/sys/class/infiniband/{}/ports/{}".format(driver, port)
-        self.files["Rate"] = (pjoin(ibpath, "rate"), r"(.+)")
-        self.files["PhysState"] = (pjoin(ibpath, "phys_state"), r"(.+)")
-        self.files["LinkLayer"] = (pjoin(ibpath, "link_layer"), r"(.+)")
+        self.addf("Rate", pjoin(ibpath, "rate"), r"(.+)")
+        self.addf("PhysState", pjoin(ibpath, "phys_state"), r"(.+)")
+        self.addf("LinkLayer", pjoin(ibpath, "link_layer"), r"(.+)")
 
 
 class InfinibandInfoClass(PathMatchInfoGroup):
@@ -1946,15 +1954,16 @@ class InfinibandInfoClass(PathMatchInfoGroup):
         super(InfinibandInfoClass, self).__init__(extended=extended, anon=anon)
         self.name = driver
         ibpath = "/sys/class/infiniband/{}".format(driver)
-        self.files["BoardId"] = (pjoin(ibpath, "board_id"), r"(.+)")
-        self.files["FirmwareVersion"] = (pjoin(ibpath, "fw_ver"), r"([\d\.]+)")
-        self.files["HCAType"] = (pjoin(ibpath, "hca_type"), r"([\w\d\.]+)")
-        self.files["HWRevision"] = (pjoin(ibpath, "hw_rev"), r"([\w\d\.]+)")
-        self.files["NodeType"] = (pjoin(ibpath, "node_type"), r"(.+)")
+        self.addf("BoardId", pjoin(ibpath, "board_id"), r"(.+)")
+        self.addf("FirmwareVersion", pjoin(ibpath, "fw_ver"), r"([\d\.]+)")
+        self.addf("HCAType", pjoin(ibpath, "hca_type"), r"([\w\d\.]+)")
+        self.addf("HWRevision", pjoin(ibpath, "hw_rev"), r"([\w\d\.]+)")
+        self.addf("NodeType", pjoin(ibpath, "node_type"), r"(.+)")
+
         if not anon:
-            self.files["NodeGUID"] = (pjoin(ibpath, "node_guid"), r"(.+)")
-            self.files["NodeDescription"] = (pjoin(ibpath, "node_desc"), r"(.+)")
-            self.files["SysImageGUID"] = (pjoin(ibpath, "sys_image_guid"), r"(.+)")
+            self.addf("NodeGUID", pjoin(ibpath, "node_guid"), r"(.+)")
+            self.addf("NodeDescription", pjoin(ibpath, "node_desc"), r"(.+)")
+            self.addf("SysImageGUID", pjoin(ibpath, "sys_image_guid"), r"(.+)")
         self.searchpath = "/sys/class/infiniband/{}/ports/*".format(driver)
         self.match = r".*/(\d+)$"
         self.subclass = InfinibandInfoClassPort
@@ -1994,10 +2003,10 @@ class NvidiaSmiInfoClass(InfoGroup):
                      }
         if abscmd:
             for key, regex in matches.items():
-                self.commands[key] = (self.cmd, self.cmd_opts, regex)
+                self.addc(key, self.cmd, self.cmd_opts, regex)
             if extended:
                 for key, regex in extmatches.items():
-                    self.commands[key] = (self.cmd, self.cmd_opts, regex)
+                    self.addc(key, self.cmd, self.cmd_opts, regex)
 
 class NvidiaSmiInfo(ListInfoGroup):
     '''Class to spawn subclasses for each NVIDIA GPU device (uses the nvidia-smi command)'''
@@ -2016,7 +2025,7 @@ class NvidiaSmiInfo(ListInfoGroup):
                   }
         if abscmd:
             for key, regex in matches.items():
-                self.commands[key] = (self.cmd, self.cmd_opts, regex)
+                self.addc(key, self.cmd, self.cmd_opts, regex)
 
 
 ################################################################################
@@ -2030,7 +2039,7 @@ class NecTsubasaInfoTemps(InfoGroup):
         vecmd = pjoin(ve_base, "vecmd")
         veargs = "-N {} info".format(device)
         for tempkey in tempkeys:
-            self.commands[tempkey] = (vecmd, veargs, r"\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
+            self.addc(tempkey, vecmd, veargs, r"\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
 
 class NecTsubasaInfoClass(InfoGroup):
     '''Class to read information for one NEC Tsubasa device (uses the vecmd command)'''
@@ -2040,15 +2049,15 @@ class NecTsubasaInfoClass(InfoGroup):
         vecmd = pjoin(ve_base, "vecmd")
         veargs = "-N {} info".format(device)
         if pexists(vecmd):
-            self.commands["State"] = (vecmd, veargs, r"VE State\s+:\s+(.+)", totitle)
-            self.commands["Model"] = (vecmd, veargs, r"VE Model\s+:\s+(\d+)")
-            self.commands["ProductType"] = (vecmd, veargs, r"Product Type\s+:\s+(\d+)")
-            self.commands["DriverVersion"] = (vecmd, veargs, r"VE Driver Version\s+:\s+([\d\.]+)")
-            self.commands["Cores"] = (vecmd, veargs, r"Cores\s+:\s+(\d+)")
-            self.commands["MemTotal"] = (vecmd, veargs, r"Memory Size\s+:\s+(\d+)")
+            self.addc("State", vecmd, veargs, r"VE State\s+:\s+(.+)", totitle)
+            self.addc("Model", vecmd, veargs, r"VE Model\s+:\s+(\d+)")
+            self.addc("ProductType", vecmd, veargs, r"Product Type\s+:\s+(\d+)")
+            self.addc("DriverVersion", vecmd, veargs, r"VE Driver Version\s+:\s+([\d\.]+)")
+            self.addc("Cores", vecmd, veargs, r"Cores\s+:\s+(\d+)")
+            self.addc("MemTotal", vecmd, veargs, r"Memory Size\s+:\s+(\d+)")
             if extended:
                 regex = r"Negotiated Link Width\s+:\s+(x\d+)"
-                self.commands["PciLinkWidth"] = (vecmd, veargs, regex)
+                self.addc("PciLinkWidth", vecmd, veargs, regex)
             ve_temps = process_cmd((vecmd, veargs, None, NecTsubasaInfoClass.gettempkeys))
             tempargs = {"device" : device, "ve_base" : ve_base}
             cls = NecTsubasaInfoTemps(ve_temps, extended=extended, anon=anon, **tempargs)

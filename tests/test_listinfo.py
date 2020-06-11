@@ -23,7 +23,7 @@ class TestInfoGroup(InfoGroup):
         self.name = "File{}".format(ident)
         path = os.path.join(basepath, "{}*".format(ident))
         files = glob.glob(path)
-        self.files[self.name] = (files[0], r"(.+)")
+        self.addf("File{}".format(ident), files[0], r"(.+)")
 
 class TestListInfoGroupBase(unittest.TestCase):
     def test_empty(self):
@@ -182,7 +182,7 @@ class TestListInfoGroupFunction(unittest.TestCase):
         except:
             pass
         cls.update()
-        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._instances, [])
         self.assertEqual(cls._data, {})
     def test_validGetInvalidClass(self):
         userlist = [x for x in range(len(self.temp_files))]
@@ -193,6 +193,6 @@ class TestListInfoGroupFunction(unittest.TestCase):
             pass
         cls.update()
         outdict = cls.get()
-        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._instances, [])
         self.assertEqual(cls._data, {})
         self.assertEqual(outdict, {})

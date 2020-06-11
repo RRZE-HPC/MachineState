@@ -36,7 +36,8 @@ class TestInfoGroupBase(unittest.TestCase):
     def test_constant(self):
         testdict = {"Test1" : "Test", "Test2" : "Test", "Test3" : 3}
         cls = InfoGroup()
-        cls.constants = testdict
+        for key, value in testdict.items():
+            cls.const(key, value)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -62,7 +63,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.files[tkey] = (tfname,)
+            cls.addf(tkey, tfname)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -74,7 +75,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.files[tkey] = (tfname, match)
+            cls.addf(tkey, tfname, match)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -86,7 +87,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.files[tkey] = (tfname, match, int)
+            cls.addf(tkey, tfname, match, int)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -98,7 +99,7 @@ class TestInfoGroupFiles(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.files[tkey] = ("{}1234".format(tfname), match, int)
+            cls.addf(tkey, "{}1234".format(tfname), match, int)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -124,7 +125,7 @@ class TestInfoGroupCommands(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.commands[tkey] = ("echo", "{}".format(tkey))
+            cls.addc(tkey, "echo", "{}".format(tkey))
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -136,7 +137,7 @@ class TestInfoGroupCommands(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.commands[tkey] = ("echo", "{}".format(tkey), match)
+            cls.addc(tkey, "echo", "{}".format(tkey), match)
         cls.generate()
         cls.update()
         outdict = cls.get()
@@ -148,19 +149,19 @@ class TestInfoGroupCommands(unittest.TestCase):
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.commands[tkey] = ("echo", "{}".format(tkey), match, int)
+            cls.addc(tkey, "echo", "{}".format(tkey), match, int)
         cls.generate()
         cls.update()
         outdict = cls.get()
         for i,tkey in enumerate(resdict):
             self.assertEqual(resdict[tkey], outdict[tkey])
-    def test_filesNotExist(self):
+    def test_commandsNotExist(self):
         resdict = {"File{}".format(x) : x for x in range(4)}
         match = r"File(\d+)"
         cls = InfoGroup()
         for tkey in self.temp_files:
             _, tfname = self.temp_files[tkey]
-            cls.files[tkey] = ("echo{}".format(tfname), "{}".format(tkey), match, int)
+            cls.addc(tkey, "echo{}".format(tfname), "{}".format(tkey), match, int)
         cls.generate()
         cls.update()
         outdict = cls.get()

@@ -18,7 +18,7 @@ class TestPathMatchInfoGroup(InfoGroup):
         super(TestPathMatchInfoGroup, self).__init__(anon=anon, extended=extended, name="File{}".format(ident))
         path = os.path.join(searchpath, "{}*".format(ident))
         files = glob.glob(path)
-        self.files["File{}".format(ident)] = (files[0], r"(.+)")
+        self.addf("File{}".format(ident), files[0], r"(.+)")
 
 
 class TestPathMatchInfoGroupBase(unittest.TestCase):
@@ -101,7 +101,7 @@ class TestPathMatchInfoGroupFunction(unittest.TestCase):
         cls = PathMatchInfoGroup(searchpath=searchpath, match=r".*/(\d).*", subclass=TestPathMatchInfoGroup, subargs={"searchpath": self.temp_dir})
         self.assertEqual(cls._instances, [])
         self.assertEqual(cls._data, {})
-        
+
     def test_validGenerate(self):
         searchpath = os.path.join(self.temp_dir, "*")
         cls = PathMatchInfoGroup(searchpath=searchpath, match=r".*/(\d).*", subclass=TestPathMatchInfoGroup, subargs={"searchpath": self.temp_dir})
@@ -183,7 +183,7 @@ class TestPathMatchInfoGroupFunction(unittest.TestCase):
         except:
             pass
         cls.update()
-        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._instances, [])
         self.assertEqual(cls._data, {})
     def test_validGetInvalidClass(self):
         searchpath = os.path.join(self.temp_dir, "*")
@@ -194,6 +194,6 @@ class TestPathMatchInfoGroupFunction(unittest.TestCase):
             pass
         cls.update()
         outdict = cls.get()
-        self.assertEqual(cls._instances, [])  
+        self.assertEqual(cls._instances, [])
         self.assertEqual(cls._data, {})
         self.assertEqual(outdict, {})

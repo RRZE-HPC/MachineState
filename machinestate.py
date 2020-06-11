@@ -215,7 +215,7 @@ def masktolist(value):
                 outlist.append(bit)
     return outlist
 
-def toHz(value):
+def tohertz(value):
     outvalue = None
     if value:
         if isinstance(value, int) or isinstance(value, float):
@@ -237,18 +237,18 @@ def toHz(value):
                     #print("KiloHertz")
                     outvalue *= 1000
                 outvalue = int(outvalue)
-    #print("toHz", type(value), value, outvalue)
+    #print("tohertz", type(value), value, outvalue)
     return outvalue
 
-def toHzlist(value):
+def tohertzlist(value):
     outlist = []
     if value and isinstance(value, int):
-        return [toHz(value)]
+        return [tohertz(value)]
 
     if value and isinstance(value, str):
         try:
             for part in [x for x in re.split(r"[,\s]", value) if x.strip()]:
-                outlist += [toHz(part)]
+                outlist += [tohertz(part)]
         except ValueError as exce:
             raise exce
         return outlist
@@ -1001,9 +1001,9 @@ class CpuFrequencyClass(InfoGroup):
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(ident)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.addf("MaxFreq", pjoin(base, "scaling_max_freq"), r"(\d+)", toHz)
+            self.addf("MaxFreq", pjoin(base, "scaling_max_freq"), r"(\d+)", tohertz)
         if pexists(pjoin(base, "scaling_max_freq")):
-            self.addf("MinFreq", pjoin(base, "scaling_min_freq"), r"(\d+)", toHz)
+            self.addf("MinFreq", pjoin(base, "scaling_min_freq"), r"(\d+)", tohertz)
         if pexists(pjoin(base, "scaling_governor")):
             self.addf("Governor", pjoin(base, "scaling_governor"), r"(.+)")
         if pexists(pjoin(base, "energy_performance_preference")):
@@ -1028,12 +1028,12 @@ class CpuFrequency(PathMatchInfoGroup):
                     fname = pjoin(base, "cpuinfo_transition_latency")
                     self.addf("TransitionLatency", fname, r"(\d+)", int)
                 if pexists(pjoin(base, "cpuinfo_max_freq")):
-                    self.addf("MaxAvailFreq", pjoin(base, "cpuinfo_max_freq"), r"(\d+)", toHz)
+                    self.addf("MaxAvailFreq", pjoin(base, "cpuinfo_max_freq"), r"(\d+)", tohertz)
                 if pexists(pjoin(base, "cpuinfo_min_freq")):
-                    self.addf("MinAvailFreq", pjoin(base, "cpuinfo_min_freq"), r"(\d+)", toHz)
+                    self.addf("MinAvailFreq", pjoin(base, "cpuinfo_min_freq"), r"(\d+)", tohertz)
                 if pexists(pjoin(base, "scaling_available_frequencies")):
                     fname = pjoin(base, "scaling_available_frequencies")
-                    self.addf("AvailFrequencies", fname, r"(.*)", toHzlist)
+                    self.addf("AvailFrequencies", fname, r"(.*)", tohertzlist)
                 if pexists(pjoin(base, "scaling_available_governors")):
                     fname = pjoin(base, "scaling_available_governors")
                     self.addf("AvailGovernors", fname, r"(.*)", tostrlist)
@@ -1613,7 +1613,7 @@ class TurboInfo(InfoGroup):
             data = process_cmd((abscmd, cmd_opts, matches[0]))
             if len(data) > 0 and not re.match(error_match, data):
                 for name, regex in zip(names, matches):
-                    self.addc(name, abscmd, cmd_opts, regex, toHz)
+                    self.addc(name, abscmd, cmd_opts, regex, tohertz)
                     self.required(name)
                 regex = r"Performance energy bias:\s+(\d+)\s.*"
                 self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
@@ -1628,7 +1628,7 @@ class TurboInfo(InfoGroup):
         for line in re.split(r"\n", indata):
             mat = re.match(r"C(\d+)\s+([\d\.]+ MHz)", line)
             if mat:
-                freqs.append(toHz(mat.group(2)))
+                freqs.append(tohertz(mat.group(2)))
         return freqs
 
 ################################################################################

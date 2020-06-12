@@ -332,15 +332,13 @@ def process_files(filedict):
 def process_cmds(cmddict):
     sortdict = {}
     outdict = {}
-    bladict = {}
     for key in cmddict:
         cmd, cmd_opts, cmatch, cparse, *_ = cmddict[key]
-        newkey = " ".join([cmd, cmd_opts or ""])
+        newkey = (cmd, cmd_opts or "")
         if newkey not in sortdict:
-            sortdict[(cmd, cmd_opts or "")] = []
-        sortdict[(cmd, cmd_opts or "")].append((key, cmatch, cparse))
+            sortdict[newkey] = []
+        sortdict[newkey].append((key, cmatch, cparse))
         outdict[key] = None
-        bladict[(cmd, cmd_opts or "")] = "bla"
     for cmdargs in sortdict:
         cmd, cmd_opts = cmdargs
         abscmd = which(cmd)

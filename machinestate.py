@@ -91,7 +91,7 @@ ENCODING = getpreferredencoding()
 ################################################################################
 
 def fopen(filename):
-    if filename and pexists(filename) and os.path.isfile(filename):
+    if filename is not None and pexists(filename) and os.path.isfile(filename):
         try:
             filefp = open(filename, "rb")
         except PermissionError:
@@ -113,7 +113,7 @@ def tostrlist(value):
     :returns: Expanded list
     :rtype: [str]
     '''
-    if value:
+    if value is not None:
         if isinstance(value, int):
             value = str(value)
         return re.split(r"[,\s]", value)
@@ -152,7 +152,7 @@ def tointlist(value):
                     ipart = int(part)
                 except ValueError as exce:
                     raise exce
-                if ipart:
+                if ipart is not None:
                     outlist.append(ipart)
         return outlist
     return None
@@ -201,7 +201,7 @@ def masktolist(value):
     :rtype: [int]
     '''
     outlist = None
-    if value:
+    if value is not None:
         bits = 0
         if isinstance(value, str):
             mask = str(value).replace(",", "")
@@ -221,7 +221,7 @@ def masktolist(value):
 
 def tohertz(value):
     outvalue = None
-    if value:
+    if value is not None:
         if isinstance(value, int) or isinstance(value, float):
             outvalue = int(value)
         elif isinstance(value, str):

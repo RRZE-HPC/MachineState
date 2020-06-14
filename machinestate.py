@@ -1747,6 +1747,7 @@ class ExecutableInfoLibraries(InfoGroup):
         super(ExecutableInfoLibraries, self).__init__(anon=anon, extended=extended)
         self.name = "LinkedLibraries"
         self.executable = which(executable)
+        self.ldd = None
         if self.executable and len(self.executable) > 0:
             self.ldd = "ldd {}; exit 0".format(self.executable)
     def update(self):
@@ -2149,6 +2150,7 @@ class NecTsubasaInfo(ListInfoGroup):
 ################################################################################
 
 def read_cli(cliargs):
+    # Create CLI parser
     desc = 'Reads and outputs system information as JSON document'
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('-e', '--extended', action='store_true', default=False,
@@ -2165,28 +2167,56 @@ def read_cli(cliargs):
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(cliargs))
+
+    # Check if executable exists and is executable
+    if pargs["executable"] is not None:
+        if not pexists(pargs["executable"]):
+            print("Given executable '{}' does not exist".format(pargs["executable"]))
+            os.exit(1)
+        if not os.access(pargs["executable"], os.X_OK):
+            print("Given executable '{}' not executable".format(pargs["executable"]))
+            os.exit(1)
+    # Check if JSON file exists and is readable
+    if pargs["json"] is not None:
+        if not pexists(pargs["json"]):
+            print("Given JSON document '{}' does not exist".format(pargs["json"]))
+            os.exit(1)
+        if not os.access(pargs["executable"], os.R_OK):
+            print("Given JSON document '{}' not readable".format(pargs["json"]))
+            os.exit(1)
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
 
 def main():
+    # Read command line arguments
     cliargs = read_cli(sys.argv[1:])
+
+    # Initialize MachineState class
     mstate = MachineState(extended=cliargs["extended"],
                           executable=cliargs["executable"],
                           anon=cliargs["anonymous"])
+    # Generate subclasses of MachineState
     mstate.generate()
+    # Update the current state
     mstate.update()
-    if cliargs["json"]:
+
+    # Compare a given JSON document (previously created with the same script)
+    if cliargs["json"] is not None:
         if mstate == cliargs["json"]:
             print("Current state matches with input file")
         else:
             print("The current state differs at least in one setting with input file")
         sys.exit(0)
+
+    # Get JSON document string (either from the configuration or the state)
     jsonout = {}
     if not cliargs["config"]:
         jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"])
     else:
         jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
+
+    # Determine output destination
     if not cliargs["output"]:
         print(jsonout)
     else:
@@ -2194,6 +2224,7 @@ def main():
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
+    # This part is for testing purposes
     # n = TurboInfo(extended=cliargs["extended"])
     # n.generate()
     # n.update()

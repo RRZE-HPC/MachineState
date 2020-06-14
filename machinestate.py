@@ -85,6 +85,7 @@ __version__ = MACHINESTATE_VERSION
 ################################################################################
 ENCODING = getpreferredencoding()
 
+DEBUG_OUTPUT = False
 
 ################################################################################
 # Helper functions
@@ -2209,6 +2210,7 @@ def read_cli(cliargs):
                         help='indention in JSON output (default: 4)')
     parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
+    parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(cliargs))
 
@@ -2228,13 +2230,62 @@ def read_cli(cliargs):
         if not os.access(pargs["executable"], os.R_OK):
             print("Given JSON document '{}' not readable".format(pargs["json"]))
             os.exit(1)
+    # Check if configuration file exists and is readable
+    if pargs["configfile"] is not None:
+        if not pexists(pargs["configfile"]):
+            print("Given configuration file '{}' does not exist".format(pargs["configfile"]))
+            os.exit(1)
+        if not os.access(pargs["configfile"], os.R_OK):
+            print("Given configuration file '{}' not readable".format(pargs["configfile"]))
+            os.exit(1)
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
+def read_config(configfile=None):
+    global DMIDECODE_FILE, DO_LIKWID, LIKWID_PATH, MODULECMD_PATH, VEOS_BASE, DEBUG_OUTPUT
+    configdict = {"dmifile" : DMIDECODE_FILE,
+                  "likwid_enable" : DO_LIKWID,
+                  "likwid_path" : LIKWID_PATH,
+                  "modulecmd" : MODULECMD_PATH,
+                  "vecmd_path" : VEOS_BASE,
+                  "debug" : DEBUG_OUTPUT,
+                 }
+    searchfiles = []
+    if configfile is not None:
+        searchfiles.append(configfile)
+    else:
+        searchfiles = [pjoin(os.getcwd(), ".machinestate")]
+        if "HOME" in os.environ:
+            searchfiles.append(pjoin(os.environ["HOME"], ".machinestate"))
+        searchfiles.append("/etc/machinestate.conf")
+    for sfile in searchfiles:
+        if pexists(sfile):
+            sfp = fopen(sfile)
+            if sfp:
+                tmpdict = json.loads(sfp.read().decode(ENCODING))
+                configdict.update(tmpdict)
+                sfp.close()
+                break
+
+    if configdict["dmifile"] != DMIDECODE_FILE:
+        DMIDECODE_FILE = configdict["dmifile"]
+    if configdict["likwid_enable"] != DO_LIKWID:
+        DO_LIKWID = configdict["likwid_enable"]
+    if configdict["likwid_path"] != LIKWID_PATH:
+        LIKWID_PATH = configdict["likwid_path"]
+    if configdict["modulecmd"] != MODULECMD_PATH:
+        MODULECMD_PATH = configdict["modulecmd"]
+    if configdict["vecmd_path"] != VEOS_BASE:
+        VEOS_BASE = configdict["vecmd_path"]
+    if configdict["debug"] != DEBUG_OUTPUT:
+        DEBUG_OUTPUT = configdict["debug"]
+    return configdict
 
 def main():
     # Read command line arguments
     cliargs = read_cli(sys.argv[1:])
+    # Read configuration from configuration file
+    cliargs.update(read_config(cliargs["configfile"]))
 
     # Initialize MachineState class
     mstate = MachineState(extended=cliargs["extended"],
@@ -2272,7 +2323,6 @@ def main():
 #    n = OSInfo(extended=cliargs["extended"])
 #    n.generate()
 #    n.update()
-#    print(n.get_schema())
 #    ndict = n.get()
 #    copydict = deepcopy(ndict)
 #    print(n == copydict)

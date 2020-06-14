@@ -536,6 +536,50 @@ class InfoGroup:
         for inst in self._instances:
             outdict.update({inst.name : inst.get_config()})
         return outdict
+# This is a starting point to implement a json-schema for MachineState
+#    def get_schema(self):
+#        schemedict = {}
+#        pdict = {}
+#        clsname = self.name
+#        surl = "https://rrze-hpc.github.io/MachineState/scheme/{}.schema.json".format(clsname.lower())
+#        schemedict["$schema"] = "http://json-schema.org/draft-07/schema#"
+#        schemedict["$id"] = surl
+#        schemedict["title"] = clsname
+#        schemedict["description"] = clsname
+#        schemedict["type"] = "object"
+#        schemedict["required"] = list(self.required4equal)
+
+#        for key in self.files:
+#            vtype = "string"
+#            itype = None
+#            fname, _, parse = self.files[key]
+#            if parse in [int, tobytes, tohertz]:
+#                vtype == "integer"
+#            if parse in [tointlist, tohertzlist, tostrlist]:
+#                vtype == "array"
+#                itype == "integer"
+#                if parse == tostrlist:
+#                    itype == "string"
+#            pdict[key] = {"type" : vtype, "description" : fname}
+#            if itype:
+#                pdict[key]["items"] = {"type" : itype}
+#        for key in self.commands:
+#            vtype = "string"
+#            itype = None
+#            cname, _, _, parse = self.commands[key]
+#            if parse in [int, tobytes, tohertz]:
+#                vtype == "integer"
+#            if parse in [tointlist, tohertzlist, tostrlist]:
+#                vtype == "array"
+#                itype == "integer"
+#                if parse == tostrlist:
+#                    itype == "string"
+#            pdict[key] = {"type" : vtype, "description" : fname}
+#            if itype:
+#                pdict[key]["items"] = {"type" : itype}
+#        schemedict["properties"] = pdict
+#        return schemedict
+
     def __eq__(self, other):
         selfdict = self.get()
         tcase = TestCase()
@@ -2224,14 +2268,15 @@ def main():
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
 
-    # This part is for testing purposes
-    # n = TurboInfo(extended=cliargs["extended"])
-    # n.generate()
-    # n.update()
-    # ndict = n.get()
-    # copydict = deepcopy(ndict)
-    # print(n == copydict)
-    # print(n.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+#    # This part is for testing purposes
+#    n = OSInfo(extended=cliargs["extended"])
+#    n.generate()
+#    n.update()
+#    print(n.get_schema())
+#    ndict = n.get()
+#    copydict = deepcopy(ndict)
+#    print(n == copydict)
+#    print(n.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
 
 __main__ = main
 if __name__ == "__main__":

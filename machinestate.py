@@ -25,12 +25,10 @@
 #
 # =======================================================================================
 
-# TODO: Should sizes like "32654660 kB" be transformed to number in bytes?
 # TODO: Should keys be available in all cases?
 # TODO: Expand bitmasks to lists?
-# TODO: More analysis by ExecutableInfo?
-# TODO: Config file for constant paths?
-# TODO: Add cli opts or environment variables for LIKWID, VEOS, DmiDecodeFile, ...
+# TODO: More analysis by ExecutableInfo? (type, compilation info, ...)
+# TODO: Add class for 'sysctl -a' ?
 
 ################################################################################
 # Imports

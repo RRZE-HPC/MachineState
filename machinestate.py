@@ -2222,28 +2222,25 @@ def read_cli(cliargs):
     # Check if executable exists and is executable
     if pargs["executable"] is not None:
         abspath = which(pargs["executable"])
-        if not pexists(abspath):
-            print("Given executable '{}' does not exist".format(pargs["executable"]))
-            raise
-        if not os.access(abspath, os.X_OK):
-            print("Given executable '{}' not executable".format(pargs["executable"]))
-            raise
+        if abspath is None or not pexists(abspath):
+            #print("Given ".format(pargs["executable"]))
+            raise ValueError("Executable '{}' does not exist".format(pargs["executable"]))
+        if abspath is not None and not os.access(abspath, os.X_OK):
+            #print("Given executable '{}' not executable".format(pargs["executable"]))
+            raise ValueError("Executable '{}' does not executable".format(pargs["executable"]))
+            #raise
     # Check if JSON file exists and is readable
     if pargs["json"] is not None:
         if not pexists(pargs["json"]):
-            print("Given JSON document '{}' does not exist".format(pargs["json"]))
-            raise
+            raise ValueError("JSON document '{}' does not exist".format(pargs["json"]))
         if not os.access(pargs["json"], os.R_OK):
-            print("Given JSON document '{}' not readable".format(pargs["json"]))
-            raise
+            raise ValueError("JSON document '{}' does not readable".format(pargs["json"]))
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
         if not pexists(pargs["configfile"]):
-            print("Given configuration file '{}' does not exist".format(pargs["configfile"]))
-            raise
+            raise ValueError("Configuration file '{}' does not exist".format(pargs["configfile"]))
         if not os.access(pargs["configfile"], os.R_OK):
-            print("Given configuration file '{}' not readable".format(pargs["configfile"]))
-            raise
+            raise ValueError("Configuration file '{}' does not readable".format(pargs["configfile"]))
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
@@ -2293,7 +2290,8 @@ def main():
         cliargs = read_cli(sys.argv[1:])
         # Read configuration from configuration file
         cliargs.update(read_config(cliargs["configfile"]))
-    except:
+    except Exception as e:
+        print(e)
         sys.exit(1)
 
     # Initialize MachineState class

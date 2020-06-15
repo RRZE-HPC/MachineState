@@ -1666,8 +1666,14 @@ class PrefetcherInfoClass(InfoGroup):
             abscmd = pjoin(likwid_base, cmd)
         if abscmd:
             for name in names:
-                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), bool)
+                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), parse_pf_state)
         self.required(names)
+    @staticmethod
+    def parse_pf_state(value):
+        if value.lower() == "on":
+            return True
+        else
+            return False
 
 class PrefetcherInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all HW threads returned by likwid-features'''

@@ -18,8 +18,8 @@ class TestClass:
     pass
 
 class TestInfoGroup(InfoGroup):
-    def __init__(self, ident, name=None, extended=False, anon=False, basepath=""):
-        super(TestInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+    def __init__(self, ident, name=None, extended=False, anonymous=False, basepath=""):
+        super(TestInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.name = "File{}".format(ident)
         path = os.path.join(basepath, "{}*".format(ident))
         files = glob.glob(path)
@@ -30,7 +30,7 @@ class TestListInfoGroupBase(unittest.TestCase):
         cls = ListInfoGroup()
         self.assertEqual(cls.name, None)
         self.assertEqual(cls.extended, False)
-        self.assertEqual(cls.anon, False)
+        self.assertEqual(cls.anonymous, False)
         self.assertEqual(cls.files, {})
         self.assertEqual(cls.commands, {})
         self.assertEqual(cls.constants, {})
@@ -45,9 +45,9 @@ class TestListInfoGroupBase(unittest.TestCase):
     def test_extended(self):
         cls = ListInfoGroup(extended=True)
         self.assertEqual(cls.extended, True)
-    def test_anon(self):
-        cls = ListInfoGroup(anon=True)
-        self.assertEqual(cls.anon, True)
+    def test_anonymous(self):
+        cls = ListInfoGroup(anonymous=True)
+        self.assertEqual(cls.anonymous, True)
     def test_userlistNone(self):
         cls = ListInfoGroup(userlist=None)
         self.assertEqual(cls.userlist, [])

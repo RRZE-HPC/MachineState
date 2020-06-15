@@ -18,8 +18,8 @@ class TestClass:
     pass
 
 class TestInfoGroup(InfoGroup):
-    def __init__(self, name=None, extended=False, anon=False, basepath="", ident=-1):
-        super(TestInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+    def __init__(self, name=None, extended=False, anonymous=False, basepath="", ident=-1):
+        super(TestInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.name = "File{}".format(ident)
         path = os.path.join(basepath, "{}*".format(ident))
         files = glob.glob(path)
@@ -31,7 +31,7 @@ class TestMultiClassInfoGroupBase(unittest.TestCase):
         cls = MultiClassInfoGroup()
         self.assertEqual(cls.name, None)
         self.assertEqual(cls.extended, False)
-        self.assertEqual(cls.anon, False)
+        self.assertEqual(cls.anonymous, False)
         self.assertEqual(cls.files, {})
         self.assertEqual(cls.commands, {})
         self.assertEqual(cls.constants, {})
@@ -43,9 +43,9 @@ class TestMultiClassInfoGroupBase(unittest.TestCase):
     def test_extended(self):
         cls = MultiClassInfoGroup(extended=True)
         self.assertEqual(cls.extended, True)
-    def test_anon(self):
-        cls = MultiClassInfoGroup(anon=True)
-        self.assertEqual(cls.anon, True)
+    def test_anonymous(self):
+        cls = MultiClassInfoGroup(anonymous=True)
+        self.assertEqual(cls.anonymous, True)
     def test_listempty(self):
         cls = MultiClassInfoGroup(classlist=[], classargs=[])
         self.assertEqual(cls.classlist, [])

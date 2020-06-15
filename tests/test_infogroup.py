@@ -18,7 +18,7 @@ class TestInfoGroupBase(unittest.TestCase):
         cls = InfoGroup()
         self.assertEqual(cls.name, None)
         self.assertEqual(cls.extended, False)
-        self.assertEqual(cls.anon, False)
+        self.assertEqual(cls.anonymous, False)
         self.assertEqual(cls.files, {})
         self.assertEqual(cls.commands, {})
         self.assertEqual(cls.constants, {})
@@ -30,9 +30,9 @@ class TestInfoGroupBase(unittest.TestCase):
     def test_extended(self):
         cls = InfoGroup(extended=True)
         self.assertEqual(cls.extended, True)
-    def test_anon(self):
-        cls = InfoGroup(anon=True)
-        self.assertEqual(cls.anon, True)
+    def test_anonymous(self):
+        cls = InfoGroup(anonymous=True)
+        self.assertEqual(cls.anonymous, True)
     def test_constant(self):
         testdict = {"Test1" : "Test", "Test2" : "Test", "Test3" : 3}
         cls = InfoGroup()

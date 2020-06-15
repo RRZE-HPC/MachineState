@@ -143,10 +143,10 @@ class TestConfigFile(unittest.TestCase):
         self.invalid.close()
         pass
     def test_validConfig(self):
-        cdict = machinestate.read_config(self.cfgfile.name)
+        cdict = machinestate.read_config({"configfile" : self.cfgfile.name})
         self.assertEqual(cdict, self.configdict)
     def test_invalidConfig(self):
-        self.assertRaises(ValueError, machinestate.read_config, self.invalid.name)
+        self.assertRaises(ValueError, machinestate.read_config, {"configfile" : self.cfgfile.name})
     def test_emptyConfig(self):
-        cdict = machinestate.read_config(self.readable.name)
+        cdict = machinestate.read_config({"configfile" : self.cfgfile.name})
         self.assertNotEqual(cdict, self.configdict)

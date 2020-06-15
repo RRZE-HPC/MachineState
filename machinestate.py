@@ -2377,6 +2377,9 @@ def read_cli(cliargs):
 
 def read_config(config={"extended" : False, "anonymous" : False, "executable" : None}):
 
+    if not ("extended" in config and "anonymous" in config and "executable" in config):
+        raise ValueError("Given dict does not contain required keys: \
+                          extended, anonymous and executable")
     configdict = {"dmifile" : DMIDECODE_FILE,
                   "likwid_enable" : DO_LIKWID,
                   "likwid_path" : LIKWID_PATH,
@@ -2384,12 +2387,18 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                   "vecmd_path" : VEOS_BASE,
                   "nvidia_path" : NVIDIA_PATH,
                   "debug" : DEBUG_OUTPUT,
-                  "anonymous" : config["anonymous"],
-                  "extended" : config["extended"],
+                  "anonymous" : False,
+                  "extended" : False,
                  }
     searchfiles = []
-    if config["configfile"] is not None:
-        searchfiles.append(config["configfile"])
+
+    userfile = config.get("configfile", None)
+    configdict["anonymous"] = config.get("anonymous", False)
+    configdict["extended"] = config.get("extended", False)
+    configdict["executable"] = config.get("executable", None)
+
+    if userfile is not None:
+        searchfiles.append(userfile)
     else:
         searchfiles = [pjoin(os.getcwd(), ".machinestate")]
         if "HOME" in os.environ:
@@ -2405,12 +2414,13 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                         tmpdict = json.loads(sstr)
                         configdict.update(tmpdict)
                     except:
-                        exce = "Configuration file '{}' not valid JSON".format(config["configfile"])
+                        exce = "Configuration file '{}' not valid JSON".format(userfile)
                         raise ValueError(exce)
                 sfp.close()
                 break
 
-    configdict["executable"] = config["executable"]
+
+
     return configdict
 
 def main():

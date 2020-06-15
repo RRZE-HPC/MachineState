@@ -1,4 +1,63 @@
 #!/usr/bin/env python3
+"""
+This module provides a simple interface for collecting hardware and software settings for
+documentation and reproducibility purposes.
+
+Depends on no external module but for all features, the following applications need to be present:
+- likwid-pin, likwid-features and likwid-powermeter
+- nvidia-smi
+- vecmd
+- modules (package environment-modules)
+- taskset
+
+Provided functions:
+- tostrlist: parse string with commas or spaces into list of strings
+- tointlist: parse string with commas or spaces into list of integers
+- tobytes: parse string with byte units (kB, MB, GB, kiB, MiB, GiB) into bytes
+- tohertz: parse string with Hz unit (kHz, MHz, GHz) to Hz
+- tohertzlist: parse string with commas or spaces into list of HZ values (tohertz)
+- totitle: call string's totitle function and removes all spaces and underscores
+- masktolist: parse bitmask to list of integers
+- fopen: opens a file if it exists and is readable and returns file pointer
+
+Provided classes:
+- HostInfo
+- CpuInfo
+- OSInfo
+- KernelInfo
+- Uptime
+- CpuTopology
+- NumaBalance
+- LoadAvg
+- MemInfo
+- CgroupInfo
+- Writeback
+- CpuFrequency
+- NumaInfo
+- CacheTopology
+- TransparentHugepages
+- PowercapInfo
+- Hugepages
+- CompilerInfo
+- MpiInfo
+- ShellEnvironment
+- PythonInfo
+- ClocksourceInfo
+- CoretempInfo
+- BiosInfo
+- ThermalZoneInfo
+- VulnerabilitiesInfo
+- UsersInfo
+- CpuAffinity (uses os.get_schedaffinity(), likwid-pin or taskset)
+- ModulesInfo (if modulecmd is present)
+- NvidiaInfo (if nvidia-smi is present)
+- NecTsubasaInfo (if vecmd is present)
+- PrefetcherInfo (if likwid-features is present)
+- TurboInfo (if likwid-powermeter is present)
+- DmiDecodeFile (if DMIDECODE_FILE is setup properly)
+
+The module contains more classes but all except the above ones are used only internally
+"""
 
 # =======================================================================================
 #
@@ -463,12 +522,16 @@ class InfoGroup:
             self.anon = anon
 
     def addf(self, key, filename, match=None, parse=None, extended=False):
+        """Add file to object including regex and parser"""
         self.files[key] = (filename, match, parse)
     def addc(self, key, cmd, cmd_opts=None, match=None, parse=None, extended=False):
+        """Add command to object including command options, regex and parser"""
         self.commands[key] = (cmd, cmd_opts, match, parse)
     def const(self, key, value):
+        """Add constant value to object"""
         self.constants[key] = value
     def required(self, *args):
+        """Add item(s) to list of required fields at comparison"""
         if args:
             for arg in args:
                 if isinstance(arg, list):
@@ -484,6 +547,7 @@ class InfoGroup:
         pass
 
     def update(self):
+        '''Read object's files and commands. Triggers update() of subclasses'''
         outdict = {}
         if len(self.files) > 0:
             outdict.update(process_files(self.files))
@@ -496,6 +560,7 @@ class InfoGroup:
             inst.update()
         self._data.update(outdict)
     def get(self):
+        """Get the object's and all subobjects' data as dict"""
         outdict = {}
         for inst in self._instances:
             clsout = inst.get()
@@ -503,9 +568,11 @@ class InfoGroup:
         outdict.update(self._data)
         return outdict
     def get_json(self, sort=False, intend=4):
+        """Get the object's and all subobjects' data as JSON document (string)"""
         outdict = self.get()
         return json.dumps(outdict, sort_keys=sort, indent=intend)
     def get_config(self):
+        """Get the object's and all subobjects' configuration as JSON document (string)"""
         outdict = {}
         selfdict = {}
         selfdict["Type"] = str(self.__class__.__name__)
@@ -629,6 +696,7 @@ class InfoGroup:
                     return False
         return True
     def __class_args__(self):
+        """Used by __repr__ to add class' arguments"""
         arglist = []
         arglist.append("name=\"{}\"".format(self.name))
         arglist.append("extended={}".format(self.extended))
@@ -2226,24 +2294,21 @@ def read_cli(cliargs):
     if pargs["executable"] is not None:
         abspath = which(pargs["executable"])
         if abspath is None or not pexists(abspath):
-            #print("Given ".format(pargs["executable"]))
             raise ValueError("Executable '{}' does not exist".format(pargs["executable"]))
-        if abspath is not None and not os.access(abspath, os.X_OK):
-            #print("Given executable '{}' not executable".format(pargs["executable"]))
-            raise ValueError("Executable '{}' does not executable".format(pargs["executable"]))
-            #raise
+        if not os.access(abspath, os.X_OK):
+            raise ValueError("Executable '{}' is not executable".format(pargs["executable"]))
     # Check if JSON file exists and is readable
     if pargs["json"] is not None:
         if not pexists(pargs["json"]):
             raise ValueError("JSON document '{}' does not exist".format(pargs["json"]))
         if not os.access(pargs["json"], os.R_OK):
-            raise ValueError("JSON document '{}' does not readable".format(pargs["json"]))
+            raise ValueError("JSON document '{}' is not readable".format(pargs["json"]))
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
         if not pexists(pargs["configfile"]):
             raise ValueError("Configuration file '{}' does not exist".format(pargs["configfile"]))
         if not os.access(pargs["configfile"], os.R_OK):
-            raise ValueError("Configuration file '{}' does not readable".format(pargs["configfile"]))
+            raise ValueError("Configuration file '{}' is not readable".format(pargs["configfile"]))
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 

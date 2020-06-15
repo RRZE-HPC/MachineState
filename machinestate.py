@@ -2594,16 +2594,19 @@ def main():
     if cliargs["html"]:
         from html_export import to_html
         # overwrite dict output jsonout
-        jsonout = to_html(jsonout)
+        jsonout = to_html(mstate.get_json(sort=cliargs["sort"]))
 
     # Determine output destination
     if not cliargs["output"]:
         print(jsonout)
     else:
         with open(cliargs["output"], "w") as outfp:
-            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
-            outfp.write("\n")
-    # sys.exit(0)
+            if cliargs["html"]:
+                outfp.write(jsonout)
+            else:
+                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+                outfp.write("\n")
+    sys.exit(0)
 
 
 #    # This part is for testing purposes

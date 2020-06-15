@@ -2008,10 +2008,16 @@ class CpuAffinity(InfoGroup):
         super(CpuAffinity, self).__init__(name="CpuAffinity", extended=extended, anon=anon)
         if "get_schedaffinity" in dir(os):
             self.const("Affinity", os.get_schedaffinity())
-        elif DO_LIKWID:
+        elif DO_LIKWID and LIKWID_PATH and pexists(LIKWID_PATH):
             abscmd = which("likwid-pin")
             if abscmd and len(abscmd) > 0:
                 self.addc("Affinity", abscmd, "-c N -p 2>&1", r"(.*)", tointlist)
+                self.required("Affinity")
+        else:
+            abscmd = which("taskset")
+            if abscmd and len(abscmd) > 0:
+                regex = r"pid \d+'s current affinity list: (.*)"
+                self.addc("Affinity", abscmd, "-c -p $$", regex, tointlist)
                 self.required("Affinity")
 
 ################################################################################

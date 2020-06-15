@@ -259,10 +259,7 @@ def tohertzlist(value):
 
 
 ################################################################################
-# Processing functions for single entries in class attributes files and commands
-# TODO: Write function that processes all entries for a single file/cmd to
-#       reduce runtime. Some commands are called multiple times to get different
-#       information
+# Processing functions for entries in class attributes 'files' and 'commands'  #
 ################################################################################
 def match_data(data, regex_str):
     out = data

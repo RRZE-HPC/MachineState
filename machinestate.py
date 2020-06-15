@@ -2214,28 +2214,29 @@ def read_cli(cliargs):
 
     # Check if executable exists and is executable
     if pargs["executable"] is not None:
-        if not pexists(pargs["executable"]):
+        abspath = which(pargs["executable"])
+        if not pexists(abspath):
             print("Given executable '{}' does not exist".format(pargs["executable"]))
-            os.exit(1)
-        if not os.access(pargs["executable"], os.X_OK):
+            raise
+        if not os.access(abspath, os.X_OK):
             print("Given executable '{}' not executable".format(pargs["executable"]))
-            os.exit(1)
+            raise
     # Check if JSON file exists and is readable
     if pargs["json"] is not None:
         if not pexists(pargs["json"]):
             print("Given JSON document '{}' does not exist".format(pargs["json"]))
-            os.exit(1)
+            raise
         if not os.access(pargs["executable"], os.R_OK):
             print("Given JSON document '{}' not readable".format(pargs["json"]))
-            os.exit(1)
+            raise
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
         if not pexists(pargs["configfile"]):
             print("Given configuration file '{}' does not exist".format(pargs["configfile"]))
-            os.exit(1)
+            raise
         if not os.access(pargs["configfile"], os.R_OK):
             print("Given configuration file '{}' not readable".format(pargs["configfile"]))
-            os.exit(1)
+            raise
     return pargs
     #return pargs["extended"], pargs["executable"], pargs["output"]
 
@@ -2280,10 +2281,13 @@ def read_config(configfile=None):
     return configdict
 
 def main():
-    # Read command line arguments
-    cliargs = read_cli(sys.argv[1:])
-    # Read configuration from configuration file
-    cliargs.update(read_config(cliargs["configfile"]))
+    try:
+        # Read command line arguments
+        cliargs = read_cli(sys.argv[1:])
+        # Read configuration from configuration file
+        cliargs.update(read_config(cliargs["configfile"]))
+    except:
+        sys.exit(1)
 
     # Initialize MachineState class
     mstate = MachineState(extended=cliargs["extended"],
@@ -2316,6 +2320,7 @@ def main():
         with open(cliargs["output"], "w") as outfp:
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
+    sys.exit(0)
 
 #    # This part is for testing purposes
 #    n = OSInfo(extended=cliargs["extended"])

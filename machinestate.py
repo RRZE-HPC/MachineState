@@ -2233,7 +2233,7 @@ def read_cli(cliargs):
         if not pexists(pargs["json"]):
             print("Given JSON document '{}' does not exist".format(pargs["json"]))
             raise
-        if not os.access(pargs["executable"], os.R_OK):
+        if not os.access(pargs["json"], os.R_OK):
             print("Given JSON document '{}' not readable".format(pargs["json"]))
             raise
     # Check if configuration file exists and is readable

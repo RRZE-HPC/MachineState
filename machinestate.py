@@ -4,10 +4,10 @@
 #
 #      Filename:  machinestate.py
 #
-#      Description:  Collect system settings
+#      Description:  Collect hardware and software settings
 #
-#      Author:   Thomas Gruber, thomas.roehl@googlemail.com
-#      Project:  Artifact-description
+#      Author:   Thomas Gruber (né Roehl), thomas.roehl@googlemail.com
+#      Project:  MachineState
 #
 #      Copyright (C) 2020 RRZE, University Erlangen-Nuremberg
 #

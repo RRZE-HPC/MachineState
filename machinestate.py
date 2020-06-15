@@ -99,7 +99,6 @@ import os
 import platform
 import re
 import sys
-from copy import deepcopy
 from datetime import datetime, timedelta
 from getpass import getuser
 from glob import glob
@@ -206,7 +205,7 @@ def tointlist(value):
                 outlist += [i for i in range(int(start), int(end) + 1)]
             else:
                 ipart = None
-                mat = re.match("(\d+)\.\d+", part)
+                mat = re.match(r"(\d+)\.\d+", part)
                 if mat:
                     part = mat.group(1)
                 try:
@@ -625,7 +624,9 @@ class InfoGroup:
     #        schemedict = {}
     #        pdict = {}
     #        clsname = self.name
-    #        surl = "https://rrze-hpc.github.io/MachineState/scheme/{}.schema.json".format(clsname.lower())
+    #        surl = (
+    #           "https://rrze-hpc.github.io/MachineState/scheme/{}.schema.json"
+    #           ).format(clsname.lower())
     #        schemedict["$schema"] = "http://json-schema.org/draft-07/schema#"
     #        schemedict["$id"] = surl
     #        schemedict["title"] = clsname
@@ -689,7 +690,7 @@ class InfoGroup:
                         try:
                             selfval = float(smatch)
                             otherval = float(omatch)
-                        except:
+                        except Exception:
                             pass
 
                     if isinstance(selfval, int) or isinstance(selfval, float):
@@ -2241,7 +2242,6 @@ class ModulesInfo(InfoGroup):
         parse = ModulesInfo.parsemodules
         cmd_opts = "sh list -t 2>&1"
         cmd = "modulecmd"
-        abspath = which(cmd)
         if MODULECMD_PATH is not None and len(MODULECMD_PATH) > 0:
             path = "{}".format(MODULECMD_PATH)
             path_opts = "{}".format(cmd_opts)
@@ -2528,7 +2528,7 @@ def read_config(configfile=None):
                     try:
                         tmpdict = json.loads(sstr)
                         configdict.update(tmpdict)
-                    except:
+                    except Exception:
                         raise ValueError(
                             "Configuration file '{}' not valid JSON".format(configfile)
                         )

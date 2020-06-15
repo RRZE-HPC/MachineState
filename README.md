@@ -56,7 +56,7 @@ Getting usage help:
 ```
 $ ./machinestate.py -h
 usage: machinestate.py [-h] [-e] [-a] [-c] [-s] [-i INDENT] [-o OUTPUT]
-                       [-j JSON] [--configfile CONFIGFILE]
+                       [-j JSON] [--configfile CONFIGFILE] [--html]
                        [executable]
 
 
@@ -78,6 +78,7 @@ optional arguments:
   -j JSON, --json JSON  compare given JSON with current state
   --configfile CONFIGFILE
                         Location of configuration file
+  --html                Create HTML output out of generated MachineState
 ```
 
 If the `configfile` cli option is not given, machinestate checks for configuration files at (in this order):
@@ -153,6 +154,11 @@ $ ./machinestate.py -s
 Compare JSON file created with `machinestate.py` with current state
 ```
 $ ./machinestate.py -j oldstate.json
+```
+
+Create HTML representation with sorted keys
+```
+$ ./machinestate.py -s --html -o webview.html
 ```
 
 --------------------------------------------------------------------------------

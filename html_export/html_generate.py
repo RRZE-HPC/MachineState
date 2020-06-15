@@ -1,8 +1,18 @@
 #!/usr/bin/env python3
 import json
 import os
-import dominate
-from dominate.tags import meta, style, div, p, button, script
+import sys
+
+try:
+    import dominate
+    from dominate.tags import meta, style, div, p, button, script
+except ImportError:
+    print(
+        'Module dominate not installed. Use \'pip install dominate\' for '
+        'installation and try again.',
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _create_subgroup(key, elem):

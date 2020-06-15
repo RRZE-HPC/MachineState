@@ -2474,6 +2474,12 @@ def read_cli(cliargs):
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument(
+        '--html',
+        action='store_true',
+        default=None,
+        help='Create HTML output out of generated MachineState',
+    )
+    parser.add_argument(
         'executable', help='analyze executable (optional)', nargs='?', default=None
     )
     pargs = vars(parser.parse_args(cliargs))
@@ -2584,6 +2590,12 @@ def main():
     else:
         jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
 
+    # Create HTML output
+    if cliargs["html"]:
+        from html_export import to_html
+        # overwrite dict output jsonout
+        jsonout = to_html(jsonout)
+
     # Determine output destination
     if not cliargs["output"]:
         print(jsonout)
@@ -2591,10 +2603,11 @@ def main():
         with open(cliargs["output"], "w") as outfp:
             outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
-    sys.exit(0)
+    # sys.exit(0)
 
 
 #    # This part is for testing purposes
+#    from copy import deepcopy
 #    n = OSInfo(extended=cliargs["extended"])
 #    n.generate()
 #    n.update()

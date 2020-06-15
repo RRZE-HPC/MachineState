@@ -1092,7 +1092,7 @@ class CpuTopology(PathMatchInfoGroup):
                 if data not in plist:
                     plist.append(data)
                 filefp.close()
-        return len(plist)
+        return len(plist) * CpuTopology.getnumpackages()
 
 ################################################################################
 # CPU Frequency
@@ -1665,14 +1665,15 @@ class PrefetcherInfoClass(InfoGroup):
         if likwid_base and os.path.isdir(likwid_base):
             abscmd = pjoin(likwid_base, cmd)
         if abscmd:
+            parser = PrefetcherInfoClass.parse_pf_state
             for name in names:
-                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), parse_pf_state)
+                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), parser)
         self.required(names)
     @staticmethod
     def parse_pf_state(value):
         if value.lower() == "on":
             return True
-        else
+        else:
             return False
 
 class PrefetcherInfo(PathMatchInfoGroup):

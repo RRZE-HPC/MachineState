@@ -2265,8 +2265,13 @@ def read_config(configfile=None):
         if pexists(sfile):
             sfp = fopen(sfile)
             if sfp:
-                tmpdict = json.loads(sfp.read().decode(ENCODING))
-                configdict.update(tmpdict)
+                sstr = sfp.read().decode(ENCODING)
+                if len(sstr) > 0:
+                    try:
+                        tmpdict = json.loads(sstr)
+                        configdict.update(tmpdict)
+                    except:
+                        raise ValueError("Configuration file '{}' not valid JSON".format(configfile))
                 sfp.close()
                 break
 

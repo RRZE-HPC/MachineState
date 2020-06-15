@@ -13,6 +13,7 @@ suite = unittest.TestLoader().loadTestsFromNames(
         'test_dmidecode_file',
         'test_machinestate',
         'test_repr',
+        'test_config',
     ]
 )
 

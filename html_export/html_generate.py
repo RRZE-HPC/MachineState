@@ -68,6 +68,10 @@ def to_html(mstate):
         meta(name='viewport', content='width=device-width, initial-scale=1')
         style(style_cont)
 
+    # create collapse/expand buttons
+    with doc:
+        button('Expand all', cls='option expandable')
+        button('Collapse all', cls='option collapsible')
     # create list structure in body
     with doc:
         for k, v in mstate.items():

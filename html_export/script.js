@@ -14,15 +14,16 @@ for (i = 0; i < acc.length; i++) {
     	    }
         }
     });
-    adjust(this.parentNode, this.style.maxHeight);
+    adjust(this.parentNode);
   });
 }
 
 function adjust(node) {
 	if(node.style) {
-        node.style.maxHeight = window.innerHeight + "px";
+        node.style.maxHeight = 10 * window.innerHeight + "px";
     }
     if(node.parentNode){
     	adjust(node.parentNode);
 	}
 }
+

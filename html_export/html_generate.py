@@ -49,11 +49,14 @@ def to_html(mstate):
     """
     Create a static HTML representation of a given machine state.
 
-    :param str mstate: machine state json as `string`
+    :param mstate: machine state json as `string`
+    :type mstate: `str` or `dict`
     :returns: str -- html representation of `mstate`
     """
     doc = dominate.document(title='MachineState')
-    mstate = json.loads(mstate)
+    # parse JSON string if needed
+    if isinstance(mstate, str):
+        mstate = json.loads(mstate)
 
     # load CSS
     dir_path = os.path.dirname(__file__)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import html
 import json
 import os
 import sys
@@ -89,4 +90,4 @@ def to_html(mstate):
         script(script_cont)
     rendered_str = doc.render()
     # replace html escape chars before returning rendered string
-    return rendered_str.replace('&quot;', '"').replace('&lt;', '<').replace('&gt;', '>')
+    return html.unescape(rendered_str)

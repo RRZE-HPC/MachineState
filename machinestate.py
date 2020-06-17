@@ -140,6 +140,7 @@ NVIDIA_PATH = "/opt/nvidia/bin"
 # Version information
 ################################################################################
 MACHINESTATE_VERSION = "0.1"
+MACHINESTATE_SCHEMA_VERSION = "v1"
 __version__ = MACHINESTATE_VERSION
 
 ################################################################################
@@ -900,6 +901,18 @@ class MultiClassInfoGroup(InfoGroup):
         arglist.append("classargs={}".format(self.classargs))
         return arglist
 
+class MachineStateInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(MachineStateInfo, self).__init__(name="MachineState",
+                                               anonymous=anonymous,
+                                               extended=extended)
+        self.const("Extended", self.extended)
+        self.const("Anonymous", self.anonymous)
+        self.const("Version", MACHINESTATE_VERSION)
+        self.const("SchemaVersion", MACHINESTATE_SCHEMA_VERSION)
+        self.const("Timestamp", datetime.now().ctime())
+        self.required("SchemaVersion", "Extended", "Anonymous")
+
 class MachineState(MultiClassInfoGroup):
     '''Main MachineState Class spawning all configuration specific subclasses'''
     def __init__(self,
@@ -914,12 +927,8 @@ class MachineState(MultiClassInfoGroup):
                  modulecmd=MODULECMD_PATH,
                  vecmd_path=VEOS_BASE):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
-        self.constants["MachineState"] = {"Extended" : self.extended,
-                                          "Anonymous" : self.anonymous,
-                                          "Version" : MACHINESTATE_VERSION,
-                                          "Timestamp" : datetime.now().ctime()
-                                         }
         self.classlist = [
+            MachineStateInfo,
             HostInfo,
             CpuInfo,
             OSInfo,

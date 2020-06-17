@@ -1888,6 +1888,8 @@ class ExecutableInfoExec(InfoGroup):
         if abscmd and len(abscmd) > 0:
             self.const("Abspath", abscmd)
             self.const("Size", psize(abscmd))
+            pfunc = ExecutableInfoExec.getcompiledwith
+            self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
             if extended:
                 self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
         self.required(["Name", "Size", "MD5sum"])
@@ -1898,6 +1900,12 @@ class ExecutableInfoExec(InfoGroup):
             for chunk in iter(lambda: md5fp.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
+    @staticmethod
+    def getcompiledwith(value):
+        for line in re.split(r"\n", value):
+            if "CC" in line:
+                return line
+        return "Not detectable"
 
 class ExecutableInfoLibraries(InfoGroup):
     '''Class to read all libraries linked with given executable'''

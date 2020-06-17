@@ -32,7 +32,7 @@ Provided classes:
 - LoadAvg
 - MemInfo
 - CgroupInfo
-- Writeback
+- WritebackWorkqueue
 - CpuFrequency
 - NumaInfo
 - CacheTopology
@@ -930,7 +930,7 @@ class MachineState(MultiClassInfoGroup):
             LoadAvg,
             MemInfo,
             CgroupInfo,
-            Writeback,
+            WritebackWorkqueue,
             CpuFrequency,
             NumaInfo,
             CacheTopology,
@@ -1438,12 +1438,15 @@ class CgroupInfo(InfoGroup):
 ################################################################################
 # Infos about the writeback workqueue
 ################################################################################
-class Writeback(InfoGroup):
+class WritebackWorkqueue(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(Writeback, self).__init__(name="Writeback", extended=extended, anonymous=anonymous)
+        super(WritebackWorkqueue, self).__init__(name="WritebackWorkqueue",
+                                                 extended=extended,
+                                                 anonymous=anonymous)
         base = "/sys/bus/workqueue/devices/writeback"
-        self.addf("CPUmask", pjoin(base, "cpumask"), r"(.+)")
+        self.addf("CPUmask", pjoin(base, "cpumask"), r"([0-9a-fA-F]+)", masktolist)
         self.addf("MaxActive", pjoin(base, "max_active"), r"(\d+)", int)
+        self.addf("NUMA", pjoin(base, "numa"), r"(\d+)", bool))
         self.required(["CPUmask", "MaxActive"])
 
 ################################################################################
@@ -1451,8 +1454,9 @@ class Writeback(InfoGroup):
 ################################################################################
 class TransparentHugepages(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(TransparentHugepages, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "TransparentHugepages"
+        super(TransparentHugepages, self).__init__(name="TransparentHugepages",
+                                                   extended=extended,
+                                                   anonymous=anonymous)
         base = "/sys/kernel/mm/transparent_hugepage"
         self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
         self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", bool)
@@ -1465,9 +1469,10 @@ class TransparentHugepages(InfoGroup):
 class PowercapInfoConstraintClass(InfoGroup):
     '''Class to read information about one powercap constraint'''
     def __init__(self, ident, extended=False, anonymous=False, package=0, domain=-1):
-        super(PowercapInfoConstraintClass, self).__init__(extended=extended, anonymous=anonymous)
+        super(PowercapInfoConstraintClass, self).__init__(name="Constraint{}".format(ident),
+                                                          extended=extended,
+                                                          anonymous=anonymous)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
-        self.name = "Constraint{}".format(ident)
         fptr = fopen(pjoin(base, "constraint_{}_name".format(ident)))
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())

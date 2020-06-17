@@ -1728,7 +1728,30 @@ class MpiInfo(ListInfoGroup):
         self.mpilist = ["mpiexec", "mpiexec.hydra", "mpirun", "srun", "aprun"]
         self.subclass = MpiInfoClass
         self.userlist = [m for m in self.mpilist if which(m)]
-
+        ompi = which("ompi_info")
+        if ompi and len(ompi) > 0 and extended:
+            ompi_args = "--parseable --params all all --level 9"
+            self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
+        impi = which ("impi_info")
+        if impi and len(impi) > 0 and extended:
+            self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
+    @staticmethod
+    def openmpiparams(value):
+        outdict = {}
+        for line in value.split("\n"):
+            if not line.strip(): continue
+            llist = re.split(r":", line)
+            outdict[":".join(llist[:-1])] = llist[-1]
+        return outdict
+    @staticmethod
+    def intelmpiparams(value):
+        outdict = {}
+        for line in value.split("\n"):
+            if "I_MPI" not in line: continue
+            if not line.strip(): continue
+            llist = [x.strip() for x in line.split("|")]
+            outdict[llist[1]] = llist[2]
+        return outdict
 
 ################################################################################
 # Infos about environ variables

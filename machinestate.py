@@ -1772,6 +1772,7 @@ class MpiInfo(ListInfoGroup):
         outdict = {}
         for line in value.split("\n"):
             if not line.strip(): continue
+            if ":help:" in line or ":type:" in line: continue
             llist = re.split(r":", line)
             outdict[":".join(llist[:-1])] = llist[-1]
         return outdict

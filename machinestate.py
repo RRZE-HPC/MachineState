@@ -959,28 +959,26 @@ class MachineState(MultiClassInfoGroup):
             CpuAffinity,
             ModulesInfo,
         ]
-        if which("nvidia-smi"):
-            self.classlist.append(NvidiaSmiInfo)
         self.classargs = [{} for x in self.classlist]
-        if pexists(VEOS_BASE):
-            self.classlist.append(NecTsubasaInfo)
-            self.classargs.append({"ve_base" : VEOS_BASE})
-        if pexists(DMIDECODE_FILE):
-            self.classlist.append(DmiDecodeFile)
-            self.classargs.append({"dmifile" : DMIDECODE_FILE})
-        if executable:
-            self.classlist.append(ExecutableInfo)
-            self.classargs.append({"executable" : executable})
-        if DO_LIKWID:
-            likwid_base = LIKWID_PATH
-            if not likwid_base:
+
+        self.classlist.append(ModulesInfo)
+        self.classargs.append({"modulecmd" : modulecmd})
+        self.classlist.append(NvidiaSmiInfo)
+        self.classargs.append({"nvidia_path" : nvidia_path})
+        self.classlist.append(NecTsubasaInfo)
+        self.classargs.append({"vecmd_path" : vecmd_path})
+        self.classlist.append(DmiDecodeFile)
+        self.classargs.append({"dmifile" : dmifile})
+        self.classlist.append(ExecutableInfo)
+        self.classargs.append({"executable" : executable})
+        if likwid_enable and likwid_path is not None:
+            if not pexists(likwid_path):
                 path = which("likwid-topology")
                 if path:
-                    likwid_base = os.path.dirname(path)
+                    likwid_path = os.path.dirname(path)
+            clargs = {"likwid_base" : likwid_path}
             self.classlist += [PrefetcherInfo, TurboInfo]
-            clargs = {"likwid_base" : likwid_base}
-            self.classargs.append(clargs)
-            self.classargs.append(clargs)
+            self.classargs += [clargs, clargs]
     def get_config(self, sort=False, intend=4):
         outdict = {}
         for inst in self._instances:
@@ -1947,18 +1945,19 @@ class ExecutableInfoExec(InfoGroup):
     def __init__(self, extended=False, anonymous=False, executable=""):
         super(ExecutableInfoExec, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "ExecutableInfo"
-        self.executable = executable
 
-        abscmd = which(self.executable)
-        self.const("Name", str(self.executable))
-        if abscmd and len(abscmd) > 0:
-            self.const("Abspath", abscmd)
-            self.const("Size", psize(abscmd))
-            pfunc = ExecutableInfoExec.getcompiledwith
-            self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
-            if extended:
-                self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
-        self.required(["Name", "Size", "MD5sum"])
+        if executable is not None:
+            self.executable = executable
+            abscmd = which(self.executable)
+            self.const("Name", str(self.executable))
+            if abscmd and len(abscmd) > 0:
+                self.const("Abspath", abscmd)
+                self.const("Size", psize(abscmd))
+                pfunc = ExecutableInfoExec.getcompiledwith
+                self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
+                if extended:
+                    self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
+            self.required(["Name", "Size", "MD5sum"])
     @staticmethod
     def getmd5sum(filename):
         hash_md5 = hashlib.md5()
@@ -1978,13 +1977,15 @@ class ExecutableInfoLibraries(InfoGroup):
     def __init__(self, executable, extended=False, anonymous=False):
         super(ExecutableInfoLibraries, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "LinkedLibraries"
-        self.executable = which(executable)
         self.ldd = None
-        if self.executable and len(self.executable) > 0:
-            self.ldd = "ldd {}; exit 0".format(self.executable)
+        if executable is not None:
+            self.executable = which(executable)
+            self.ldd = None
+            if self.executable and len(self.executable) > 0:
+                self.ldd = "LANG=C ldd {}; exit 0".format(self.executable)
     def update(self):
         libdict = {}
-        if self.ldd:
+        if self.ldd is not None:
             rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
             data = rawdata.decode(ENCODING)
             libregex = re.compile(r"\s*([^\s]+)\s+.*")
@@ -2219,16 +2220,16 @@ class CpuAffinity(InfoGroup):
 ################################################################################
 class ModulesInfo(InfoGroup):
     '''Class to read information from the modules system'''
-    def __init__(self, extended=False, anonymous=False):
+    def __init__(self, extended=False, anonymous=False, modulecmd="modulecmd"):
         super(ModulesInfo, self).__init__(name="ModulesInfo",
                                           extended=extended,
                                           anonymous=anonymous)
         parse = ModulesInfo.parsemodules
         cmd_opts = "sh list -t 2>&1"
-        cmd = "modulecmd"
+        cmd = modulecmd
         abspath = which(cmd)
-        if MODULECMD_PATH is not None and len(MODULECMD_PATH) > 0:
-            path = "{}".format(MODULECMD_PATH)
+        if modulecmd is not None and len(modulecmd) > 0:
+            path = "{}".format(modulecmd)
             path_opts = "{}".format(cmd_opts)
             if " " in path:
                 tmplist = path.split(" ")
@@ -2296,10 +2297,15 @@ class InfinibandInfo(PathMatchInfoGroup):
 ################################################################################
 class NvidiaSmiInfoClass(InfoGroup):
     '''Class to read information for one Nvidia GPU (uses the nvidia-smi command)'''
-    def __init__(self, device, extended=False, anonymous=False):
-        super(NvidiaSmiInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Card{}".format(device)
-        self.cmd = "nvidia-smi"
+    def __init__(self, device, extended=False, anonymous=False, nvidia_path=""):
+        super(NvidiaSmiInfoClass, self).__init__(name="Card{}".format(device),
+                                                 extended=extended,
+                                                 anonymous=anonymous)
+        cmd = pjoin(nvidia_path, "nvidia-smi")
+        if pexists(cmd):
+            self.cmd = cmd
+        elif which("nvidia-smi"):
+            self.cmd = which("nvidia-smi")
         self.cmd_opts = "-q -i {}".format(device)
         abscmd = which(self.cmd)
         matches = {"ProductName" : r"\s+Product Name\s+:\s+(.+)",
@@ -2322,11 +2328,14 @@ class NvidiaSmiInfoClass(InfoGroup):
 
 class NvidiaSmiInfo(ListInfoGroup):
     '''Class to spawn subclasses for each NVIDIA GPU device (uses the nvidia-smi command)'''
-    def __init__(self, extended=False, anonymous=False):
+    def __init__(self, nvidia_path="", extended=False, anonymous=False):
         super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo",
                                             extended=extended,
                                             anonymous=anonymous)
         self.cmd = "nvidia-smi"
+        cmd = pjoin(nvidia_path, "nvidia-smi")
+        if pexists(cmd):
+            self.cmd = cmd
         self.cmd_opts = "-q"
         abscmd = which(self.cmd)
         if abscmd:
@@ -2334,6 +2343,7 @@ class NvidiaSmiInfo(ListInfoGroup):
             if num_gpus > 0:
                 self.userlist = [i for i in range(num_gpus)]
                 self.subclass = NvidiaSmiInfoClass
+                self.subargs = {"nvidia_path" : nvidia_path}
         matches = {"DriverVersion" : r"Driver Version\s+:\s+([\d\.]+)",
                    "CudaVersion" : r"CUDA Version\s+:\s+([\d\.]+)",
                   }
@@ -2347,20 +2357,20 @@ class NvidiaSmiInfo(ListInfoGroup):
 ################################################################################
 class NecTsubasaInfoTemps(InfoGroup):
     '''Class to read temperature information for one NEC Tsubasa device (uses the vecmd command)'''
-    def __init__(self, tempkeys, ve_base="", extended=False, anonymous=False, device=0):
+    def __init__(self, tempkeys, vecmd_path="", extended=False, anonymous=False, device=0):
         super(NecTsubasaInfoTemps, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Temperatures"
-        vecmd = pjoin(ve_base, "vecmd")
+        vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         for tempkey in tempkeys:
             self.addc(tempkey, vecmd, veargs, r"\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
 
 class NecTsubasaInfoClass(InfoGroup):
     '''Class to read information for one NEC Tsubasa device (uses the vecmd command)'''
-    def __init__(self, device, ve_base="", extended=False, anonymous=False):
+    def __init__(self, device, vecmd_path="", extended=False, anonymous=False):
         super(NecTsubasaInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Card{}".format(device)
-        vecmd = pjoin(ve_base, "vecmd")
+        vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         if pexists(vecmd):
             self.addc("State", vecmd, veargs, r"VE State\s+:\s+(.+)", totitle)
@@ -2373,7 +2383,7 @@ class NecTsubasaInfoClass(InfoGroup):
                 regex = r"Negotiated Link Width\s+:\s+(x\d+)"
                 self.addc("PciLinkWidth", vecmd, veargs, regex)
             ve_temps = process_cmd((vecmd, veargs, None, NecTsubasaInfoClass.gettempkeys))
-            tempargs = {"device" : device, "ve_base" : ve_base}
+            tempargs = {"device" : device, "vecmd_path" : vecmd_path}
             cls = NecTsubasaInfoTemps(ve_temps, extended=extended, anonymous=anonymous, **tempargs)
             self._instances.append(cls)
     @staticmethod
@@ -2395,7 +2405,8 @@ class NecTsubasaInfo(ListInfoGroup):
         vecmd = pjoin(vecmd_path, "vecmd")
         if not pexists(vecmd):
             vecmd = which("vecmd")
-            vecmd_path = os.path.dirname(vecmd)
+            if vecmd is not None:
+                vecmd_path = os.path.dirname(vecmd)
         if vecmd and len(vecmd) > 0:
             num_ves = process_cmd((vecmd, "info", r"Attached VEs\s+:\s+(\d+)", int))
             if num_ves > 0:

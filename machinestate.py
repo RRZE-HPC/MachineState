@@ -88,6 +88,7 @@ The module contains more classes but all except the above ones are used only int
 # TODO: Expand bitmasks to lists?
 # TODO: More analysis by ExecutableInfo? (type, compilation info, ...)
 # TODO: Add class for 'sysctl -a' ?
+# TODO: Check SMTWidth in CpuTopology
 
 ################################################################################
 # Imports
@@ -402,7 +403,7 @@ def process_cmds(cmddict):
         abscmd = which(cmd)
         data = None
         if abscmd and len(abscmd) > 0:
-            exestr = "{} {}; exit 0;".format(cmd, cmd_opts)
+            exestr = "LANG=C {} {}; exit 0;".format(cmd, cmd_opts)
             data = check_output(exestr, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
         for args in sortdict[cmdargs]:
             key, cmatch, cparse = args
@@ -427,7 +428,7 @@ def process_cmd(args):
         if abspath and len(abspath) > 0:
             if optsmatchconvert:
                 cmd_opts, *matchconvert = optsmatchconvert
-                exe = "{} {}; exit 0;".format(cmd, cmd_opts)
+                exe = "LANG=C {} {}; exit 0;".format(cmd, cmd_opts)
                 data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
                 if data and len(data) >= 0 and len(matchconvert) > 0:
                     cmatch, *convert = matchconvert
@@ -1832,10 +1833,9 @@ class TurboInfo(InfoGroup):
                 for name, regex in zip(names, matches):
                     self.addc(name, abscmd, cmd_opts, regex, tohertz)
                     self.required(name)
-                regex = r"Performance energy bias:\s+(\d+)\s.*"
+                regex = r"^Performance energy bias:\s+(\d+)"
                 self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
                 self.required("PerfEnergyBias")
-                regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
                 self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
         self.required4equal = self.commands.keys()
@@ -2136,7 +2136,7 @@ class CpuAffinity(InfoGroup):
         else:
             abscmd = which("taskset")
             if abscmd and len(abscmd) > 0:
-                regex = r"pid \d+'s current affinity list: (.*)"
+                regex = r".*current affinity list: (.*)"
                 self.addc("Affinity", abscmd, "-c -p $$", regex, tointlist)
                 self.required("Affinity")
 

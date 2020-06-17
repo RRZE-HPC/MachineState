@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 This module provides a simple interface for collecting hardware and software settings for
 documentation and reproducibility purposes.

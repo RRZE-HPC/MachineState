@@ -1409,12 +1409,39 @@ class MemInfo(InfoGroup):
 ################################################################################
 # Infos about the kernel
 ################################################################################
+class KernelSchedInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(KernelSchedInfo, self).__init__(name="KernelSchedInfo",
+                                              extended=extended,
+                                              anonymous=anonymous)
+        base = "/proc/sys/kernel"
+        self.addf("RealtimeBandwidthReservationUs", pjoin(base, "sched_rt_runtime_us"), parse=int)
+        self.addf("TargetedPreemptionLatencyNs", pjoin(base, "sched_latency_ns"), parse=int)
+        self.addf("MinimalPreemptionGranularityNs", pjoin(base, "sched_min_granularity_ns"), parse=int)
+        self.addf("WakeupLatencyNs", pjoin(base, "sched_wakeup_granularity_ns"), parse=int)
+        self.addf("RuntimePoolTransferUs", pjoin(base, "sched_cfs_bandwidth_slice_us"), parse=int)
+        self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=bool)
+        self.addf("CacheHotTimeNs", pjoin(base, "sched_migration_cost_ns"), parse=int)
+
+
+
 class KernelInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(KernelInfo, self).__init__(name="KernelInfo", extended=extended, anonymous=anonymous)
+        super(KernelInfo, self).__init__(name="KernelInfo",
+                                         extended=extended,
+                                         anonymous=anonymous)
         self.addf("Version", "/proc/sys/kernel/osrelease")
         self.addf("CmdLine", "/proc/cmdline")
-        self.required = ["Version", "CmdLine"]
+        self.addf("ThreadsMax", "/proc/sys/kernel/threads-max", parse=int)
+        self.addf("NMIWatchdog", "/proc/sys/kernel/nmi_watchdog", parse=bool)
+        self.addf("Watchdog", "/proc/sys/kernel/watchdog", parse=bool)
+        if pexists("/proc/sys/kernel/softlockup_thresh"):
+            self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
+        self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
+        self.required("Version", "CmdLine","NMIWatchdog", "Watchdog")
+        cls = KernelSchedInfo(extended=extended,
+                              anonymous=anonymous)
+        self._instances.append(cls)
 
 ################################################################################
 # Infos about CGroups
@@ -1446,8 +1473,8 @@ class WritebackWorkqueue(InfoGroup):
         base = "/sys/bus/workqueue/devices/writeback"
         self.addf("CPUmask", pjoin(base, "cpumask"), r"([0-9a-fA-F]+)", masktolist)
         self.addf("MaxActive", pjoin(base, "max_active"), r"(\d+)", int)
-        self.addf("NUMA", pjoin(base, "numa"), r"(\d+)", bool))
-        self.required(["CPUmask", "MaxActive"])
+        self.addf("NUMA", pjoin(base, "numa"), r"(\d+)", int)
+        self.required(["CPUmask", "MaxActive", "NUMA"])
 
 ################################################################################
 # Infos about transparent hugepages

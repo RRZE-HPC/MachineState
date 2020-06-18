@@ -40,3 +40,15 @@ after_success:
 - codecov
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
 cache: pip
+deploy:
+  provider: pypi
+  username: "__token__"
+  password:
+    secure: "BWNC6EVfvgm8vBvWJsq2zeR3yauhL5gpJB2QwK3ua/lGM1d3mVDaIkAyttRaoT25bpitktI5jVrLmfb6dgF8taeUY9I7dnFlyppkKs3weOSLKtQxlN6ICY2Jcw0OjhzXKv/6i+NzZZOM0Y6jTptUc604Fi+wBubGvAqx0JjR72FmECVxvon9GQfgqraC0hrIXOrjIGGtw4R7/pias/wUCKXyGjojsdti63+3fdi4nZvaEF7PCxP9ZGIfWMvLfm00hT8trKobFh3cmHoiKB8sPIwKN0GjcIyYsZ7NrledDAHBfzbHCawcppuY1MLiCiJBrrQxrcZffIYOPMuFzSkYAMdKiRugRsVbGltSmPAsom2rEWoyJ5Auy0Myw5YQAHp6edVnPI0Ot8gkVcuCzzpbdtZUjvdLI59GclXIZw07ChpnX0RqOaECxvQSLft2uUpzYU3Zi5JIU3+2ne0d1Cy81qVLUCB571UVUHIzfhgRVKhxAconEEwezlZRjQVChPyuBt7P5w4Sr2bi/l26bKvQ+rk4XrPXhzEmgpGVIfLObcnpD5D4ROteFXRedk9ezlpAJofC05wtyDL1PybUIB5Ra4VQ6NL86MXqt3TeVxjNbWAXlT1d3wHwwqz6LxtB7WmzqWTuA0TWpjmlGeVkRUCR83MbYngXRYhpa3EbwXdQFKc="
+  distributions: sdist
+  skip_existing: true
+  cleanup: false
+  on:
+    repo: RRZE-HPC/MachineState
+    branch: master
+    tags: true

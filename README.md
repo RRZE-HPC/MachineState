@@ -1,3 +1,6 @@
+
+<div align=center><img src="https://github.com/RRZE-HPC/MachineState/raw/master/logo/machinestate_logo.png" alt="MachineState logo" width="150px"/></div>
+
 --------------------------------------------------------------------------------
 Introduction
 --------------------------------------------------------------------------------

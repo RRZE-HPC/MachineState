@@ -1833,8 +1833,12 @@ class PrefetcherInfoClass(InfoGroup):
         names = ["HW_PREFETCHER", "CL_PREFETCHER", "DCU_PREFETCHER", "IP_PREFETCHER"]
         cmd_opts = "-c {} -l".format(ident)
         cmd = "likwid-features"
+        abscmd = cmd
         if likwid_base and os.path.isdir(likwid_base):
             abscmd = pjoin(likwid_base, cmd)
+        if not pexists(abscmd):
+            abscmd = which(cmd)
+
         if abscmd:
             parser = PrefetcherInfoClass.parse_pf_state
             for name in names:
@@ -1854,9 +1858,10 @@ class PrefetcherInfo(PathMatchInfoGroup):
                                              extended=extended,
                                              anonymous=anonymous)
         cmd = "likwid-features"
+        abscmd = cmd
         if likwid_base and os.path.isdir(likwid_base):
             abscmd = pjoin(likwid_base, cmd)
-        else:
+        if not pexists(abscmd):
             abscmd = which(cmd)
 
         if abscmd:
@@ -2241,7 +2246,6 @@ class ModulesInfo(InfoGroup):
             cmd_opts = path_opts
         if abscmd and len(abscmd) > 0:
             self.addc("Loaded", abscmd, cmd_opts, None, parse)
-            #self.required4equal.append("Loaded")
     @staticmethod
     def parsemodules(value):
         slist = re.split("\n", value)

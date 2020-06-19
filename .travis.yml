@@ -11,6 +11,8 @@ python:
 - '3.6'
 - '3.7'
 before_install:
+# Workaround for cacheing issue on travis:
+- sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels
 - pip install codecov
 - pip install requests
 - sudo apt-get install slurm slurm-client

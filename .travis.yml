@@ -39,7 +39,6 @@ after_success:
 - coverage combine
 - codecov
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
-cache: pip
 deploy:
   provider: pypi
   username: "__token__"

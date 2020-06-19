@@ -341,14 +341,17 @@ class TestToBool(unittest.TestCase):
     def test_toboolIntTrue2(self):
         out = machinestate.tobool(2)
         self.assertEqual(out, True)
-    def test_toboolIntFalse(self):
+    def test_toboolIntTrueNeg4(self):
+        out = machinestate.tobool(-4)
+        self.assertEqual(out, True)
+    def test_toboolFloatFalse(self):
         out = machinestate.tobool(0.0)
         self.assertEqual(out, False)
-    def test_toboolIntTrue1(self):
-        out = machinestate.tobool(1.0)
+    def test_toboolFloatTruePos(self):
+        out = machinestate.tobool(1.2)
         self.assertEqual(out, True)
-    def test_toboolIntTrue2(self):
-        out = machinestate.tobool(2.0)
+    def test_toboolFloatTrueNeg(self):
+        out = machinestate.tobool(-12.2)
         self.assertEqual(out, True)
     def test_toboolStrOn(self):
         out = machinestate.tobool("on")

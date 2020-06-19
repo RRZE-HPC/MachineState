@@ -1090,7 +1090,7 @@ class CpuTopologyClass(InfoGroup):
         self.addf("PackageId", pjoin(base, "physical_package_id"), r"(\d+)", int)
         self.const("HWThread", ident)
         self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
-        self.required = ["CoreId", "PackageId", "HWThread", "ThreadId"]
+        self.required("CoreId", "PackageId", "HWThread", "ThreadId")
 
     @staticmethod
     def getthreadid(hwthread):

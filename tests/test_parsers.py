@@ -330,3 +330,72 @@ class TestToTitle(unittest.TestCase):
     def test_totitleMixed(self):
         out = machinestate.totitle("abc_defg-hij")
         self.assertEqual(out, "AbcDefg-Hij")
+
+class TestToBool(unittest.TestCase):
+    def test_toboolIntFalse(self):
+        out = machinestate.tobool(0)
+        self.assertEqual(out, False)
+    def test_toboolIntTrue1(self):
+        out = machinestate.tobool(1)
+        self.assertEqual(out, True)
+    def test_toboolIntTrue2(self):
+        out = machinestate.tobool(2)
+        self.assertEqual(out, True)
+    def test_toboolStrOn(self):
+        out = machinestate.tobool("on")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("On")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("ON")
+        self.assertEqual(out, True)
+    def test_toboolStrOff(self):
+        out = machinestate.tobool("off")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("Off")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("OFf")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("OFF")
+        self.assertEqual(out, False)
+    def test_toboolStr0(self):
+        out = machinestate.tobool("0")
+        self.assertEqual(out, False)
+    def test_toboolStr1(self):
+        out = machinestate.tobool("1")
+        self.assertEqual(out, True)
+    def test_toboolStr2(self):
+        out = machinestate.tobool("2")
+        self.assertEqual(out, True)
+    def test_toboolStrTrue(self):
+        out = machinestate.tobool("true")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("True")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("TRue")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("TRUe")
+        self.assertEqual(out, True)
+        out = machinestate.tobool("TRUE")
+        self.assertEqual(out, True)
+    def test_toboolStrOff(self):
+        out = machinestate.tobool("false")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("False")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("FAlse")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("FALse")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("FALSe")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("FALSE")
+        self.assertEqual(out, False)
+    def test_toboolInvalid(self):
+        out = machinestate.tobool("abc")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("-1")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("offf")
+        self.assertEqual(out, False)
+        out = machinestate.tobool("o")
+        self.assertEqual(out, False)

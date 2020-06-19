@@ -322,6 +322,21 @@ def tohertzlist(value):
         return outlist
     return None
 
+def tobool(value):
+    if isinstance(value, int):
+        return bool(value)
+    elif isinstance(value, str):
+        if re.match(r"\d+", value):
+            return bool(int(value))
+        elif value.lower() == "on":
+            return True
+        elif value.lower() == "off":
+            return False
+        elif value.lower() == "true":
+            return True
+        elif value.lower() == "false":
+            return False
+    return False
 
 ################################################################################
 # Processing functions for entries in class attributes 'files' and 'commands'  #
@@ -1014,7 +1029,7 @@ class NumaBalance(InfoGroup):
         self.name = "NumaBalancing"
         base = "/proc/sys/kernel"
         regex = r"(\d+)"
-        self.addf("Enabled", pjoin(base, "numa_balancing"), regex, bool)
+        self.addf("Enabled", pjoin(base, "numa_balancing"), regex, tobool)
         self.required("Enabled")
         if extended:
             names = ["ScanDelayMs", "ScanPeriodMaxMs", "ScanPeriodMinMs", "ScanSizeMb"]
@@ -1066,7 +1081,7 @@ class CpuInfo(InfoGroup):
 
         self.required(["Vendor", "Family", "Model", "Stepping"])
         if pexists("/sys/devices/system/cpu/smt/active"):
-            self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", bool)
+            self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
             self.required("SMT")
         if extended:
             if march in ["x86_64", "i386"]:
@@ -1428,7 +1443,7 @@ class KernelSchedInfo(InfoGroup):
         self.addf("MinimalPreemptionGranularityNs", pjoin(base, "sched_min_granularity_ns"), parse=int)
         self.addf("WakeupLatencyNs", pjoin(base, "sched_wakeup_granularity_ns"), parse=int)
         self.addf("RuntimePoolTransferUs", pjoin(base, "sched_cfs_bandwidth_slice_us"), parse=int)
-        self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=bool)
+        self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=tobool)
         self.addf("CacheHotTimeNs", pjoin(base, "sched_migration_cost_ns"), parse=int)
 
 class KernelRcuInfo(InfoGroup):
@@ -1451,8 +1466,8 @@ class KernelInfo(ListInfoGroup):
         # see https://pyperf.readthedocs.io/en/latest/system.html#checks
         self.addf("ASLR", "/proc/sys/kernel/randomize_va_space", parse=int)
         self.addf("ThreadsMax", "/proc/sys/kernel/threads-max", parse=int)
-        self.addf("NMIWatchdog", "/proc/sys/kernel/nmi_watchdog", parse=bool)
-        self.addf("Watchdog", "/proc/sys/kernel/watchdog", parse=bool)
+        self.addf("NMIWatchdog", "/proc/sys/kernel/nmi_watchdog", parse=tobool)
+        self.addf("Watchdog", "/proc/sys/kernel/watchdog", parse=tobool)
         self.addf("HungTaskCheckCount", "/proc/sys/kernel/hung_task_check_count", parse=int)
         if pexists("/proc/sys/kernel/softlockup_thresh"):
             self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
@@ -1507,7 +1522,7 @@ class TransparentHugepages(InfoGroup):
                                                    anonymous=anonymous)
         base = "/sys/kernel/mm/transparent_hugepage"
         self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
-        self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", bool)
+        self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", tobool)
         self.required(["State", "UseZeroPage"])
 
 
@@ -1545,7 +1560,7 @@ class PowercapInfoClass(PathMatchInfoGroup):
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
             fptr.close()
-        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", bool)
+        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", tobool)
         self.searchpath = pjoin(base, "constraint_*_name")
         self.match = r".*/constraint_(\d+)_name"
         self.subclass = PowercapInfoConstraintClass
@@ -1564,7 +1579,7 @@ class PowercapInfoPackageClass(PathMatchInfoGroup):
                                                        match=r".*/constraint_(\d+)_name",
                                                        subclass=PowercapInfoConstraintClass,
                                                        subargs={"package" : ident})
-        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", bool)
+        self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", tobool)
 
 class PowercapInfoPackage(PathMatchInfoGroup):
     '''Class to spawn subclasses for one powercap device/package

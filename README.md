@@ -230,7 +230,7 @@ $ python3
 >>> hi_dict = hi.get()
 {'Hostname': 'testhost'}
 >>> hi_json = hi.get_json()
-'{\n    "Hostname": "broadep2"\n}'
+'{\n    "Hostname": "testhost"\n}'
 ```
 
 If you want to compare with an old state:

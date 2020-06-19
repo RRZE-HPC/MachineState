@@ -324,6 +324,8 @@ def tohertzlist(value):
 def tobool(value):
     if isinstance(value, int):
         return bool(value)
+    elif isinstance(value, float):
+        return bool(int(math.floor(value)))
     elif isinstance(value, str):
         if re.match(r"\d+", value):
             return bool(int(value))

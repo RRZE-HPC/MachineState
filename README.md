@@ -11,7 +11,7 @@ Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
 
-An example JSON from an Intel Skylake Desktop system can be found [here](./examples/skylake-desktop.json).
+An example JSON from an Intel Skylake Desktop system can be found [here](./examples/skylake-desktop.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop.json)).
 
 [![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 
@@ -55,11 +55,11 @@ Checks
 **All sizes are converted to bytes, all frequencies are converted to Hz**
 
 --------------------------------------------------------------------------------
-Usage (Python version)
+Usage (CLI)
 --------------------------------------------------------------------------------
 Getting usage help:
 ```
-$ ./machinestate.py -h
+$ machinestate -h
 usage: machinestate.py [-h] [-e] [-a] [-c] [-s] [-i INDENT] [-o OUTPUT]
                        [-j JSON] [--configfile CONFIGFILE]
                        [executable]
@@ -97,7 +97,7 @@ Examples
 Gather data and print JSON
 
 ```
-$ ./machinestate.py
+$ machinestate
 {
     "HostInfo": {
         "Hostname": "testhost"
@@ -109,7 +109,7 @@ $ ./machinestate.py
 Gather extended data and print JSON
 
 ```
-$ ./machinestate.py -e
+$ machinestate -e
 {
     "HostInfo": {
         "Hostname": "testhost"
@@ -123,7 +123,7 @@ $ ./machinestate.py -e
 Gather data, include information about the executable on cmdline and print JSON
 
 ```
-$ ./machinestate.py hostname
+$ machinestate hostname
 {
     "HostInfo": {
         "Hostname": "testhost"
@@ -147,17 +147,17 @@ $ ./machinestate.py hostname
 Redirecting JSON output to file
 
 ```
-$ ./machinestate.py -o $(hostname -s).json
+$ machinestate -o $(hostname -s).json
 ```
 
 Sort keys in JSON output
 ```
-$ ./machinestate.py -s
+$ machinestate -s
 ```
 
 Compare JSON file created with `machinestate.py` with current state
 ```
-$ ./machinestate.py -j oldstate.json
+$ machinestate -j oldstate.json
 ```
 
 --------------------------------------------------------------------------------
@@ -186,6 +186,65 @@ Or the user can specify a custom path with the `--configfile CONFIGFILE` option.
 
 For the ModulesInfo class with its `modulecmd` setting, also the TCL version can be used
 with `tclsh /path/to/modulecmd.tcl`.
+
+--------------------------------------------------------------------------------
+Usage as Python3 module
+--------------------------------------------------------------------------------
+You can use MachineState also as module in your applications. You don't need to gather all
+information if you are interested in only specific information classes.
+
+In order to capture the current state:
+```
+$ python3
+>>> import machinestate
+>>> ms = machinestate.MachineState(extended=False, anonymous=False)
+>>> ms.generate()                        # generate subclasses
+>>> ms.update()                          # read information
+>>> ms.get()                             # get the information as dict
+{ ... all fields ... }
+>>> ms.get_json(indent=4, sort=True)     # get the information as JSON document (parameters optional)
+"... JSON document ..."
+```
+
+
+How to get the list of information classes:
+```
+$ python3
+>>> import machinestate
+>>> help(machinestate)
+[...]
+Provided classes:
+    - HostInfo
+    - CpuInfo
+    - OSInfo
+    [...]
+```
+
+Using single information classes is similar to the big `MachineState` class
+```
+$ python3
+>>> import machinestate
+>>> hi = machinestate.HostInfo(extended=False, anonymous=False)
+>>> hi.generate()
+>>> hi.update()
+>>> hi_dict = hi.get()
+{'Hostname': 'testhost'}
+>>> hi_json = hi.get_json()
+'{\n    "Hostname": "broadep2"\n}'
+```
+
+If you want to compare with an old state:
+```
+$ python3
+>>> oldstate = {}            # dictionary of oldstate or
+                             # filename "oldstate.json" or
+                             # JSON document "... OldState JSON document ..."
+>>> ms = machinestate.MachineState(extended=False, anonymous=False)
+>>> ms.generate()
+>>> ms.update()
+>>> ms == oldstate
+False
+```
 
 --------------------------------------------------------------------------------
 Differences between Shell and Python version

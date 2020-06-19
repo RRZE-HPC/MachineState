@@ -14,7 +14,7 @@ from locale import getpreferredencoding
 ENCODING = getpreferredencoding()
 
 
-class TestParsers(unittest.TestCase):
+class TestToStrList(unittest.TestCase):
     # Tests for tostrlist
     def test_tostrlistNone(self):
         out = machinestate.tostrlist(None)
@@ -31,12 +31,17 @@ class TestParsers(unittest.TestCase):
     def test_tostrlistValidComma(self):
         out = machinestate.tostrlist("a,b,c")
         self.assertEqual(out, ["a", "b", "c"])
+
+class TestToIntList(unittest.TestCase):
     # Tests for tointlist
     def test_tointlistNone(self):
         out = machinestate.tointlist(None)
         self.assertEqual(out, None)
     def test_tointlistInt(self):
         out = machinestate.tointlist(1)
+        self.assertEqual(out, [1])
+    def test_tointlistFloat(self):
+        out = machinestate.tointlist(1.0)
         self.assertEqual(out, [1])
     def test_tointlistValidSpaces(self):
         out = machinestate.tointlist("1 2 3")
@@ -62,6 +67,8 @@ class TestParsers(unittest.TestCase):
         self.assertRaises(ValueError, machinestate.tointlist, "a-c")
     def test_tostrlistInvalidNoNumbersMixed(self):
         self.assertRaises(ValueError, machinestate.tointlist, "a-b,c")
+
+class TestToBytes(unittest.TestCase):
     # Tests for tobytes
     def test_tobytesNone(self):
         out = machinestate.tobytes(None)
@@ -156,6 +163,8 @@ class TestParsers(unittest.TestCase):
         self.assertEqual(out, None)
     def test_tobytesAlmostValid(self):
         self.assertRaises(ValueError, machinestate.tobytes, ". kb")
+
+class TestMaskToList(unittest.TestCase):
     # Tests for masktolist
     def test_masktolistNone(self):
         out = machinestate.masktolist(None)
@@ -178,6 +187,8 @@ class TestParsers(unittest.TestCase):
     def test_masktolistStrMaskComma(self):
         out = machinestate.masktolist("ff,FF")
         self.assertEqual(out, [x for x in range(16)])
+
+class TestToHertz(unittest.TestCase):
     # Tests for tohertz
     def test_tohertzNone(self):
         out = machinestate.tohertz(None)
@@ -250,6 +261,7 @@ class TestParsers(unittest.TestCase):
         out = machinestate.tohertz("abc")
         self.assertEqual(out, None)
 
+class TestToHertzList(unittest.TestCase):
     # Tests for tohertzlist
     def test_tohertzlistNone(self):
         out = machinestate.tohertzlist(None)
@@ -289,7 +301,8 @@ class TestParsers(unittest.TestCase):
         # string without unit are seen as kHz
         out = machinestate.tohertzlist("10000kHz,20000KHz,30000khz")
         self.assertEqual(out, [10000000, 20000000, 30000000])
-    # Tests for totitle
+
+class TestToTitle(unittest.TestCase):
     def test_totitleNone(self):
         out = machinestate.totitle(None)
         self.assertEqual(out, "None")

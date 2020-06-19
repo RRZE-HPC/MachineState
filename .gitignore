@@ -1,5 +1,5 @@
 # MachineState specific files
-*.json
+/*.json
 
 # Temporary files
 *.~

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 This module provides a simple interface for collecting hardware and software settings for
 documentation and reproducibility purposes.
@@ -31,7 +32,7 @@ Provided classes:
 - LoadAvg
 - MemInfo
 - CgroupInfo
-- Writeback
+- WritebackWorkqueue
 - CpuFrequency
 - NumaInfo
 - CacheTopology
@@ -88,6 +89,7 @@ The module contains more classes but all except the above ones are used only int
 # TODO: Expand bitmasks to lists?
 # TODO: More analysis by ExecutableInfo? (type, compilation info, ...)
 # TODO: Add class for 'sysctl -a' ?
+# TODO: Check SMTWidth in CpuTopology
 
 import argparse
 import hashlib
@@ -129,11 +131,15 @@ BIOS_XML_FILE = ""
 MODULECMD_PATH = "tclsh /apps/modules/modulecmd.tcl"
 # The NecTsubasaInfo class requires this path to call the vecmd command
 VEOS_BASE = "/opt/nec/ve/bin"
+# The NvidiaInfo class requires this path if nvidia-smi is not in $PATH
+NVIDIA_PATH = "/opt/nvidia/bin"
+
 
 ################################################################################
 # Version information
 ################################################################################
-MACHINESTATE_VERSION = "0.1"
+MACHINESTATE_VERSION = "0.2.1-dev1"
+MACHINESTATE_SCHEMA_VERSION = "v1"
 __version__ = MACHINESTATE_VERSION
 
 ################################################################################
@@ -409,7 +415,7 @@ def process_cmds(cmddict):
         abscmd = which(cmd)
         data = None
         if abscmd and len(abscmd) > 0:
-            exestr = "{} {}; exit 0;".format(cmd, cmd_opts)
+            exestr = "LANG=C {} {}; exit 0;".format(cmd, cmd_opts)
             data = check_output(exestr, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
         for args in sortdict[cmdargs]:
             key, cmatch, cparse = args
@@ -435,7 +441,7 @@ def process_cmd(args):
         if abspath and len(abspath) > 0:
             if optsmatchconvert:
                 cmd_opts, *matchconvert = optsmatchconvert
-                exe = "{} {}; exit 0;".format(cmd, cmd_opts)
+                exe = "LANG=C {} {}; exit 0;".format(cmd, cmd_opts)
                 data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
                 if data and len(data) >= 0 and len(matchconvert) > 0:
                     cmatch, *convert = matchconvert
@@ -502,7 +508,7 @@ def get_config_cmd(args):
 
 
 class InfoGroup:
-    def __init__(self, name=None, extended=False, anon=False):
+    def __init__(self, name=None, extended=False, anonymous=False):
         # Holds subclasses
         self._instances = []
         # Holds the data of this class instance
@@ -530,9 +536,9 @@ class InfoGroup:
         if isinstance(extended, bool):
             self.extended = extended
 
-        self.anon = False
-        if isinstance(anon, bool):
-            self.anon = anon
+        self.anonymous = False
+        if isinstance(anonymous, bool):
+            self.anonymous = anonymous
 
     def addf(self, key, filename, match=None, parse=None, extended=False):
         """Add file to object including regex and parser"""
@@ -727,7 +733,7 @@ class InfoGroup:
         arglist = []
         arglist.append("name=\"{}\"".format(self.name))
         arglist.append("extended={}".format(self.extended))
-        arglist.append("anon={}".format(self.anon))
+        arglist.append("anonymous={}".format(self.anonymous))
         return arglist
 
     def __repr__(self):
@@ -738,18 +744,15 @@ class InfoGroup:
 
 class PathMatchInfoGroup(InfoGroup):
     '''Class for matching files in a folder and create subclasses for each path'''
-
-    def __init__(
-        self,
-        name=None,
-        extended=False,
-        anon=False,
-        searchpath=None,
-        match=None,
-        subclass=None,
-        subargs={},
-    ):
-        super(PathMatchInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+    def __init__(self,
+                 name=None,
+                 extended=False,
+                 anonymous=False,
+                 searchpath=None,
+                 match=None,
+                 subclass=None,
+                 subargs={}):
+        super(PathMatchInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.searchpath = None
         self.match = None
         self.subargs = {}
@@ -778,7 +781,10 @@ class PathMatchInfoGroup(InfoGroup):
             except ValueError:
                 glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
             for item in glist:
-                cls = self.subclass(item, extended=self.extended, anon=self.anon, **self.subargs)
+                cls = self.subclass(item,
+                                    extended=self.extended,
+                                    anonymous=self.anonymous,
+                                    **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
 
@@ -816,11 +822,14 @@ class ListInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list given by the user. All subclasses have the same
     class type.
     '''
-
-    def __init__(
-        self, name=None, extended=False, anon=False, userlist=None, subclass=None, subargs=None
-    ):
-        super(ListInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+    def __init__(self,
+                 name=None,
+                 extended=False,
+                 anonymous=False,
+                 userlist=None,
+                 subclass=None,
+                 subargs=None):
+        super(ListInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.userlist = []
         self.subclass = None
         self.subargs = {}
@@ -836,7 +845,10 @@ class ListInfoGroup(InfoGroup):
     def generate(self):
         if self.userlist and self.subclass:
             for item in self.userlist:
-                cls = self.subclass(item, extended=self.extended, anon=self.anon, **self.subargs)
+                cls = self.subclass(item,
+                                    extended=self.extended,
+                                    anonymous=self.anonymous,
+                                    **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
 
@@ -870,9 +882,13 @@ class ListInfoGroup(InfoGroup):
 class MultiClassInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list of class types given by the user.
     '''
-
-    def __init__(self, name=None, extended=False, anon=False, classlist=[], classargs=[]):
-        super(MultiClassInfoGroup, self).__init__(extended=extended, name=name, anon=anon)
+    def __init__(self,
+                 name=None,
+                 extended=False,
+                 anonymous=False,
+                 classlist=[],
+                 classargs=[]):
+        super(MultiClassInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.classlist = []
         self.classargs = []
         if len(classlist) == len(classargs):
@@ -896,7 +912,7 @@ class MultiClassInfoGroup(InfoGroup):
     def generate(self):
         for cltype, clargs in zip(self.classlist, self.classargs):
             try:
-                cls = cltype(extended=self.extended, anon=self.anon, **clargs)
+                cls = cltype(extended=self.extended, anonymous=self.anonymous, **clargs)
                 if cls:
                     cls.generate()
                     self._instances.append(cls)
@@ -922,18 +938,35 @@ class MultiClassInfoGroup(InfoGroup):
         return arglist
 
 
+class MachineStateInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(MachineStateInfo, self).__init__(name="MachineState",
+                                               anonymous=anonymous,
+                                               extended=extended)
+        self.const("Extended", self.extended)
+        self.const("Anonymous", self.anonymous)
+        self.const("Version", MACHINESTATE_VERSION)
+        self.const("SchemaVersion", MACHINESTATE_SCHEMA_VERSION)
+        self.const("Timestamp", datetime.now().ctime())
+        self.required("SchemaVersion", "Extended", "Anonymous")
+
+
 class MachineState(MultiClassInfoGroup):
     '''Main MachineState Class spawning all configuration specific subclasses'''
-
-    def __init__(self, extended=False, executable=None, anon=False):
-        super(MachineState, self).__init__(extended=extended, anon=anon)
-        self.constants["MachineState"] = {
-            "Extended": self.extended,
-            "Anonymous": self.anon,
-            "Version": MACHINESTATE_VERSION,
-            "Timestamp": datetime.now().ctime(),
-        }
+    def __init__(self,
+                 extended=False,
+                 executable=None,
+                 anonymous=False,
+                 debug=DEBUG_OUTPUT,
+                 dmifile=DMIDECODE_FILE,
+                 likwid_enable=DO_LIKWID,
+                 likwid_path=LIKWID_PATH,
+                 nvidia_path=NVIDIA_PATH,
+                 modulecmd=MODULECMD_PATH,
+                 vecmd_path=VEOS_BASE):
+        super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
         self.classlist = [
+            MachineStateInfo,
             HostInfo,
             CpuInfo,
             OSInfo,
@@ -944,7 +977,7 @@ class MachineState(MultiClassInfoGroup):
             LoadAvg,
             MemInfo,
             CgroupInfo,
-            Writeback,
+            WritebackWorkqueue,
             CpuFrequency,
             NumaInfo,
             CacheTopology,
@@ -964,28 +997,25 @@ class MachineState(MultiClassInfoGroup):
             CpuAffinity,
             ModulesInfo,
         ]
-        if which("nvidia-smi"):
-            self.classlist.append(NvidiaSmiInfo)
         self.classargs = [{} for x in self.classlist]
-        if pexists(VEOS_BASE):
-            self.classlist.append(NecTsubasaInfo)
-            self.classargs.append({"ve_base": VEOS_BASE})
-        if pexists(DMIDECODE_FILE):
-            self.classlist.append(DmiDecodeFile)
-            self.classargs.append({"dmifile": DMIDECODE_FILE})
-        if executable:
-            self.classlist.append(ExecutableInfo)
-            self.classargs.append({"executable": executable})
-        if DO_LIKWID:
-            likwid_base = LIKWID_PATH
-            if not likwid_base:
+        self.classlist.append(ModulesInfo)
+        self.classargs.append({"modulecmd" : modulecmd})
+        self.classlist.append(NvidiaSmiInfo)
+        self.classargs.append({"nvidia_path" : nvidia_path})
+        self.classlist.append(NecTsubasaInfo)
+        self.classargs.append({"vecmd_path" : vecmd_path})
+        self.classlist.append(DmiDecodeFile)
+        self.classargs.append({"dmifile" : dmifile})
+        self.classlist.append(ExecutableInfo)
+        self.classargs.append({"executable" : executable})
+        if likwid_enable and likwid_path is not None:
+            if not pexists(likwid_path):
                 path = which("likwid-topology")
                 if path:
-                    likwid_base = os.path.dirname(path)
+                    likwid_path = os.path.dirname(path)
+            clargs = {"likwid_base" : likwid_path}
             self.classlist += [PrefetcherInfo, TurboInfo]
-            clargs = {"likwid_base": likwid_base}
-            self.classargs.append(clargs)
-            self.classargs.append(clargs)
+            self.classargs += [clargs, clargs]
 
     def get_config(self, sort=False, intend=4):
         outdict = {}
@@ -1003,8 +1033,8 @@ class MachineState(MultiClassInfoGroup):
 # Infos about operating system
 ################################################################################
 class OSInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(OSInfo, self).__init__(anon=anon, extended=extended)
+    def __init__(self, extended=False, anonymous=False):
+        super(OSInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "OperatingSystemInfo"
         self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
         self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
@@ -1018,8 +1048,8 @@ class OSInfo(InfoGroup):
 # Infos about NUMA balancing
 ################################################################################
 class NumaBalance(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(NumaBalance, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(NumaBalance, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "NumaBalancing"
         base = "/proc/sys/kernel"
         regex = r"(\d+)"
@@ -1042,10 +1072,10 @@ class NumaBalance(InfoGroup):
 # Infos about the host
 ################################################################################
 class HostInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(HostInfo, self).__init__(anon=anon, extended=extended)
+    def __init__(self, extended=False, anonymous=False):
+        super(HostInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "HostInfo"
-        if not anon:
+        if not anonymous:
             self.addc("Hostname", "hostname", "-s", r"(.+)")
             if extended:
                 self.addc("Domainname", "hostname", "-d", r"(.+)")
@@ -1056,8 +1086,8 @@ class HostInfo(InfoGroup):
 # Infos about the CPU
 ################################################################################
 class CpuInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anonymous=anonymous)
         march = platform.machine()
         self.const("MachineType", march)
         if march in ["x86_64", "i386"]:
@@ -1097,8 +1127,8 @@ class CpuInfo(InfoGroup):
 # CPU Topology
 ################################################################################
 class CpuTopologyClass(InfoGroup):
-    def __init__(self, ident, extended=False, anon=False):
-        super(CpuTopologyClass, self).__init__(anon=anon, extended=extended)
+    def __init__(self, ident, extended=False, anonymous=False):
+        super(CpuTopologyClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/topology".format(ident)
         self.addf("CoreId", pjoin(base, "core_id"), r"(\d+)", int)
@@ -1128,8 +1158,8 @@ class CpuTopologyClass(InfoGroup):
 
 
 class CpuTopology(PathMatchInfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(CpuTopology, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuTopology, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "CpuTopology"
         self.searchpath = "/sys/devices/system/cpu/cpu*"
         self.match = r".*/cpu(\d+)$"
@@ -1209,8 +1239,8 @@ class CpuTopology(PathMatchInfoGroup):
 # CPU Frequency
 ################################################################################
 class CpuFrequencyClass(InfoGroup):
-    def __init__(self, ident, extended=False, anon=False):
-        super(CpuFrequencyClass, self).__init__(anon=anon, extended=extended)
+    def __init__(self, ident, extended=False, anonymous=False):
+        super(CpuFrequencyClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "Cpu{}".format(ident)
         base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(ident)
         if pexists(pjoin(base, "scaling_max_freq")):
@@ -1226,8 +1256,8 @@ class CpuFrequencyClass(InfoGroup):
 
 
 class CpuFrequency(PathMatchInfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(CpuFrequency, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuFrequency, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "CpuFrequency"
         base = "/sys/devices/system/cpu/cpu0/cpufreq"
         if pexists(base):
@@ -1260,9 +1290,11 @@ class CpuFrequency(PathMatchInfoGroup):
 # NUMA Topology
 ################################################################################
 class NumaInfoHugepagesClass(InfoGroup):
-    def __init__(self, size, extended=False, anon=False, node=0):
+    def __init__(self, size, extended=False, anonymous=False, node=0):
         name = "Hugepages-{}".format(size)
-        super(NumaInfoHugepagesClass, self).__init__(name=name, extended=extended, anon=anon)
+        super(NumaInfoHugepagesClass, self).__init__(name=name,
+                                                     extended=extended,
+                                                     anonymous=anonymous)
         base = "/sys/devices/system/node/node{}/hugepages/hugepages-{}".format(node, size)
         self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
         self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
@@ -1270,8 +1302,8 @@ class NumaInfoHugepagesClass(InfoGroup):
 
 
 class NumaInfoClass(PathMatchInfoGroup):
-    def __init__(self, node, anon=False, extended=False):
-        super(NumaInfoClass, self).__init__(anon=anon, extended=extended)
+    def __init__(self, node, anonymous=False, extended=False):
+        super(NumaInfoClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "NumaNode{}".format(node)
         base = "/sys/devices/system/node/node{}".format(node)
         meminfo = pjoin(base, "meminfo")
@@ -1294,8 +1326,8 @@ class NumaInfoClass(PathMatchInfoGroup):
 
 
 class NumaInfo(PathMatchInfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(NumaInfo, self).__init__(name="NumaInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(NumaInfo, self).__init__(name="NumaInfo", extended=extended, anonymous=anonymous)
         self.searchpath = "/sys/devices/system/node/node*"
         self.match = r".*/node(\d+)$"
         self.subclass = NumaInfoClass
@@ -1305,8 +1337,8 @@ class NumaInfo(PathMatchInfoGroup):
 # Cache Topology
 ################################################################################
 class CacheTopologyClass(InfoGroup):
-    def __init__(self, ident, extended=False, anon=False):
-        super(CacheTopologyClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, ident, extended=False, anonymous=False):
+        super(CacheTopologyClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "L{}".format(ident)
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
         fparse = CacheTopologyClass.kBtoB
@@ -1372,8 +1404,8 @@ class CacheTopologyClass(InfoGroup):
 
 
 class CacheTopology(PathMatchInfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(CacheTopology, self).__init__(anon=anon, extended=extended)
+    def __init__(self, extended=False, anonymous=False):
+        super(CacheTopology, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "CacheTopology"
         self.searchpath = "/sys/devices/system/cpu/cpu0/cache/index*"
         self.match = r".*/index(\d+)$"
@@ -1384,8 +1416,8 @@ class CacheTopology(PathMatchInfoGroup):
 # Infos about the uptime of the system
 ################################################################################
 class Uptime(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(Uptime, self).__init__(name="Uptime", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(Uptime, self).__init__(name="Uptime", extended=extended, anonymous=anonymous)
         fname = "/proc/uptime"
         self.addf("Uptime", fname, r"([\d\.]+)\s+[\d\.]+", float)
         self.addf("UptimeReadable", fname, r"([\d\.]+)\s+[\d\.]+", Uptime.totimedelta)
@@ -1418,8 +1450,8 @@ class Uptime(InfoGroup):
 # Infos about the load of the system
 ################################################################################
 class LoadAvg(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(LoadAvg, self).__init__(name="LoadAvg", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(LoadAvg, self).__init__(name="LoadAvg", extended=extended, anonymous=anonymous)
         self.addf("LoadAvg1m", "/proc/loadavg", r"([\d\.]+)", float)
         self.addf("LoadAvg5m", "/proc/loadavg", r"[\d\.]+\s+([\d+\.]+)", float)
         self.addf("LoadAvg15m", "/proc/loadavg", r"[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float)
@@ -1435,8 +1467,8 @@ class LoadAvg(InfoGroup):
 # Infos about the memory of the system
 ################################################################################
 class MemInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(MemInfo, self).__init__(name="MemInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(MemInfo, self).__init__(name="MemInfo", extended=extended, anonymous=anonymous)
         fname = "/proc/meminfo"
         self.addf("MemTotal", fname, r"MemTotal:\s+(\d+\s[kKMG][B])", tobytes)
         self.addf("MemAvailable", fname, r"MemAvailable:\s+(\d+\s[kKMG][B])", tobytes)
@@ -1452,20 +1484,47 @@ class MemInfo(InfoGroup):
 ################################################################################
 # Infos about the kernel
 ################################################################################
+class KernelSchedInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(KernelSchedInfo, self).__init__(name="KernelSchedInfo",
+                                              extended=extended,
+                                              anonymous=anonymous)
+        base = "/proc/sys/kernel"
+        self.addf("RealtimeBandwidthReservationUs", pjoin(base, "sched_rt_runtime_us"), parse=int)
+        self.addf("TargetedPreemptionLatencyNs", pjoin(base, "sched_latency_ns"), parse=int)
+        self.addf("MinimalPreemptionGranularityNs", pjoin(base, "sched_min_granularity_ns"), parse=int)
+        self.addf("WakeupLatencyNs", pjoin(base, "sched_wakeup_granularity_ns"), parse=int)
+        self.addf("RuntimePoolTransferUs", pjoin(base, "sched_cfs_bandwidth_slice_us"), parse=int)
+        self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=bool)
+        self.addf("CacheHotTimeNs", pjoin(base, "sched_migration_cost_ns"), parse=int)
+
+
+
 class KernelInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(KernelInfo, self).__init__(name="KernelInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(KernelInfo, self).__init__(name="KernelInfo",
+                                         extended=extended,
+                                         anonymous=anonymous)
         self.addf("Version", "/proc/sys/kernel/osrelease")
         self.addf("CmdLine", "/proc/cmdline")
-        self.required = ["Version", "CmdLine"]
+        self.addf("ThreadsMax", "/proc/sys/kernel/threads-max", parse=int)
+        self.addf("NMIWatchdog", "/proc/sys/kernel/nmi_watchdog", parse=bool)
+        self.addf("Watchdog", "/proc/sys/kernel/watchdog", parse=bool)
+        if pexists("/proc/sys/kernel/softlockup_thresh"):
+            self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
+        self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
+        self.required("Version", "CmdLine","NMIWatchdog", "Watchdog")
+        cls = KernelSchedInfo(extended=extended,
+                              anonymous=anonymous)
+        self._instances.append(cls)
 
 
 ################################################################################
 # Infos about CGroups
 ################################################################################
 class CgroupInfo(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(CgroupInfo, self).__init__(name="Cgroups", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CgroupInfo, self).__init__(name="Cgroups", extended=extended, anonymous=anonymous)
         csetmat = re.compile(r"\d+\:cpuset\:([/\w\d\-\._]*)")
         cset = process_file(("/proc/self/cgroup", csetmat))
         base = pjoin("/sys/fs/cgroup/cpuset", cset.strip("/"))
@@ -1483,22 +1542,26 @@ class CgroupInfo(InfoGroup):
 ################################################################################
 # Infos about the writeback workqueue
 ################################################################################
-class Writeback(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(Writeback, self).__init__(name="Writeback", extended=extended, anon=anon)
+class WritebackWorkqueue(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(WritebackWorkqueue, self).__init__(name="WritebackWorkqueue",
+                                                 extended=extended,
+                                                 anonymous=anonymous)
         base = "/sys/bus/workqueue/devices/writeback"
-        self.addf("CPUmask", pjoin(base, "cpumask"), r"(.+)")
+        self.addf("CPUmask", pjoin(base, "cpumask"), r"([0-9a-fA-F]+)", masktolist)
         self.addf("MaxActive", pjoin(base, "max_active"), r"(\d+)", int)
-        self.required(["CPUmask", "MaxActive"])
+        self.addf("NUMA", pjoin(base, "numa"), r"(\d+)", int)
+        self.required(["CPUmask", "MaxActive", "NUMA"])
 
 
 ################################################################################
 # Infos about transparent hugepages
 ################################################################################
 class TransparentHugepages(InfoGroup):
-    def __init__(self, extended=False, anon=False):
-        super(TransparentHugepages, self).__init__(extended=extended, anon=anon)
-        self.name = "TransparentHugepages"
+    def __init__(self, extended=False, anonymous=False):
+        super(TransparentHugepages, self).__init__(name="TransparentHugepages",
+                                                   extended=extended,
+                                                   anonymous=anonymous)
         base = "/sys/kernel/mm/transparent_hugepage"
         self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
         self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", bool)
@@ -1510,11 +1573,11 @@ class TransparentHugepages(InfoGroup):
 #################################################################################
 class PowercapInfoConstraintClass(InfoGroup):
     '''Class to read information about one powercap constraint'''
-
-    def __init__(self, ident, extended=False, anon=False, package=0, domain=-1):
-        super(PowercapInfoConstraintClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, ident, extended=False, anonymous=False, package=0, domain=-1):
+        super(PowercapInfoConstraintClass, self).__init__(name="Constraint{}".format(ident),
+                                                          extended=extended,
+                                                          anonymous=anonymous)
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
-        self.name = "Constraint{}".format(ident)
         fptr = fopen(pjoin(base, "constraint_{}_name".format(ident)))
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
@@ -1533,9 +1596,8 @@ class PowercapInfoConstraintClass(InfoGroup):
 
 class PowercapInfoClass(PathMatchInfoGroup):
     '''Class to spawn subclasses for each contraint in a powercap domain'''
-
-    def __init__(self, ident, extended=False, anon=False, package=0):
-        super(PowercapInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, ident, extended=False, anonymous=False, package=0):
+        super(PowercapInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         base = "/sys/devices/virtual/powercap/intel-rapl"
         base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(package, package, ident))
         fptr = fopen(pjoin(base, "name".format(ident)))
@@ -1553,36 +1615,37 @@ class PowercapInfoPackageClass(PathMatchInfoGroup):
     '''Class to spawn subclasses for powercap package domain
     (/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*)
     '''
-
-    def __init__(self, ident, extended=False, anon=False):
-        super(PowercapInfoPackageClass, self).__init__(
-            name="Package", extended=extended, anon=anon
-        )
+    def __init__(self, ident, extended=False, anonymous=False):
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(ident)
+        super(PowercapInfoPackageClass, self).__init__(name="Package",
+                                                       extended=extended,
+                                                       anonymous=anonymous,
+                                                       searchpath=pjoin(base, "constraint_*_name"),
+                                                       match=r".*/constraint_(\d+)_name",
+                                                       subclass=PowercapInfoConstraintClass,
+                                                       subargs={"package" : ident})
         self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", bool)
-        self.searchpath = pjoin(base, "constraint_*_name")
-        self.match = r".*/constraint_(\d+)_name"
-        self.subclass = PowercapInfoConstraintClass
-        self.subargs = {"package": ident}
-
 
 class PowercapInfoPackage(PathMatchInfoGroup):
     '''Class to spawn subclasses for one powercap device/package
     (/sys/devices/virtual/powercap/intel-rapl/intel-rapl:<package>*:*)
     '''
-
-    def __init__(self, package, extended=False, anon=False):
-        super(PowercapInfoPackage, self).__init__(name="TMP", extended=extended, anon=anon)
+    def __init__(self, package, extended=False, anonymous=False):
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
+        super(PowercapInfoPackage, self).__init__(extended=extended,
+                                                  anonymous=anonymous,
+                                                  subargs={"package" : package},
+                                                  match=r".*/intel-rapl\:\d+:(\d+)",
+                                                  subclass=PowercapInfoClass)
+
         fptr = fopen(pjoin(base, "name"))
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
             fptr.close()
+        else:
+            self.name = "PowercapInfoPackage{}".format(package)
         self.searchpath = pjoin(base, "intel-rapl:{}:*".format(package))
-        self.match = r".*/intel-rapl\:\d+:(\d+)"
         self.package = package
-        self.subargs = {"package": package}
-        self.subclass = PowercapInfoClass
 
     def generate(self):
         super(PowercapInfoPackage, self).generate()
@@ -1596,9 +1659,10 @@ class PowercapInfo(PathMatchInfoGroup):
     X86 path: /sys/devices/virtual/powercap
     POWER path: /sys/firmware/opal/powercap/system-powercap
     '''
-
-    def __init__(self, extended=False, anon=False):
-        super(PowercapInfo, self).__init__(name="PowercapInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(PowercapInfo, self).__init__(name="PowercapInfo",
+                                           extended=extended,
+                                           anonymous=anonymous)
         if platform.machine() in ["x86_64", "i386"]:
             self.subclass = PowercapInfoPackage
             self.searchpath = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:*"
@@ -1622,10 +1686,9 @@ class PowercapInfo(PathMatchInfoGroup):
 ################################################################################
 class HugepagesClass(InfoGroup):
     '''Class to read information about one size of hugepages'''
-
-    def __init__(self, size, extended=False, anon=False):
+    def __init__(self, size, extended=False, anonymous=False):
         name = "Hugepages-{}".format(size)
-        super(HugepagesClass, self).__init__(name=name, extended=extended, anon=anon)
+        super(HugepagesClass, self).__init__(name=name, extended=extended, anonymous=anonymous)
         base = "/sys/kernel/mm/hugepages/hugepages-{}".format(size)
         self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
         self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
@@ -1634,9 +1697,8 @@ class HugepagesClass(InfoGroup):
 
 class Hugepages(PathMatchInfoGroup):
     '''Class to spawn subclasses for all hugepages sizes (/sys/kernel/mm/hugepages/hugepages-*)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(Hugepages, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(Hugepages, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Hugepages"
         self.searchpath = "/sys/kernel/mm/hugepages/hugepages-*"
         self.match = r".*/hugepages-(\d+[kKMG][B])"
@@ -1648,9 +1710,8 @@ class Hugepages(PathMatchInfoGroup):
 ################################################################################
 class CompilerInfoClass(InfoGroup):
     '''Class to read version and path of a given executable'''
-
-    def __init__(self, executable, extended=False, anon=False):
-        super(CompilerInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, executable, extended=False, anonymous=False):
+        super(CompilerInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = executable
         self.addc("Version", executable, "--version", r"(\d+\.\d+\.\d+)")
         abscmd = which(executable)
@@ -1661,9 +1722,11 @@ class CompilerInfoClass(InfoGroup):
 
 class CCompilerInfo(ListInfoGroup):
     '''Class to spawn subclasses for various C compilers'''
-
-    def __init__(self, extended=False, anon=False):
-        super(CCompilerInfo, self).__init__(name="C", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CCompilerInfo, self).__init__(name="C",
+                                            extended=extended,
+                                            subclass=CompilerInfoClass,
+                                            anonymous=anonymous)
         self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
@@ -1675,9 +1738,11 @@ class CCompilerInfo(ListInfoGroup):
 
 class CPlusCompilerInfo(ListInfoGroup):
     '''Class to spawn subclasses for various C++ compilers'''
-
-    def __init__(self, extended=False, anon=False):
-        super(CPlusCompilerInfo, self).__init__(name="C++", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CPlusCompilerInfo, self).__init__(name="C++",
+                                                extended=extended,
+                                                subclass=CompilerInfoClass,
+                                                anonymous=anonymous)
         self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
@@ -1689,11 +1754,12 @@ class CPlusCompilerInfo(ListInfoGroup):
 
 class FortranCompilerInfo(ListInfoGroup):
     '''Class to spawn subclasses for various Fortran compilers'''
-
-    def __init__(self, extended=False, anon=False):
-        super(FortranCompilerInfo, self).__init__(name="Fortran", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(FortranCompilerInfo, self).__init__(name="Fortran",
+                                                  extended=extended,
+                                                  subclass=CompilerInfoClass,
+                                                  anonymous=anonymous)
         self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort"]
-        self.subclass = CompilerInfoClass
         if "FC" in os.environ:
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
@@ -1703,11 +1769,14 @@ class FortranCompilerInfo(ListInfoGroup):
 
 class CompilerInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for various compilers'''
-
-    def __init__(self, extended=False, anon=False):
-        super(CompilerInfo, self).__init__(name="CompilerInfo", extended=extended, anon=anon)
-        self.classlist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo]
-        self.classargs = [{} for i in range(len(self.classlist))]
+    def __init__(self, extended=False, anonymous=False):
+        clist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo]
+        cargs = [{} for i in range(len(clist))]
+        super(CompilerInfo, self).__init__(name="CompilerInfo",
+                                           extended=extended,
+                                           anonymous=anonymous,
+                                           classlist=clist,
+                                           classargs=cargs)
 
 
 ################################################################################
@@ -1715,9 +1784,8 @@ class CompilerInfo(MultiClassInfoGroup):
 ################################################################################
 class PythonInfoClass(InfoGroup):
     '''Class to read information about a Python executable'''
-
-    def __init__(self, executable, extended=False, anon=False):
-        super(PythonInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, executable, extended=False, anonymous=False):
+        super(PythonInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = executable
         abspath = which(executable)
         if abspath and len(abspath) > 0:
@@ -1728,12 +1796,13 @@ class PythonInfoClass(InfoGroup):
 
 class PythonInfo(ListInfoGroup):
     '''Class to spawn subclasses for various Python commands'''
-
-    def __init__(self, extended=False, anon=False):
-        super(PythonInfo, self).__init__(name="PythonInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
         self.interpreters = ["python2", "python3", "python"]
-        self.userlist = [i for i in self.interpreters if which(i)]
-        self.subclass = PythonInfoClass
+        super(PythonInfo, self).__init__(name="PythonInfo",
+                                         extended=extended,
+                                         anonymous=anonymous,
+                                         subclass=PythonInfoClass,
+                                         userlist=[i for i in self.interpreters if which(i)])
 
 
 ################################################################################
@@ -1741,9 +1810,8 @@ class PythonInfo(ListInfoGroup):
 ################################################################################
 class MpiInfoClass(InfoGroup):
     '''Class to read information about an MPI or job scheduler executable'''
-
-    def __init__(self, executable, extended=False, anon=False):
-        super(MpiInfoClass, self).__init__(name=executable, extended=extended, anon=anon)
+    def __init__(self, executable, extended=False, anonymous=False):
+        super(MpiInfoClass, self).__init__(name=executable, extended=extended, anonymous=anonymous)
         self.addc("Version", executable, "--version", r"(.+)", MpiInfoClass.mpiversion)
         self.addc("Implementor", executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
         abscmd = which(executable)
@@ -1774,22 +1842,44 @@ class MpiInfoClass(InfoGroup):
 
 class MpiInfo(ListInfoGroup):
     '''Class to spawn subclasses for various MPI/job scheduler commands'''
-
-    def __init__(self, extended=False, anon=False):
+    def __init__(self, extended=False, anonymous=False):
         super(MpiInfo, self).__init__(name="MpiInfo", extended=extended)
         self.mpilist = ["mpiexec", "mpiexec.hydra", "mpirun", "srun", "aprun"]
         self.subclass = MpiInfoClass
         self.userlist = [m for m in self.mpilist if which(m)]
-
+        ompi = which("ompi_info")
+        if ompi and len(ompi) > 0 and extended:
+            ompi_args = "--parseable --params all all --level 9"
+            self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
+        impi = which ("impi_info")
+        if impi and len(impi) > 0 and extended:
+            self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
+    @staticmethod
+    def openmpiparams(value):
+        outdict = {}
+        for line in value.split("\n"):
+            if not line.strip(): continue
+            if ":help:" in line or ":type:" in line: continue
+            llist = re.split(r":", line)
+            outdict[":".join(llist[:-1])] = llist[-1]
+        return outdict
+    @staticmethod
+    def intelmpiparams(value):
+        outdict = {}
+        for line in value.split("\n"):
+            if "I_MPI" not in line: continue
+            if not line.strip(): continue
+            llist = [x.strip() for x in line.split("|")]
+            outdict[llist[1]] = llist[2]
+        return outdict
 
 ################################################################################
 # Infos about environ variables
 ################################################################################
 class ShellEnvironment(InfoGroup):
     '''Class to read the shell environment (os.environ)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(ShellEnvironment, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(ShellEnvironment, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "ShellEnvironment"
 
     def update(self):
@@ -1797,13 +1887,13 @@ class ShellEnvironment(InfoGroup):
         outdict = {}
         for key in os.environ:
             value = os.environ[key]
-            if self.anon:
-                value = ShellEnvironment.anon_shell_var(key, value)
-            outdict.update({key: value})
+            if self.anonymous:
+                value = ShellEnvironment.anonymous_shell_var(key, value)
+            outdict.update({key : value})
         self._data.update(outdict)
 
     @staticmethod
-    def anon_shell_var(key, value):
+    def anonymous_shell_var(key, value):
         out = value
         ipregex = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
         for ipaddr in ipregex.findall(value):
@@ -1820,15 +1910,18 @@ class ShellEnvironment(InfoGroup):
 ################################################################################
 class PrefetcherInfoClass(InfoGroup):
     '''Class to read prefetcher settings for one HW thread (uses the likwid-features command)'''
-
-    def __init__(self, ident, extended=False, anon=False, likwid_base=None):
-        super(PrefetcherInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, ident, extended=False, anonymous=False, likwid_base=None):
+        super(PrefetcherInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Cpu{}".format(ident)
         names = ["HW_PREFETCHER", "CL_PREFETCHER", "DCU_PREFETCHER", "IP_PREFETCHER"]
         cmd_opts = "-c {} -l".format(ident)
         cmd = "likwid-features"
+        abscmd = cmd
         if likwid_base and os.path.isdir(likwid_base):
             abscmd = pjoin(likwid_base, cmd)
+        if not pexists(abscmd):
+            abscmd = which(cmd)
+
         if abscmd:
             parser = PrefetcherInfoClass.parse_pf_state
             for name in names:
@@ -1845,13 +1938,15 @@ class PrefetcherInfoClass(InfoGroup):
 
 class PrefetcherInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all HW threads returned by likwid-features'''
-
-    def __init__(self, extended=False, anon=False, likwid_base=None):
-        super(PrefetcherInfo, self).__init__(name="PrefetcherInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False, likwid_base=None):
+        super(PrefetcherInfo, self).__init__(name="PrefetcherInfo",
+                                             extended=extended,
+                                             anonymous=anonymous)
         cmd = "likwid-features"
+        abscmd = cmd
         if likwid_base and os.path.isdir(likwid_base):
             abscmd = pjoin(likwid_base, cmd)
-        else:
+        if not pexists(abscmd):
             abscmd = which(cmd)
 
         if abscmd:
@@ -1870,9 +1965,8 @@ class TurboInfo(InfoGroup):
     '''Class to read information about CPU/Uncore frequencies and perf-energy-bias
     (uses the likwid-powermeter command)
     '''
-
-    def __init__(self, extended=False, anon=False, likwid_base=None):
-        super(TurboInfo, self).__init__(name="TurboInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False, likwid_base=None):
+        super(TurboInfo, self).__init__(name="TurboInfo", extended=extended, anonymous=anonymous)
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
         error_match = r"Cannot gather values.*"
@@ -1895,10 +1989,9 @@ class TurboInfo(InfoGroup):
                 for name, regex in zip(names, matches):
                     self.addc(name, abscmd, cmd_opts, regex, tohertz)
                     self.required(name)
-                regex = r"Performance energy bias:\s+(\d+)\s.*"
+                regex = r"^Performance energy bias:\s+(\d+)"
                 self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
                 self.required("PerfEnergyBias")
-                regex = r"C(\d+) ([\d\.]+ MHz)"
                 freqfunc = TurboInfo.getactivecores
                 self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
         self.required4equal = self.commands.keys()
@@ -1918,9 +2011,8 @@ class TurboInfo(InfoGroup):
 ################################################################################
 class ClocksourceInfoClass(InfoGroup):
     '''Class to read information for one clocksource device'''
-
-    def __init__(self, ident, extended=False, anon=False):
-        super(ClocksourceInfoClass, self).__init__(anon=anon, extended=extended)
+    def __init__(self, ident, extended=False, anonymous=False):
+        super(ClocksourceInfoClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "Clocksource{}".format(ident)
         base = "/sys/devices/system/clocksource/clocksource{}".format(ident)
         self.addf("Current", pjoin(base, "current_clocksource"), r"(\s+)", str)
@@ -1933,9 +2025,8 @@ class ClocksourceInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all clocksourse devices
     /sys/devices/system/clocksource/clocksource*
     '''
-
-    def __init__(self, extended=False, anon=False):
-        super(ClocksourceInfo, self).__init__(anon=anon, extended=extended)
+    def __init__(self, extended=False, anonymous=False):
+        super(ClocksourceInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "ClocksourceInfo"
         self.searchpath = "/sys/devices/system/clocksource/clocksource*"
         self.match = r".*/clocksource(\d+)$"
@@ -1947,20 +2038,22 @@ class ClocksourceInfo(PathMatchInfoGroup):
 ################################################################################
 class ExecutableInfoExec(InfoGroup):
     '''Class to read basic information of given executable'''
-
-    def __init__(self, extended=False, anon=False, executable=""):
-        super(ExecutableInfoExec, self).__init__(anon=anon, extended=extended)
+    def __init__(self, extended=False, anonymous=False, executable=""):
+        super(ExecutableInfoExec, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "ExecutableInfo"
-        self.executable = executable
 
-        abscmd = which(self.executable)
-        self.const("Name", str(self.executable))
-        if abscmd and len(abscmd) > 0:
-            self.const("Abspath", abscmd)
-            self.const("Size", psize(abscmd))
-            if extended:
-                self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
-        self.required(["Name", "Size", "MD5sum"])
+        if executable is not None:
+            self.executable = executable
+            abscmd = which(self.executable)
+            self.const("Name", str(self.executable))
+            if abscmd and len(abscmd) > 0:
+                self.const("Abspath", abscmd)
+                self.const("Size", psize(abscmd))
+                pfunc = ExecutableInfoExec.getcompiledwith
+                self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
+                if extended:
+                    self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
+            self.required(["Name", "Size", "MD5sum"])
 
     @staticmethod
     def getmd5sum(filename):
@@ -1969,22 +2062,29 @@ class ExecutableInfoExec(InfoGroup):
             for chunk in iter(lambda: md5fp.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
+    @staticmethod
+    def getcompiledwith(value):
+        for line in re.split(r"\n", value):
+            if "CC" in line:
+                return line
+        return "Not detectable"
 
 
 class ExecutableInfoLibraries(InfoGroup):
     '''Class to read all libraries linked with given executable'''
-
-    def __init__(self, executable, extended=False, anon=False):
-        super(ExecutableInfoLibraries, self).__init__(anon=anon, extended=extended)
+    def __init__(self, executable, extended=False, anonymous=False):
+        super(ExecutableInfoLibraries, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "LinkedLibraries"
-        self.executable = which(executable)
         self.ldd = None
-        if self.executable and len(self.executable) > 0:
-            self.ldd = "ldd {}; exit 0".format(self.executable)
+        if executable is not None:
+            self.executable = which(executable)
+            self.ldd = None
+            if self.executable and len(self.executable) > 0:
+                self.ldd = "LANG=C ldd {}; exit 0".format(self.executable)
 
     def update(self):
         libdict = {}
-        if self.ldd:
+        if self.ldd is not None:
             rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
             data = rawdata.decode(ENCODING)
             libregex = re.compile(r"\s*([^\s]+)\s+.*")
@@ -2006,9 +2106,8 @@ class ExecutableInfoLibraries(InfoGroup):
 
 class ExecutableInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for analyzing a given executable'''
-
-    def __init__(self, executable, extended=False, anon=False):
-        super(ExecutableInfo, self).__init__(extended=extended, anon=anon)
+    def __init__(self, executable, extended=False, anonymous=False):
+        super(ExecutableInfo, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "ExecutableInfo"
         self.executable = executable
         self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
@@ -2021,9 +2120,8 @@ class ExecutableInfo(MultiClassInfoGroup):
 ################################################################################
 class CoretempInfoHwmonClassX86(InfoGroup):
     '''Class to read information for one X86 coretemps sensor inside one hwmon entry and device'''
-
-    def __init__(self, sensor, extended=False, anon=False, socket=0, hwmon=0):
-        super(CoretempInfoHwmonClassX86, self).__init__(extended=extended, anon=anon)
+    def __init__(self, sensor, extended=False, anonymous=False, socket=0, hwmon=0):
+        super(CoretempInfoHwmonClassX86, self).__init__(extended=extended, anonymous=anonymous)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
         self.name = process_file((pjoin(base, "temp{}_label".format(sensor)),))
         self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
@@ -2036,9 +2134,8 @@ class CoretempInfoHwmonClassX86(InfoGroup):
 
 class CoretempInfoHwmonX86(PathMatchInfoGroup):
     '''Class to spawn subclasses for one hwmon entry inside a X86 coretemps device'''
-
-    def __init__(self, hwmon, extended=False, anon=False, socket=0):
-        super(CoretempInfoHwmonX86, self).__init__(extended=extended, anon=anon)
+    def __init__(self, hwmon, extended=False, anonymous=False, socket=0):
+        super(CoretempInfoHwmonX86, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Hwmon{}".format(hwmon)
         self.subclass = CoretempInfoHwmonClassX86
         self.subargs = {"socket": socket, "hwmon": hwmon}
@@ -2049,9 +2146,8 @@ class CoretempInfoHwmonX86(PathMatchInfoGroup):
 
 class CoretempInfoSocketX86(PathMatchInfoGroup):
     '''Class to spawn subclasses for one X86 coretemps device'''
-
-    def __init__(self, socket, extended=False, anon=False):
-        super(CoretempInfoSocketX86, self).__init__(extended=extended, anon=anon)
+    def __init__(self, socket, extended=False, anonymous=False):
+        super(CoretempInfoSocketX86, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Package{}".format(socket)
         self.socket = socket
         self.subargs = {"socket": socket}
@@ -2062,9 +2158,8 @@ class CoretempInfoSocketX86(PathMatchInfoGroup):
 
 class CoretempInfoHwmonClassARM(InfoGroup):
     '''Class to read information for one ARM coretemps sensor inside one hwmon entry'''
-
-    def __init__(self, sensor, extended=False, anon=False, hwmon=0):
-        super(CoretempInfoHwmonClassARM, self).__init__(extended=extended, anon=anon)
+    def __init__(self, sensor, extended=False, anonymous=False, hwmon=0):
+        super(CoretempInfoHwmonClassARM, self).__init__(extended=extended, anonymous=anonymous)
         base = "/sys/devices/virtual/hwmon/hwmon{}".format(hwmon)
         self.name = "Core{}".format(sensor)
         self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
@@ -2075,9 +2170,8 @@ class CoretempInfoHwmonClassARM(InfoGroup):
 
 class CoretempInfoSocketARM(PathMatchInfoGroup):
     '''Class to spawn subclasses for ARM coretemps for one hwmon entry'''
-
-    def __init__(self, hwmon, extended=False, anon=False):
-        super(CoretempInfoSocketARM, self).__init__(extended=extended, anon=anon)
+    def __init__(self, hwmon, extended=False, anonymous=False):
+        super(CoretempInfoSocketARM, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Hwmon{}".format(hwmon)
         self.searchpath = "/sys/devices/virtual/hwmon/hwmon{}/temp*_input".format(hwmon)
         self.match = r".*/temp(\d+)_input$"
@@ -2090,9 +2184,10 @@ class CoretempInfo(PathMatchInfoGroup):
     X86 path: /sys/devices/platform/coretemp.*
     ARM64 path: /sys/devices/virtual/hwmon/hwmon*
     '''
-
-    def __init__(self, extended=False, anon=False):
-        super(CoretempInfo, self).__init__(name="CoretempInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CoretempInfo, self).__init__(name="CoretempInfo",
+                                           extended=extended,
+                                           anonymous=anonymous)
         machine = platform.machine()
         if machine in ["x86_64", "i386"]:
             self.subclass = CoretempInfoSocketX86
@@ -2109,9 +2204,10 @@ class CoretempInfo(PathMatchInfoGroup):
 ################################################################################
 class BiosInfo(InfoGroup):
     '''Class to read BIOS information (/sys/devices/virtual/dmi/id)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(BiosInfo, self).__init__(name="BiosInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(BiosInfo, self).__init__(name="BiosInfo",
+                                       extended=extended,
+                                       anonymous=anonymous)
         base = "/sys/devices/virtual/dmi/id"
         if pexists(base):
             self.addf("BiosDate", pjoin(base, "bios_date"))
@@ -2129,10 +2225,10 @@ class BiosInfo(InfoGroup):
 ################################################################################
 class ThermalZoneInfoClass(InfoGroup):
     '''Class to read information for one thermal zone'''
-
-    def __init__(self, zone, extended=False, anon=False):
-        name = "ThermalZone{}".format(zone)
-        super(ThermalZoneInfoClass, self).__init__(name=name, extended=extended, anon=anon)
+    def __init__(self, zone, extended=False, anonymous=False):
+        super(ThermalZoneInfoClass, self).__init__(name="ThermalZone{}".format(zone),
+                                                   extended=extended,
+                                                   anonymous=anonymous)
         base = "/sys/devices/virtual/thermal/thermal_zone{}".format(zone)
         if pexists(pjoin(base, "device/description")):
             with (open(pjoin(base, "device/description"), "rb")) as filefp:
@@ -2147,12 +2243,14 @@ class ThermalZoneInfoClass(InfoGroup):
 
 class ThermalZoneInfo(PathMatchInfoGroup):
     '''Class to read information for thermal zones (/sys/devices/virtual/thermal/thermal_zone*)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(ThermalZoneInfo, self).__init__(name="ThermalZoneInfo", extended=extended, anon=anon)
-        self.searchpath = "/sys/devices/virtual/thermal/thermal_zone*"
-        self.match = r".*/thermal_zone(\d+)$"
-        self.subclass = ThermalZoneInfoClass
+    def __init__(self, extended=False, anonymous=False):
+        spath = "/sys/devices/virtual/thermal/thermal_zone*"
+        super(ThermalZoneInfo, self).__init__(name="ThermalZoneInfo",
+                                              extended=extended,
+                                              anonymous=anonymous,
+                                              match=r".*/thermal_zone(\d+)$",
+                                              searchpath=spath,
+                                              subclass=ThermalZoneInfoClass)
 
 
 ################################################################################
@@ -2160,9 +2258,8 @@ class ThermalZoneInfo(PathMatchInfoGroup):
 ################################################################################
 class VulnerabilitiesInfo(InfoGroup):
     '''Class to read vulnerabilities information (/sys/devices/system/cpu/vulnerabilities)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(VulnerabilitiesInfo, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(VulnerabilitiesInfo, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "VulnerabilitiesInfo"
         base = "/sys/devices/system/cpu/vulnerabilities"
         for vfile in glob(pjoin(base, "*")):
@@ -2176,9 +2273,8 @@ class VulnerabilitiesInfo(InfoGroup):
 ################################################################################
 class UsersInfo(InfoGroup):
     '''Class to get count of logged in users. Does not print out the usernames'''
-
-    def __init__(self, extended=False, anon=False):
-        super(UsersInfo, self).__init__(name="UsersInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(UsersInfo, self).__init__(name="UsersInfo", extended=extended, anonymous=anonymous)
         self.addc("LoggedIn", "users", "", r"(.*)", UsersInfo.countusers)
         self.required("LoggedIn")
 
@@ -2197,9 +2293,10 @@ class DmiDecodeFile(InfoGroup):
     commonly only usable with sufficient permissions. If a system administrator has dumped the
     content to a user readable file, this class includes the file.
     '''
-
-    def __init__(self, dmifile, extended=False, anon=False):
-        super(DmiDecodeFile, self).__init__(name="DmiDecodeFile", extended=extended, anon=anon)
+    def __init__(self, dmifile, extended=False, anonymous=False):
+        super(DmiDecodeFile, self).__init__(name="DmiDecodeFile",
+                                            extended=extended,
+                                            anonymous=anonymous)
         if pexists(dmifile):
             self.addf("DmiDecode", dmifile)
 
@@ -2213,9 +2310,10 @@ class CpuAffinity(InfoGroup):
     '''Class to read information the CPU affinity for the session using Python's
     os.get_schedaffinity or likwid-pin if available
     '''
-
-    def __init__(self, extended=False, anon=False):
-        super(CpuAffinity, self).__init__(name="CpuAffinity", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuAffinity, self).__init__(name="CpuAffinity",
+                                          extended=extended,
+                                          anonymous=anonymous)
         if "get_schedaffinity" in dir(os):
             self.const("Affinity", os.get_schedaffinity())
         elif DO_LIKWID and LIKWID_PATH and pexists(LIKWID_PATH):
@@ -2226,7 +2324,7 @@ class CpuAffinity(InfoGroup):
         else:
             abscmd = which("taskset")
             if abscmd and len(abscmd) > 0:
-                regex = r"pid \d+'s current affinity list: (.*)"
+                regex = r".*current affinity list: (.*)"
                 self.addc("Affinity", abscmd, "-c -p $$", regex, tointlist)
                 self.required("Affinity")
 
@@ -2236,14 +2334,16 @@ class CpuAffinity(InfoGroup):
 ################################################################################
 class ModulesInfo(InfoGroup):
     '''Class to read information from the modules system'''
-
-    def __init__(self, extended=False, anon=False):
-        super(ModulesInfo, self).__init__(name="ModulesInfo", extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False, modulecmd="modulecmd"):
+        super(ModulesInfo, self).__init__(name="ModulesInfo",
+                                          extended=extended,
+                                          anonymous=anonymous)
         parse = ModulesInfo.parsemodules
         cmd_opts = "sh list -t 2>&1"
-        cmd = "modulecmd"
-        if MODULECMD_PATH is not None and len(MODULECMD_PATH) > 0:
-            path = "{}".format(MODULECMD_PATH)
+        cmd = modulecmd
+        abspath = which(cmd)
+        if modulecmd is not None and len(modulecmd) > 0:
+            path = "{}".format(modulecmd)
             path_opts = "{}".format(cmd_opts)
             if " " in path:
                 tmplist = path.split(" ")
@@ -2255,7 +2355,6 @@ class ModulesInfo(InfoGroup):
             cmd_opts = path_opts
         if abscmd and len(abscmd) > 0:
             self.addc("Loaded", abscmd, cmd_opts, None, parse)
-            # self.required4equal.append("Loaded")
 
     @staticmethod
     def parsemodules(value):
@@ -2268,9 +2367,8 @@ class ModulesInfo(InfoGroup):
 ################################################################################
 class InfinibandInfoClassPort(InfoGroup):
     '''Class to read the information of a single port of an InfiniBand/OmniPath driver.'''
-
-    def __init__(self, port, extended=False, anon=False, driver=""):
-        super(InfinibandInfoClassPort, self).__init__(extended=extended, anon=anon)
+    def __init__(self, port, extended=False, anonymous=False, driver=""):
+        super(InfinibandInfoClassPort, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Port{}".format(port)
         ibpath = "/sys/class/infiniband/{}/ports/{}".format(driver, port)
         self.addf("Rate", pjoin(ibpath, "rate"), r"(.+)")
@@ -2280,9 +2378,8 @@ class InfinibandInfoClassPort(InfoGroup):
 
 class InfinibandInfoClass(PathMatchInfoGroup):
     '''Class to read the information of an InfiniBand/OmniPath driver.'''
-
-    def __init__(self, driver, extended=False, anon=False):
-        super(InfinibandInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, driver, extended=False, anonymous=False):
+        super(InfinibandInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = driver
         ibpath = "/sys/class/infiniband/{}".format(driver)
         self.addf("BoardId", pjoin(ibpath, "board_id"), r"(.+)")
@@ -2291,7 +2388,7 @@ class InfinibandInfoClass(PathMatchInfoGroup):
         self.addf("HWRevision", pjoin(ibpath, "hw_rev"), r"([\w\d\.]+)")
         self.addf("NodeType", pjoin(ibpath, "node_type"), r"(.+)")
 
-        if not anon:
+        if not anonymous:
             self.addf("NodeGUID", pjoin(ibpath, "node_guid"), r"(.+)")
             self.addf("NodeDescription", pjoin(ibpath, "node_desc"), r"(.+)")
             self.addf("SysImageGUID", pjoin(ibpath, "sys_image_guid"), r"(.+)")
@@ -2303,9 +2400,8 @@ class InfinibandInfoClass(PathMatchInfoGroup):
 
 class InfinibandInfo(PathMatchInfoGroup):
     '''Class to read InfiniBand/OmniPath (/sys/class/infiniband).'''
-
-    def __init__(self, extended=False, anon=False):
-        super(InfinibandInfo, self).__init__(extended=extended, anon=anon)
+    def __init__(self, extended=False, anonymous=False):
+        super(InfinibandInfo, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "InfinibandInfo"
         if pexists("/sys/class/infiniband"):
             self.searchpath = "/sys/class/infiniband/*"
@@ -2318,11 +2414,16 @@ class InfinibandInfo(PathMatchInfoGroup):
 ################################################################################
 class NvidiaSmiInfoClass(InfoGroup):
     '''Class to read information for one Nvidia GPU (uses the nvidia-smi command)'''
-
-    def __init__(self, device, extended=False, anon=False):
-        super(NvidiaSmiInfoClass, self).__init__(extended=extended, anon=anon)
-        self.name = "Card{}".format(device)
-        self.cmd = "nvidia-smi"
+    def __init__(self, device, extended=False, anonymous=False, nvidia_path=""):
+        super(NvidiaSmiInfoClass, self).__init__(name="Card{}".format(device),
+                                                 extended=extended,
+                                                 anonymous=anonymous)
+        cmd = pjoin(nvidia_path, "nvidia-smi")
+        if pexists(cmd):
+            self.cmd = cmd
+        elif which("nvidia-smi"):
+            self.cmd = which("nvidia-smi")
+>>>>>>> master
         self.cmd_opts = "-q -i {}".format(device)
         abscmd = which(self.cmd)
         matches = {
@@ -2348,10 +2449,14 @@ class NvidiaSmiInfoClass(InfoGroup):
 
 class NvidiaSmiInfo(ListInfoGroup):
     '''Class to spawn subclasses for each NVIDIA GPU device (uses the nvidia-smi command)'''
-
-    def __init__(self, extended=False, anon=False):
-        super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo", extended=extended, anon=anon)
+    def __init__(self, nvidia_path="", extended=False, anonymous=False):
+        super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo",
+                                            extended=extended,
+                                            anonymous=anonymous)
         self.cmd = "nvidia-smi"
+        cmd = pjoin(nvidia_path, "nvidia-smi")
+        if pexists(cmd):
+            self.cmd = cmd
         self.cmd_opts = "-q"
         abscmd = which(self.cmd)
         if abscmd:
@@ -2359,10 +2464,11 @@ class NvidiaSmiInfo(ListInfoGroup):
             if num_gpus > 0:
                 self.userlist = [i for i in range(num_gpus)]
                 self.subclass = NvidiaSmiInfoClass
-        matches = {
-            "DriverVersion": r"Driver Version\s+:\s+([\d\.]+)",
-            "CudaVersion": r"CUDA Version\s+:\s+([\d\.]+)",
-        }
+
+                self.subargs = {"nvidia_path" : nvidia_path}
+        matches = {"DriverVersion" : r"Driver Version\s+:\s+([\d\.]+)",
+                   "CudaVersion" : r"CUDA Version\s+:\s+([\d\.]+)",
+                  }
         if abscmd:
             for key, regex in matches.items():
                 self.addc(key, self.cmd, self.cmd_opts, regex)
@@ -2373,11 +2479,10 @@ class NvidiaSmiInfo(ListInfoGroup):
 ################################################################################
 class NecTsubasaInfoTemps(InfoGroup):
     '''Class to read temperature information for one NEC Tsubasa device (uses the vecmd command)'''
-
-    def __init__(self, tempkeys, ve_base="", extended=False, anon=False, device=0):
-        super(NecTsubasaInfoTemps, self).__init__(extended=extended, anon=anon)
+    def __init__(self, tempkeys, vecmd_path="", extended=False, anonymous=False, device=0):
+        super(NecTsubasaInfoTemps, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Temperatures"
-        vecmd = pjoin(ve_base, "vecmd")
+        vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         for tempkey in tempkeys:
             self.addc(tempkey, vecmd, veargs, r"\s+{}\s+:\s+([\d\.]+\sC)".format(tempkey))
@@ -2385,11 +2490,10 @@ class NecTsubasaInfoTemps(InfoGroup):
 
 class NecTsubasaInfoClass(InfoGroup):
     '''Class to read information for one NEC Tsubasa device (uses the vecmd command)'''
-
-    def __init__(self, device, ve_base="", extended=False, anon=False):
-        super(NecTsubasaInfoClass, self).__init__(extended=extended, anon=anon)
+    def __init__(self, device, vecmd_path="", extended=False, anonymous=False):
+        super(NecTsubasaInfoClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Card{}".format(device)
-        vecmd = pjoin(ve_base, "vecmd")
+        vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         if pexists(vecmd):
             self.addc("State", vecmd, veargs, r"VE State\s+:\s+(.+)", totitle)
@@ -2402,8 +2506,9 @@ class NecTsubasaInfoClass(InfoGroup):
                 regex = r"Negotiated Link Width\s+:\s+(x\d+)"
                 self.addc("PciLinkWidth", vecmd, veargs, regex)
             ve_temps = process_cmd((vecmd, veargs, None, NecTsubasaInfoClass.gettempkeys))
-            tempargs = {"device": device, "ve_base": ve_base}
-            cls = NecTsubasaInfoTemps(ve_temps, extended=extended, anon=anon, **tempargs)
+
+            tempargs = {"device" : device, "vecmd_path" : vecmd_path}
+            cls = NecTsubasaInfoTemps(ve_temps, extended=extended, anonymous=anonymous, **tempargs)
             self._instances.append(cls)
 
     @staticmethod
@@ -2418,16 +2523,22 @@ class NecTsubasaInfoClass(InfoGroup):
 
 class NecTsubasaInfo(ListInfoGroup):
     '''Class to spawn subclasses for each NEC Tsubasa device (uses the vecmd command)'''
-
-    def __init__(self, ve_base="", extended=False, anon=False):
-        super(NecTsubasaInfo, self).__init__(name="NecTsubasaInfo", extended=extended, anon=anon)
-        vecmd = pjoin(ve_base, "vecmd")
-        if pexists(vecmd):
+    def __init__(self, vecmd_path="", extended=False, anonymous=False):
+        super(NecTsubasaInfo, self).__init__(name="NecTsubasaInfo",
+                                             extended=extended,
+                                             anonymous=anonymous)
+        vecmd = pjoin(vecmd_path, "vecmd")
+        if not pexists(vecmd):
+            vecmd = which("vecmd")
+            if vecmd is not None:
+                vecmd_path = os.path.dirname(vecmd)
+        if vecmd and len(vecmd) > 0:
             num_ves = process_cmd((vecmd, "info", r"Attached VEs\s+:\s+(\d+)", int))
             if num_ves > 0:
                 self.userlist = [i for i in range(num_ves)]
                 self.subclass = NecTsubasaInfoClass
-                self.subargs = {"ve_base": ve_base}
+
+                self.subargs = {"vecmd_path" : vecmd_path}
 
 
 ################################################################################
@@ -2504,22 +2615,31 @@ def read_cli(cliargs):
         if not os.access(pargs["configfile"], os.R_OK):
             raise ValueError("Configuration file '{}' is not readable".format(pargs["configfile"]))
     return pargs
-    # return pargs["extended"], pargs["executable"], pargs["output"]
 
+def read_config(config={"extended" : False, "anonymous" : False, "executable" : None}):
 
-def read_config(configfile=None):
-    global DMIDECODE_FILE, DO_LIKWID, LIKWID_PATH, MODULECMD_PATH, VEOS_BASE, DEBUG_OUTPUT
-    configdict = {
-        "dmifile": DMIDECODE_FILE,
-        "likwid_enable": DO_LIKWID,
-        "likwid_path": LIKWID_PATH,
-        "modulecmd": MODULECMD_PATH,
-        "vecmd_path": VEOS_BASE,
-        "debug": DEBUG_OUTPUT,
-    }
+    if not ("extended" in config and "anonymous" in config and "executable" in config):
+        raise ValueError("Given dict does not contain required keys: \
+                          extended, anonymous and executable")
+    configdict = {"dmifile" : DMIDECODE_FILE,
+                  "likwid_enable" : DO_LIKWID,
+                  "likwid_path" : LIKWID_PATH,
+                  "modulecmd" : MODULECMD_PATH,
+                  "vecmd_path" : VEOS_BASE,
+                  "nvidia_path" : NVIDIA_PATH,
+                  "debug" : DEBUG_OUTPUT,
+                  "anonymous" : False,
+                  "extended" : False,
+                 }
     searchfiles = []
-    if configfile is not None:
-        searchfiles.append(configfile)
+
+    userfile = config.get("configfile", None)
+    configdict["anonymous"] = config.get("anonymous", False)
+    configdict["extended"] = config.get("extended", False)
+    configdict["executable"] = config.get("executable", None)
+
+    if userfile is not None:
+        searchfiles.append(userfile)
     else:
         searchfiles = [pjoin(os.getcwd(), ".machinestate")]
         if "HOME" in os.environ:
@@ -2534,25 +2654,14 @@ def read_config(configfile=None):
                     try:
                         tmpdict = json.loads(sstr)
                         configdict.update(tmpdict)
-                    except Exception:
-                        raise ValueError(
-                            "Configuration file '{}' not valid JSON".format(configfile)
-                        )
+                    except:
+                        exce = "Configuration file '{}' not valid JSON".format(userfile)
+                        raise ValueError(exce)
                 sfp.close()
                 break
 
-    if configdict["dmifile"] != DMIDECODE_FILE:
-        DMIDECODE_FILE = configdict["dmifile"]
-    if configdict["likwid_enable"] != DO_LIKWID:
-        DO_LIKWID = configdict["likwid_enable"]
-    if configdict["likwid_path"] != LIKWID_PATH:
-        LIKWID_PATH = configdict["likwid_path"]
-    if configdict["modulecmd"] != MODULECMD_PATH:
-        MODULECMD_PATH = configdict["modulecmd"]
-    if configdict["vecmd_path"] != VEOS_BASE:
-        VEOS_BASE = configdict["vecmd_path"]
-    if configdict["debug"] != DEBUG_OUTPUT:
-        DEBUG_OUTPUT = configdict["debug"]
+
+
     return configdict
 
 
@@ -2561,15 +2670,14 @@ def main():
         # Read command line arguments
         cliargs = read_cli(sys.argv[1:])
         # Read configuration from configuration file
-        cliargs.update(read_config(cliargs["configfile"]))
+        runargs = read_config(cliargs)
     except Exception as e:
         print(e)
         sys.exit(1)
 
     # Initialize MachineState class
-    mstate = MachineState(
-        extended=cliargs["extended"], executable=cliargs["executable"], anon=cliargs["anonymous"]
-    )
+
+    mstate = MachineState(**runargs)
     # Generate subclasses of MachineState
     mstate.generate()
     # Update the current state

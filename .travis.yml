@@ -10,9 +10,9 @@ python:
 - '3.5'
 - '3.6'
 - '3.7'
-env:
-- CC=testcompiler CXX=testccompiler FC=testfortran
 before_install:
+# Workaround for cacheing issue on travis:
+- sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels
 - pip install codecov
 - pip install requests
 - sudo apt-get install slurm slurm-client
@@ -30,7 +30,7 @@ script:
 - coverage run -p `which machinestate` -e -s -i 4
 - coverage run -p `which machinestate` -e -s -i 4 -o output-ext.json
 - coverage run -p `which machinestate` -s -i 4 -o output.json
-- coverage run -p `which machinestate` -c
+- CC=testcompiler CXX=testccompiler FC=testfortran coverage run -p `which machinestate` -c
 - coverage run -p `which machinestate` -e -s -a hostname
 - coverage run -p `which machinestate` -j output.json
 - coverage run -p `which machinestate` -e -j output.json
@@ -39,7 +39,6 @@ after_success:
 - coverage combine
 - codecov
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
-cache: pip
 deploy:
   provider: pypi
   username: "__token__"

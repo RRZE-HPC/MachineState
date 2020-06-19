@@ -14,8 +14,8 @@ from locale import getpreferredencoding
 ENCODING = getpreferredencoding()
 
 class TestPathMatchInfoGroup(InfoGroup):
-    def __init__(self, ident, extended=False, anon=False, searchpath=""):
-        super(TestPathMatchInfoGroup, self).__init__(anon=anon, extended=extended, name="File{}".format(ident))
+    def __init__(self, ident, extended=False, anonymous=False, searchpath=""):
+        super(TestPathMatchInfoGroup, self).__init__(anonymous=anonymous, extended=extended, name="File{}".format(ident))
         path = os.path.join(searchpath, "{}*".format(ident))
         files = glob.glob(path)
         self.addf("File{}".format(ident), files[0], r"(.+)")
@@ -26,7 +26,7 @@ class TestPathMatchInfoGroupBase(unittest.TestCase):
         cls = PathMatchInfoGroup()
         self.assertEqual(cls.name, None)
         self.assertEqual(cls.extended, False)
-        self.assertEqual(cls.anon, False)
+        self.assertEqual(cls.anonymous, False)
         self.assertEqual(cls.files, {})
         self.assertEqual(cls.commands, {})
         self.assertEqual(cls.constants, {})
@@ -42,9 +42,9 @@ class TestPathMatchInfoGroupBase(unittest.TestCase):
     def test_extended(self):
         cls = PathMatchInfoGroup(extended=True)
         self.assertEqual(cls.extended, True)
-    def test_anon(self):
-        cls = PathMatchInfoGroup(anon=True)
-        self.assertEqual(cls.anon, True)
+    def test_anonymous(self):
+        cls = PathMatchInfoGroup(anonymous=True)
+        self.assertEqual(cls.anonymous, True)
     def test_searchpathNotExist(self):
         cls = PathMatchInfoGroup(searchpath="/path/does/not/exist/*")
         self.assertEqual(cls.searchpath, None)

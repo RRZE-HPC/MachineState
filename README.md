@@ -1,3 +1,6 @@
+
+<div align=center><img src="https://github.com/RRZE-HPC/MachineState/raw/master/logo/machinestate_logo.png" alt="MachineState logo" width="150px"/></div>
+
 --------------------------------------------------------------------------------
 Introduction
 --------------------------------------------------------------------------------
@@ -7,6 +10,8 @@ current system settings and the execution enviroment.
 Most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
+
+An example JSON from an Intel Skylake Desktop system can be found [here](./examples/skylake-desktop.json).
 
 [![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from setuptools import setup
+from setuptools import setup, find_packages
 import re
 
 long_description='''Gathering the system state before benchmarking and other tests on compute
@@ -10,7 +10,7 @@ before re-running a test.
 '''
 
 def find_version():
-    with open("machinestate.py") as msfp:
+    with open("machinestate/__init__.py") as msfp:
         lines = msfp.read().split("\n")
         for line in lines:
             mat = re.search(r"^MACHINESTATE_VERSION = ['\"]([^'\"]*)['\"]", line)
@@ -32,7 +32,10 @@ setup(name='MachineState',
 
     # License
     license='GPLv3',
-    py_modules=['machinestate'],
+    packages=find_packages(exclude=['examples', 'tests*']),
+    package_data={
+        'machinestate': ['html_export/*.js', 'html_export/*.css']
+    },
     entry_points = {
         'console_scripts': ['machinestate=machinestate:main'],
     },

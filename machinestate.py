@@ -1117,9 +1117,11 @@ class CpuTopologyClass(InfoGroup):
             tid = 0
             data = outfp.read().decode(ENCODING).strip()
             dlist = data.split(",")
-            if len(dlist) > 1:
+            if len(dlist) == 1:
+                tid = 0
+            elif len(dlist) > 1:
                 tid = dlist.index(str(hwthread))
-            else:
+            elif "-" in data:
                 dlist = data.split("-")
                 if len(dlist) > 1:
                     trange = range(int(dlist[0]), int(dlist[1])+1)
@@ -1148,11 +1150,7 @@ class CpuTopology(PathMatchInfoGroup):
         if searchpath and match and pexists(os.path.dirname(searchpath)):
             mat = re.compile(match)
             base = searchpath
-            glist = []
-            try:
-                glist += sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
-            except ValueError:
-                glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
+            glist = sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
             return len(glist)
         return 0
     @staticmethod
@@ -1162,11 +1160,7 @@ class CpuTopology(PathMatchInfoGroup):
         if searchpath and match and pexists(os.path.dirname(searchpath)):
             mat = re.compile(match)
             base = searchpath
-            glist = []
-            try:
-                glist += sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
-            except ValueError:
-                glist += sorted([mat.match(f).group(1) for f in glob(base) if mat.match(f)])
+            glist = sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
             return len(glist)
         return 0
     def getsmtwidth():
@@ -1441,7 +1435,8 @@ class KernelSchedInfo(InfoGroup):
         base = "/proc/sys/kernel"
         self.addf("RealtimeBandwidthReservationUs", pjoin(base, "sched_rt_runtime_us"), parse=int)
         self.addf("TargetedPreemptionLatencyNs", pjoin(base, "sched_latency_ns"), parse=int)
-        self.addf("MinimalPreemptionGranularityNs", pjoin(base, "sched_min_granularity_ns"), parse=int)
+        name = "MinimalPreemptionGranularityNs"
+        self.addf(name, pjoin(base, "sched_min_granularity_ns"), parse=int)
         self.addf("WakeupLatencyNs", pjoin(base, "sched_wakeup_granularity_ns"), parse=int)
         self.addf("RuntimePoolTransferUs", pjoin(base, "sched_cfs_bandwidth_slice_us"), parse=int)
         self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=tobool)

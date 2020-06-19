@@ -87,10 +87,8 @@ The module contains more classes but all except the above ones are used only int
 # =======================================================================================
 
 # TODO: Should keys be available in all cases?
-# TODO: Expand bitmasks to lists?
 # TODO: More analysis by ExecutableInfo? (type, compilation info, ...)
 # TODO: Add class for 'sysctl -a' ?
-# TODO: Check SMTWidth in CpuTopology
 
 ################################################################################
 # Imports
@@ -1296,7 +1294,7 @@ class CacheTopologyClass(InfoGroup):
         super(CacheTopologyClass, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "L{}".format(ident)
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
-        fparse = CacheTopologyClass.kBtoB
+        fparse = CacheTopologyClass.kBtoBytes
         if pexists(base):
             self.addf("Size", pjoin(base, "size"), r"(\d+)", fparse)
             self.addf("Level", pjoin(base, "level"), r"(\d+)", int)
@@ -1338,9 +1336,8 @@ class CacheTopologyClass(InfoGroup):
                 filefp.close()
         return cpulist
     @staticmethod
-    def kBtoB(value):
-        size = int(value)
-        return size * 1024
+    def kBtoBytes(value):
+        return tobytes("{} kB".format(value))
     def update(self):
         super(CacheTopologyClass, self).update()
         if "Level" in self._data:
@@ -1468,7 +1465,8 @@ class KernelInfo(ListInfoGroup):
         if pexists("/proc/sys/kernel/softlockup_thresh"):
             self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
         self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
-        self.required("Version", "CmdLine","NMIWatchdog", "Watchdog")
+        self.required("Version", "CmdLine", "NMIWatchdog", "Watchdog")
+
         cls = KernelSchedInfo(extended=extended,
                               anonymous=anonymous)
         self._instances.append(cls)
@@ -1796,7 +1794,7 @@ class MpiInfo(ListInfoGroup):
         if ompi and len(ompi) > 0 and extended:
             ompi_args = "--parseable --params all all --level 9"
             self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
-        impi = which ("impi_info")
+        impi = which("impi_info")
         if impi and len(impi) > 0 and extended:
             self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
     @staticmethod
@@ -2288,7 +2286,7 @@ class IrqAffinity(PathMatchInfoGroup):
                                           extended=extended,
                                           anonymous=anonymous,
                                           searchpath="/proc/irq/*",
-                                          match=".*/(\d+)",
+                                          match=r".*/(\d+)",
                                           subclass=IrqAffinityClass)
         self.addf("DefaultSMPAffinity", "/proc/irq/default_smp_affinity", parse=masktolist)
 

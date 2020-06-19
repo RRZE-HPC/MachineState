@@ -49,6 +49,7 @@ Provided classes:
 - ThermalZoneInfo
 - VulnerabilitiesInfo
 - UsersInfo
+- IrqAffinity
 - CpuAffinity (uses os.get_schedaffinity(), likwid-pin or taskset)
 - ModulesInfo (if modulecmd is present)
 - NvidiaInfo (if nvidia-smi is present)
@@ -987,8 +988,8 @@ class MachineState(MultiClassInfoGroup):
         self.classargs.append({"dmifile" : dmifile})
         self.classlist.append(ExecutableInfo)
         self.classargs.append({"executable" : executable})
-        if likwid_enable and likwid_path is not None:
-            if not pexists(likwid_path):
+        if likwid_enable:
+            if likwid_path is None or not pexists(likwid_path):
                 path = which("likwid-topology")
                 if path:
                     likwid_path = os.path.dirname(path)
@@ -1869,16 +1870,9 @@ class PrefetcherInfoClass(InfoGroup):
             abscmd = which(cmd)
 
         if abscmd:
-            parser = PrefetcherInfoClass.parse_pf_state
             for name in names:
-                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), parser)
+                self.addc(name, abscmd, cmd_opts, r"{}\s+(\w+)".format(name), tobool)
         self.required(names)
-    @staticmethod
-    def parse_pf_state(value):
-        if value.lower() == "on":
-            return True
-        else:
-            return False
 
 class PrefetcherInfo(PathMatchInfoGroup):
     '''Class to spawn subclasses for all HW threads returned by likwid-features'''

@@ -341,6 +341,15 @@ class TestToBool(unittest.TestCase):
     def test_toboolIntTrue2(self):
         out = machinestate.tobool(2)
         self.assertEqual(out, True)
+    def test_toboolIntFalse(self):
+        out = machinestate.tobool(0.0)
+        self.assertEqual(out, False)
+    def test_toboolIntTrue1(self):
+        out = machinestate.tobool(1.0)
+        self.assertEqual(out, True)
+    def test_toboolIntTrue2(self):
+        out = machinestate.tobool(2.0)
+        self.assertEqual(out, True)
     def test_toboolStrOn(self):
         out = machinestate.tobool("on")
         self.assertEqual(out, True)
@@ -377,7 +386,7 @@ class TestToBool(unittest.TestCase):
         self.assertEqual(out, True)
         out = machinestate.tobool("TRUE")
         self.assertEqual(out, True)
-    def test_toboolStrOff(self):
+    def test_toboolStrFalse(self):
         out = machinestate.tobool("false")
         self.assertEqual(out, False)
         out = machinestate.tobool("False")

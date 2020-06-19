@@ -1431,18 +1431,29 @@ class KernelSchedInfo(InfoGroup):
         self.addf("ChildRunsFirst", pjoin(base, "sched_child_runs_first"), parse=bool)
         self.addf("CacheHotTimeNs", pjoin(base, "sched_migration_cost_ns"), parse=int)
 
+class KernelRcuInfo(InfoGroup):
+    def __init__(self, command, extended=False, anonymous=False):
+        super(KernelRcuInfo, self).__init__(name=command,
+                                            extended=extended,
+                                            anonymous=anonymous)
+        cmd_opts = "-c -p $(pgrep {})".format(command)
+        regex = r".*current affinity list: (.*)"
+        # see https://pyperf.readthedocs.io/en/latest/system.html#more-options
+        self.addc("Affinity", "taskset", cmd_opts, regex, tointlist)
 
-
-class KernelInfo(InfoGroup):
+class KernelInfo(ListInfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(KernelInfo, self).__init__(name="KernelInfo",
                                          extended=extended,
                                          anonymous=anonymous)
         self.addf("Version", "/proc/sys/kernel/osrelease")
         self.addf("CmdLine", "/proc/cmdline")
+        # see https://pyperf.readthedocs.io/en/latest/system.html#checks
+        self.addf("ASLR", "/proc/sys/kernel/randomize_va_space", parse=int)
         self.addf("ThreadsMax", "/proc/sys/kernel/threads-max", parse=int)
         self.addf("NMIWatchdog", "/proc/sys/kernel/nmi_watchdog", parse=bool)
         self.addf("Watchdog", "/proc/sys/kernel/watchdog", parse=bool)
+        self.addf("HungTaskCheckCount", "/proc/sys/kernel/hung_task_check_count", parse=int)
         if pexists("/proc/sys/kernel/softlockup_thresh"):
             self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
         self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
@@ -1450,6 +1461,8 @@ class KernelInfo(InfoGroup):
         cls = KernelSchedInfo(extended=extended,
                               anonymous=anonymous)
         self._instances.append(cls)
+        self.userlist = ["rcu_sched", "rcu_bh", "rcu_tasks_kthre"]
+        self.subclass = KernelRcuInfo
 
 ################################################################################
 # Infos about CGroups

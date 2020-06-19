@@ -2423,7 +2423,6 @@ class NvidiaSmiInfoClass(InfoGroup):
             self.cmd = cmd
         elif which("nvidia-smi"):
             self.cmd = which("nvidia-smi")
->>>>>>> master
         self.cmd_opts = "-q -i {}".format(device)
         abscmd = which(self.cmd)
         matches = {

@@ -18,15 +18,20 @@ An example JSON from an Intel Skylake Desktop system can be found [here](./examp
 --------------------------------------------------------------------------------
 Installation
 --------------------------------------------------------------------------------
-MachineState is written as Python3 module but it's not yet in the PIP index.
-So, in order to install it, use pip's local feature:
+MachineState is written as Python3 module:
 
 ```
 $ git clone https://github.com/RRZE-HPC/MachineState
 $ cd MachineState
-$ pip3 install (--user) .
-or
 $ ./machinestate.py
+```
+or
+```
+$ pip3 install MachineState
+$ machinestate
+or
+$ python3
+>>> import machinestate
 ```
 
 The module cannot be used with Python2!

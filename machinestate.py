@@ -973,9 +973,9 @@ class MachineState(MultiClassInfoGroup):
             VulnerabilitiesInfo,
             UsersInfo,
             CpuAffinity,
-            ModulesInfo,
-            IrqAffinity,
         ]
+        if extended:
+            self.classlist.append(IrqAffinity)
         self.classargs = [{} for x in self.classlist]
 
         self.classlist.append(ModulesInfo)
@@ -1792,13 +1792,14 @@ class MpiInfo(ListInfoGroup):
         self.mpilist = ["mpiexec", "mpiexec.hydra", "mpirun", "srun", "aprun"]
         self.subclass = MpiInfoClass
         self.userlist = [m for m in self.mpilist if which(m)]
-        ompi = which("ompi_info")
-        if ompi and len(ompi) > 0 and extended:
-            ompi_args = "--parseable --params all all --level 9"
-            self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
-        impi = which("impi_info")
-        if impi and len(impi) > 0 and extended:
-            self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
+        if extended:
+            ompi = which("ompi_info")
+            if ompi and len(ompi) > 0 and extended:
+                ompi_args = "--parseable --params all all --level 9"
+                self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
+            impi = which("impi_info")
+            if impi and len(impi) > 0 and extended:
+                self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
     @staticmethod
     def openmpiparams(value):
         outdict = {}

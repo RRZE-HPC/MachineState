@@ -504,6 +504,12 @@ def get_config_cmd(args):
                             outdict["Parser"] = str(cconvert)
     return outdict
 
+def get_ostype():
+    out = process_cmd(("uname", "-s", r"(\s+)", None))
+    if out:
+        return out
+    return "Unknown"
+
 ################################################################################
 # Base Classes
 ################################################################################
@@ -943,59 +949,69 @@ class MachineState(MultiClassInfoGroup):
                  modulecmd=MODULECMD_PATH,
                  vecmd_path=VEOS_BASE):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
-        self.classlist = [
-            MachineStateInfo,
-            HostInfo,
-            CpuInfo,
-            OSInfo,
-            KernelInfo,
-            Uptime,
-            CpuTopology,
-            NumaBalance,
-            LoadAvg,
-            MemInfo,
-            CgroupInfo,
-            WritebackWorkqueue,
-            CpuFrequency,
-            NumaInfo,
-            CacheTopology,
-            TransparentHugepages,
-            PowercapInfo,
-            Hugepages,
-            CompilerInfo,
-            MpiInfo,
-            ShellEnvironment,
-            PythonInfo,
-            ClocksourceInfo,
-            CoretempInfo,
-            BiosInfo,
-            ThermalZoneInfo,
-            VulnerabilitiesInfo,
-            UsersInfo,
-            CpuAffinity,
-        ]
-        if extended:
-            self.classlist.append(IrqAffinity)
-        self.classargs = [{} for x in self.classlist]
+        ostype = get_ostype()
+        if ostype == "Linux":
+            self.classlist = [
+                MachineStateInfo,
+                HostInfo,
+                CpuInfo,
+                OSInfo,
+                KernelInfo,
+                Uptime,
+                CpuTopology,
+                NumaBalance,
+                LoadAvg,
+                MemInfo,
+                CgroupInfo,
+                WritebackWorkqueue,
+                CpuFrequency,
+                NumaInfo,
+                CacheTopology,
+                TransparentHugepages,
+                PowercapInfo,
+                Hugepages,
+                CompilerInfo,
+                MpiInfo,
+                ShellEnvironment,
+                PythonInfo,
+                ClocksourceInfo,
+                CoretempInfo,
+                BiosInfo,
+                ThermalZoneInfo,
+                VulnerabilitiesInfo,
+                UsersInfo,
+                CpuAffinity,
+            ]
+            if extended:
+                self.classlist.append(IrqAffinity)
+            self.classargs = [{} for x in self.classlist]
 
-        self.classlist.append(ModulesInfo)
-        self.classargs.append({"modulecmd" : modulecmd})
-        self.classlist.append(NvidiaSmiInfo)
-        self.classargs.append({"nvidia_path" : nvidia_path})
-        self.classlist.append(NecTsubasaInfo)
-        self.classargs.append({"vecmd_path" : vecmd_path})
-        self.classlist.append(DmiDecodeFile)
-        self.classargs.append({"dmifile" : dmifile})
-        self.classlist.append(ExecutableInfo)
-        self.classargs.append({"executable" : executable})
-        if likwid_enable:
-            if likwid_path is None or not pexists(likwid_path):
-                path = which("likwid-topology")
-                if path:
-                    likwid_path = os.path.dirname(path)
-            clargs = {"likwid_base" : likwid_path}
-            self.classlist += [PrefetcherInfo, TurboInfo]
-            self.classargs += [clargs, clargs]
+            self.classlist.append(ModulesInfo)
+            self.classargs.append({"modulecmd" : modulecmd})
+            self.classlist.append(NvidiaSmiInfo)
+            self.classargs.append({"nvidia_path" : nvidia_path})
+            self.classlist.append(NecTsubasaInfo)
+            self.classargs.append({"vecmd_path" : vecmd_path})
+            self.classlist.append(DmiDecodeFile)
+            self.classargs.append({"dmifile" : dmifile})
+            self.classlist.append(ExecutableInfo)
+            self.classargs.append({"executable" : executable})
+            if likwid_enable:
+                if likwid_path is None or not pexists(likwid_path):
+                    path = which("likwid-topology")
+                    if path:
+                        likwid_path = os.path.dirname(path)
+                clargs = {"likwid_base" : likwid_path}
+                self.classlist += [PrefetcherInfo, TurboInfo]
+                self.classargs += [clargs, clargs]
+        elif ostype == "Darwin":
+            self.classlist = [
+                MachineStateInfo,
+                HostInfo,
+                CpuInfo,
+                OSInfo
+            ]
+            self.classargs = [{} for x in self.classlist]
     def get_config(self, sort=False, intend=4):
         outdict = {}
         for inst in self._instances:
@@ -1014,12 +1030,18 @@ class OSInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(OSInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "OperatingSystemInfo"
-        self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
-        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
+        ostype = get_ostype()
+        self.const("Type", ostype)
+        self.required("Type")
+        if ostype == "Linux":
+            self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
+            self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
 
-        self.required(["Name", "Version"])
-        if extended:
-            self.addf("URL", "/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
+            self.required(["Name", "Version"])
+            if extended:
+                self.addf("URL", "/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
+        elif ostype == "Darwin":
+            self.addc("Version", "uname", "-r", r"([\d\.]+)")
 
 ################################################################################
 # Infos about NUMA balancing
@@ -1061,37 +1083,45 @@ class CpuInfo(InfoGroup):
         super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anonymous=anonymous)
         march = platform.machine()
         self.const("MachineType", march)
-        if march in ["x86_64", "i386"]:
-            self.addf("Vendor", "/proc/cpuinfo", r"vendor_id\s+:\s(.*)")
-            self.addf("Name", "/proc/cpuinfo", r"model name\s+:\s(.+)")
-            self.addf("Family", "/proc/cpuinfo", r"cpu family\s+:\s(.+)", int)
-            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)", int)
-            self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
-        elif march in ["aarch64"]:
-            self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
-            self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
-            self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
-            self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
-            self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
-        elif march in ["ppc64le", "ppc64"]:
-            self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
-            self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")
-            self.addf("Family", "/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*")
-            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
-            self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
-
-        self.required(["Vendor", "Family", "Model", "Stepping"])
-        if pexists("/sys/devices/system/cpu/smt/active"):
-            self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
-            self.required("SMT")
-        if extended:
+        ostype = get_ostype()
+        if ostype == "Linux":
             if march in ["x86_64", "i386"]:
-                self.addf("Flags", "/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
-                self.addf("Microcode", "/proc/cpuinfo", r"microcode\s+:\s(.+)")
-                self.addf("Bugs", "/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
-                self.required("Microcode")
+                self.addf("Vendor", "/proc/cpuinfo", r"vendor_id\s+:\s(.*)")
+                self.addf("Name", "/proc/cpuinfo", r"model name\s+:\s(.+)")
+                self.addf("Family", "/proc/cpuinfo", r"cpu family\s+:\s(.+)", int)
+                self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)", int)
+                self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
             elif march in ["aarch64"]:
-                self.addf("Flags", "/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
+                self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
+                self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
+                self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
+                self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
+                self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
+            elif march in ["ppc64le", "ppc64"]:
+                self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
+                self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")
+                self.addf("Family", "/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*")
+                self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
+                self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
+
+            self.required(["Vendor", "Family", "Model", "Stepping"])
+            if pexists("/sys/devices/system/cpu/smt/active"):
+                self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
+                self.required("SMT")
+            if extended:
+                if march in ["x86_64", "i386"]:
+                    self.addf("Flags", "/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
+                    self.addf("Microcode", "/proc/cpuinfo", r"microcode\s+:\s(.+)")
+                    self.addf("Bugs", "/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
+                    self.required("Microcode")
+                elif march in ["aarch64"]:
+                    self.addf("Flags", "/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
+        elif ostype == "Darwin":
+            self.addc("Vendor", "sysctl", "-n machdep.cpu.vendor", r"(.*)")
+            self.addc("Name", "sysctl", "-n machdep.cpu.brand_string", r"(.*)")
+            self.addc("Family", "sysctl", "-n machdep.cpu.family", r"(.*)", int)
+            self.addc("Model", "sysctl", "-n machdep.cpu.model", r"(.*)", int)
+            self.addc("Stepping", "sysctl", "-n machdep.cpu.stepping", r"(.*)", int)
 
 
 ################################################################################

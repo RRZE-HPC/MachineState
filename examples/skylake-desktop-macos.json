@@ -1,0 +1,374 @@
+{
+    "CacheTopology": {
+        "L1D": {
+            "CoherencyLineSize": 64,
+            "CpuList": [
+                [
+                    0,
+                    1
+                ],
+                [
+                    2,
+                    3
+                ],
+                [
+                    4,
+                    5
+                ],
+                [
+                    6,
+                    7
+                ]
+            ],
+            "Level": "1",
+            "Size": 32768,
+            "Type": "Data"
+        },
+        "L1I": {
+            "CoherencyLineSize": 64,
+            "CpuList": [
+                [
+                    0,
+                    1
+                ],
+                [
+                    2,
+                    3
+                ],
+                [
+                    4,
+                    5
+                ],
+                [
+                    6,
+                    7
+                ]
+            ],
+            "Level": "1",
+            "Size": 32768,
+            "Type": "Instruction"
+        },
+        "L2": {
+            "Associativity": 4,
+            "CoherencyLineSize": 64,
+            "CpuList": [
+                [
+                    0,
+                    1
+                ],
+                [
+                    2,
+                    3
+                ],
+                [
+                    4,
+                    5
+                ],
+                [
+                    6,
+                    7
+                ]
+            ],
+            "Level": "2",
+            "Size": 262144,
+            "Type": "Unified"
+        },
+        "L3": {
+            "CoherencyLineSize": 64,
+            "CpuList": [
+                [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7
+                ]
+            ],
+            "Level": "3",
+            "Size": 6291456,
+            "Type": "Unified"
+        }
+    },
+    "CompilerInfo": {
+        "C": {
+            "clang": {
+                "Path": "/usr/bin/clang",
+                "Version": "11.0.0"
+            },
+            "gcc": {
+                "Path": "/usr/bin/gcc",
+                "Version": "11.0.0"
+            }
+        },
+        "C++": {
+            "clang++": {
+                "Path": "/usr/bin/clang++",
+                "Version": "11.0.0"
+            },
+            "g++": {
+                "Path": "/usr/bin/g++",
+                "Version": "11.0.0"
+            }
+        },
+        "Fortran": {}
+    },
+    "CpuFrequency": {
+        "Bus": {
+            "MaxFreq": 100000000,
+            "MinFreq": 100000000
+        },
+        "Cpus": {
+            "MaxFreq": 2600000000,
+            "MinFreq": 2600000000
+        },
+        "TimerFreq": 1000000000
+    },
+    "CpuInfo": {
+        "ExtFamily": 0,
+        "ExtFlags": [
+            "SYSCALL",
+            "XD",
+            "1GBPAGE",
+            "EM64T",
+            "LAHF",
+            "LZCNT",
+            "PREFETCHW",
+            "RDTSCP",
+            "TSCI"
+        ],
+        "ExtModel": 5,
+        "Family": 6,
+        "Flags": [
+            "FPU",
+            "VME",
+            "DE",
+            "PSE",
+            "TSC",
+            "MSR",
+            "PAE",
+            "MCE",
+            "CX8",
+            "APIC",
+            "SEP",
+            "MTRR",
+            "PGE",
+            "MCA",
+            "CMOV",
+            "PAT",
+            "PSE36",
+            "CLFSH",
+            "DS",
+            "ACPI",
+            "MMX",
+            "FXSR",
+            "SSE",
+            "SSE2",
+            "SS",
+            "HTT",
+            "TM",
+            "PBE",
+            "SSE3",
+            "PCLMULQDQ",
+            "DTES64",
+            "MON",
+            "DSCPL",
+            "VMX",
+            "EST",
+            "TM2",
+            "SSSE3",
+            "FMA",
+            "CX16",
+            "TPR",
+            "PDCM",
+            "SSE4.1",
+            "SSE4.2",
+            "x2APIC",
+            "MOVBE",
+            "POPCNT",
+            "AES",
+            "PCID",
+            "XSAVE",
+            "OSXSAVE",
+            "SEGLIM64",
+            "TSCTMR",
+            "AVX1.0",
+            "RDRAND",
+            "F16C"
+        ],
+        "Leaf7Flags": [
+            "RDWRFSGS",
+            "TSC_THREAD_OFFSET",
+            "SGX",
+            "BMI1",
+            "HLE",
+            "AVX2",
+            "SMEP",
+            "BMI2",
+            "ERMS",
+            "INVPCID",
+            "RTM",
+            "FPU_CSDS",
+            "MPX",
+            "RDSEED",
+            "ADX",
+            "SMAP",
+            "CLFSOPT",
+            "IPT",
+            "MDCLEAR",
+            "TSXFA",
+            "IBRS",
+            "STIBP",
+            "L1DF",
+            "SSBD"
+        ],
+        "MachineType": "x86_64",
+        "Microcode": "214",
+        "Model": 94,
+        "Name": "Intel(R) Core(TM) i7-6700HQ CPU @ 2.60GHz",
+        "Stepping": 3,
+        "Vendor": "GenuineIntel"
+    },
+    "CpuTopology": {
+        "Cpu0": {
+            "CoreId": 0,
+            "HWThread": 0,
+            "PackageId": 0,
+            "ThreadId": 0
+        },
+        "Cpu1": {
+            "CoreId": 0,
+            "HWThread": 1,
+            "PackageId": 0,
+            "ThreadId": 1
+        },
+        "Cpu2": {
+            "CoreId": 1,
+            "HWThread": 2,
+            "PackageId": 0,
+            "ThreadId": 0
+        },
+        "Cpu3": {
+            "CoreId": 1,
+            "HWThread": 3,
+            "PackageId": 0,
+            "ThreadId": 1
+        },
+        "Cpu4": {
+            "CoreId": 2,
+            "HWThread": 4,
+            "PackageId": 0,
+            "ThreadId": 0
+        },
+        "Cpu5": {
+            "CoreId": 2,
+            "HWThread": 5,
+            "PackageId": 0,
+            "ThreadId": 1
+        },
+        "Cpu6": {
+            "CoreId": 3,
+            "HWThread": 6,
+            "PackageId": 0,
+            "ThreadId": 0
+        },
+        "Cpu7": {
+            "CoreId": 3,
+            "HWThread": 7,
+            "PackageId": 0,
+            "ThreadId": 1
+        }
+    },
+    "HostInfo": {
+        "Domainname": "",
+        "FQDN": "hoersaal-001-233",
+        "Hostname": "hoersaal-001-233"
+    },
+    "LoadAvg": {
+        "LoadAvg15m": 3.13,
+        "LoadAvg1m": 3.41,
+        "LoadAvg5m": 3.31
+    },
+    "MachineState": {
+        "Anonymous": false,
+        "Extended": true,
+        "SchemaVersion": "v1",
+        "Timestamp": "Thu Jul 16 17:39:09 2020",
+        "Version": "0.2.1-dev1"
+    },
+    "MemInfo": {
+        "MemFree": 793284608,
+        "MemTotal": 17179869184,
+        "SwapFree": 1461714944,
+        "SwapTotal": 3221225472
+    },
+    "MpiInfo": {},
+    "NumaNode0": {
+        "CpuList": [
+            [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        ],
+        "MemFree": 793317376,
+        "MemTotal": 17179869184
+    },
+    "OperatingSystemInfo": {
+        "Type": "Darwin",
+        "Version": "10.14.6"
+    },
+    "PythonInfo": {
+        "python": {
+            "Path": "/usr/bin/python",
+            "Version": "2.7.16"
+        },
+        "python3": {
+            "Path": "/usr/local/bin/python3",
+            "Version": "3.8.3"
+        }
+    },
+    "ShellEnvironment": {
+        "Apple_PubSub_Socket_Render": "/private/tmp/com.apple.launchd.2D48w8nt0f/Render",
+        "COLORFGBG": "15;0",
+        "COLORTERM": "truecolor",
+        "DISPLAY": "/private/tmp/com.apple.launchd.ROg4bGgpy4/org.macosforge.xquartz:0",
+        "HOME": "/Users/ub55yzis",
+        "ITERM_PROFILE": "Default",
+        "ITERM_SESSION_ID": "w0t1p0:E935823C-096C-436C-8C63-450DC33746C0",
+        "LANG": "de_DE.UTF-8",
+        "LC_TERMINAL": "iTerm2",
+        "LC_TERMINAL_VERSION": "3.3.7",
+        "LOGNAME": "ub55yzis",
+        "OLDPWD": "/Users/ub55yzis",
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/TeX/texbin:/opt/X11/bin",
+        "PWD": "/Users/ub55yzis/Work/MachineState",
+        "SHELL": "/bin/bash",
+        "SHLVL": "1",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.oaYztAtgd8/Listeners",
+        "TERM": "xterm-256color",
+        "TERM_PROGRAM": "iTerm.app",
+        "TERM_PROGRAM_VERSION": "3.3.7",
+        "TERM_SESSION_ID": "w0t1p0:E935823C-096C-436C-8C63-450DC33746C0",
+        "TMPDIR": "/var/folders/8z/08lw9k1d3ys6zcf75wvhx9g80000gp/T/",
+        "USER": "ub55yzis",
+        "XPC_FLAGS": "0x0",
+        "XPC_SERVICE_NAME": "0",
+        "_": "./machinestate.py",
+        "__CF_USER_TEXT_ENCODING": "0x1F6:0x0:0x3"
+    },
+    "Uptime": {
+        "Uptime": 1311000.0,
+        "UptimeReadable": "Mon May 18 09:29:10 2020"
+    },
+    "UsersInfo": {
+        "LoggedIn": 1
+    }
+}

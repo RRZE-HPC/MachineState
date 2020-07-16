@@ -1,4 +1,13 @@
-os: linux
+os:
+- linux
+- osx
+osx_image:
+- xcode12
+- xcode11.6
+- xcode11.3
+- xcode10.3
+- xcode10.2
+- xcode10.1
 dist: xenial
 arch:
   - amd64
@@ -12,15 +21,11 @@ python:
 - '3.7'
 before_install:
 # Workaround for cacheing issue on travis:
+- if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules fi
+- if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install python fi
 - sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels
 - pip install codecov
 - pip install requests
-- sudo apt-get install slurm slurm-client
-- sudo apt-get install openmpi-bin 
-- sudo apt-get install clang
-- sudo apt-get install gfortran
-- sudo apt-get install clinfo
-- sudo apt-get install environment-modules
   #- if [ $(which mpiexec.hydra 2>/dev/null | wc -l) == "0" ]; then echo "/bin/bash\n\necho \"Intel(R) MPI Library for Linux* OS, Version 2017 Update 4 Build 20170817 (id: 17752)\"" | sudo tee /usr/bin/mpiexec.hydra; sudo chmod +x /usr/bin/mpiexec.hydra; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
 install:

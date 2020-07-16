@@ -1,30 +1,142 @@
-os:
-- linux
-- osx
-osx_image:
-- xcode12
+matrix:
+  include:
+    - name: "Ubuntu Xenial AMD64 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.8
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.8
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.8
+      language: python
+    - name: "MacOS 10.15.5 AMD64 Python 3.7"
+      os: osx
+      osx_image: xcode12
+      arch: amd64
+      language: shell
+      python: 3.7
+      cache:
+        - directories:
+          - $HOME/Library/Caches/pip
+    - name: "MacOS 10.15.5 AMD64 Python 3.8"
+      os: osx
+      osx_image: xcode12
+      arch: amd64
+      language: shell
+      python: 3.8
+      cache:
+        - directories:
+          - $HOME/Library/Caches/pip
+
+
+#os:
+#- linux
+#- osx
+#osx_image:
+#- xcode12
 #- xcode11.6
 #- xcode11.3
 #- xcode10.3
 #- xcode10.2
 #- xcode10.1
-dist: xenial
-arch:
-  - amd64
-  - ppc64le
-  - arm64
-language: python
-python:
-- '3.4'
-- '3.5'
-- '3.6'
-- '3.7'
+#dist: xenial
+#arch:
+#  - amd64
+#  - ppc64le
+#  - arm64
+#language: python
+#python:
+#- '3.4'
+#- '3.5'
+#- '3.6'
+#- '3.7'
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" -a "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install likwid; fi
-- if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install python; fi
+#- if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install python; fi
 # Workaround for cacheing issue on travis:
-- if [ -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi
+- if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi
 - pip install codecov
 - pip install requests
 install:
@@ -42,7 +154,7 @@ script:
 after_success:
 - coverage combine
 - codecov
-- if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
+#- if [ "$TRAVIS_CPU_ARCH" == "amd64" ]; then likwid-features -c 0 -l; likwid-powermeter -i; ls /sys/devices/platform/coretemp*; ls /sys/devices/virtual/thermal/thermal_zone*; fi
 deploy:
   provider: pypi
   username: "__token__"

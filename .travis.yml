@@ -149,6 +149,7 @@ matrix:
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" -a "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install likwid; fi
+- brew search python
 - if [ "$TRAVIS_OS_NAME" == "osx" -a ! -z "$OSX_PY_VERSION" ]; then brew upgrade "python@$OSX_PY_VERSION"; fi
 # Workaround for cacheing issue on travis:
 - if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi

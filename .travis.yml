@@ -90,19 +90,29 @@ matrix:
     #   arch: arm64
     #   python: 3.8
     #   language: python
-    - name: "MacOS 10.15.5 AMD64 Python 3.7"
+    - name: "MacOS 10.15.5 AMD64 Python 3.8"
       os: osx
       osx_image: xcode12
       arch: amd64
       language: shell
-      python: 3.7
-      env: MS_PY_VERSION="3.7"
+      python: 3.8
+      env: MS_PY_VERSION="3.8"
       cache:
         - directories:
           - $HOME/Library/Caches/pip
-    - name: "MacOS 10.15.5 AMD64 Python 3.8"
+    - name: "MacOS 10.14.6 AMD64 Python 3.8"
       os: osx
-      osx_image: xcode12
+      osx_image: xcode11.3
+      arch: amd64
+      language: shell
+      python: 3.8
+      env: MS_PY_VERSION="3.8"
+      cache:
+        - directories:
+          - $HOME/Library/Caches/pip
+    - name: "MacOS 10.13 AMD64 Python 3.8"
+      os: osx
+      osx_image: xcode10.1
       arch: amd64
       language: shell
       python: 3.8
@@ -142,6 +152,7 @@ before_install:
 - pip3 install codecov
 - pip3 install requests
 - python3 --version
+- python --version
 - which python
 - which python3
 install:

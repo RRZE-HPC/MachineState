@@ -95,31 +95,34 @@ matrix:
       osx_image: xcode12
       arch: amd64
       language: shell
-      python: 3.8
-      env: MS_PY_VERSION="3.8"
       cache:
         - directories:
           - $HOME/Library/Caches/pip
-    - name: "MacOS 10.14.6 AMD64 Python 3.8"
+    - name: "MacOS 10.15.5 AMD64 Python 3.7"
       os: osx
-      osx_image: xcode11.3
+      osx_image: xcode12
       arch: amd64
       language: shell
-      python: 3.8
-      env: MS_PY_VERSION="3.8"
+      env: OSX_PY_VERSION="3.7"
       cache:
         - directories:
           - $HOME/Library/Caches/pip
-    - name: "MacOS 10.13 AMD64 Python 3.8"
-      os: osx
-      osx_image: xcode10.1
-      arch: amd64
-      language: shell
-      python: 3.8
-      env: MS_PY_VERSION="3.8"
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.14.6 AMD64 Python 3.7"
+    #   os: osx
+    #   osx_image: xcode11.3
+    #   arch: amd64
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.13 AMD64 Python 3.7"
+    #   os: osx
+    #   osx_image: xcode10.1
+    #   arch: amd64
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
 
 
 #os:
@@ -146,7 +149,7 @@ matrix:
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi
 - if [ "$TRAVIS_CPU_ARCH" == "amd64" -a "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install likwid; fi
-- if [ "$TRAVIS_OS_NAME" == "osx" -a "$(which python3 2>/dev/null | wc -l)" == "0" ]; then brew install "python@$MS_PY_VERSION"; fi
+- if [ "$TRAVIS_OS_NAME" == "osx" -a ! -z "$OSX_PY_VERSION" ]; then brew upgrade "python@$OSX_PY_VERSION"; fi
 # Workaround for cacheing issue on travis:
 - if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi
 - pip3 install codecov

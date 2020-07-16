@@ -1008,8 +1008,20 @@ class MachineState(MultiClassInfoGroup):
             self.classlist = [
                 MachineStateInfo,
                 HostInfo,
-                CpuInfo,
-                OSInfo
+                CpuInfoMacOS,
+                OSInfoMacOS,
+                CacheTopologyMacOS,
+                CpuTopologyMacOS,
+                CpuFrequencyMacOs,
+                UptimeMacOs,
+                UsersInfo,
+                ShellEnvironment,
+                PythonInfo,
+                CompilerInfo,
+                LoadAvgMacOs,
+                MemInfoMacOS,
+                MpiInfo,
+                NumaInfoMacOS,
             ]
             self.classargs = [{} for x in self.classlist]
     def get_config(self, sort=False, intend=4):
@@ -1026,6 +1038,16 @@ class MachineState(MultiClassInfoGroup):
 ################################################################################
 # Infos about operating system
 ################################################################################
+class OSInfoMacOS(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(OSInfoMacOS, self).__init__(anonymous=anonymous, extended=extended)
+        self.name = "OperatingSystemInfo"
+        ostype = get_ostype()
+        self.const("Type", ostype)
+        self.required("Type")
+        self.addc("Version", "sysctl", "-n kern.osproductversion", r"([\d\.]+)")
+        self.required("Version")
+
 class OSInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(OSInfo, self).__init__(anonymous=anonymous, extended=extended)
@@ -1033,15 +1055,12 @@ class OSInfo(InfoGroup):
         ostype = get_ostype()
         self.const("Type", ostype)
         self.required("Type")
-        if ostype == "Linux":
-            self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
-            self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
+        self.addf("Name", "/etc/os-release", r"NAME=[\"]*([^\"]+)[\"]*\s*")
+        self.addf("Version", "/etc/os-release", r"VERSION=[\"]*([^\"]+)[\"]*\s*")
 
-            self.required(["Name", "Version"])
-            if extended:
-                self.addf("URL", "/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
-        elif ostype == "Darwin":
-            self.addc("Version", "uname", "-r", r"([\d\.]+)")
+        self.required(["Name", "Version"])
+        if extended:
+            self.addf("URL", "/etc/os-release", r"HOME_URL=[\"]*([^\"]+)[\"]*\s*")
 
 ################################################################################
 # Infos about NUMA balancing
@@ -1078,55 +1097,90 @@ class HostInfo(InfoGroup):
 ################################################################################
 # Infos about the CPU
 ################################################################################
+
+class CpuInfoMacOS(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuInfoMacOS, self).__init__(name="CpuInfo", extended=extended, anonymous=anonymous)
+        self.const("MachineType", platform.machine())
+        self.addc("Vendor", "sysctl", "-a", r"machdep.cpu.vendor: (.*)")
+        self.addc("Name", "sysctl", "-a", r"machdep.cpu.brand_string: (.*)")
+        self.addc("Family", "sysctl", "-a", r"machdep.cpu.family: (\d+)", int)
+        self.addc("Model", "sysctl", "-a", r"machdep.cpu.model: (\d+)", int)
+        self.addc("Stepping", "sysctl", "-a", r"machdep.cpu.stepping: (\d+)", int)
+        if extended:
+            self.addc("Flags", "sysctl", "-a", r"machdep.cpu.features: (.*)", tostrlist)
+            self.addc("ExtFlags", "sysctl", "-a", r"machdep.cpu.extfeatures: (.*)", tostrlist)
+            self.addc("Leaf7Flags", "sysctl", "-a", r"machdep.cpu.leaf7_features: (.*)", tostrlist)
+            self.addc("Microcode", "sysctl", "-a", r"machdep.cpu.microcode_version: (.*)")
+            self.addc("ExtFamily", "sysctl", "-a", r"machdep.cpu.extfamily: (\d+)", int)
+            self.addc("ExtModel", "sysctl", "-a", r"machdep.cpu.extmodel: (\d+)", int)
+        self.required(["Vendor", "Family", "Model", "Stepping"])
+
 class CpuInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(CpuInfo, self).__init__(name="CpuInfo", extended=extended, anonymous=anonymous)
         march = platform.machine()
         self.const("MachineType", march)
-        ostype = get_ostype()
-        if ostype == "Linux":
+
+        if march in ["x86_64", "i386"]:
+            self.addf("Vendor", "/proc/cpuinfo", r"vendor_id\s+:\s(.*)")
+            self.addf("Name", "/proc/cpuinfo", r"model name\s+:\s(.+)")
+            self.addf("Family", "/proc/cpuinfo", r"cpu family\s+:\s(.+)", int)
+            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)", int)
+            self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
+        elif march in ["aarch64"]:
+            self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
+            self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
+            self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
+        elif march in ["ppc64le", "ppc64"]:
+            self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
+            self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")
+            self.addf("Family", "/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*")
+            self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
+            self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
+
+        
+        if pexists("/sys/devices/system/cpu/smt/active"):
+            self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
+            self.required("SMT")
+        if extended:
             if march in ["x86_64", "i386"]:
-                self.addf("Vendor", "/proc/cpuinfo", r"vendor_id\s+:\s(.*)")
-                self.addf("Name", "/proc/cpuinfo", r"model name\s+:\s(.+)")
-                self.addf("Family", "/proc/cpuinfo", r"cpu family\s+:\s(.+)", int)
-                self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)", int)
-                self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
+                self.addf("Flags", "/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
+                self.addf("Microcode", "/proc/cpuinfo", r"microcode\s+:\s(.+)")
+                self.addf("Bugs", "/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
+                self.required("Microcode")
             elif march in ["aarch64"]:
-                self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
-                self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
-                self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
-                self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
-                self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
-            elif march in ["ppc64le", "ppc64"]:
-                self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
-                self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")
-                self.addf("Family", "/proc/cpuinfo", r"cpu\s+:\s(POWER\d+).*")
-                self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
-                self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
+                self.addf("Flags", "/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
 
-            self.required(["Vendor", "Family", "Model", "Stepping"])
-            if pexists("/sys/devices/system/cpu/smt/active"):
-                self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
-                self.required("SMT")
-            if extended:
-                if march in ["x86_64", "i386"]:
-                    self.addf("Flags", "/proc/cpuinfo", r"flags\s+:\s(.+)", tostrlist)
-                    self.addf("Microcode", "/proc/cpuinfo", r"microcode\s+:\s(.+)")
-                    self.addf("Bugs", "/proc/cpuinfo", r"bugs\s+:\s(.+)", tostrlist)
-                    self.required("Microcode")
-                elif march in ["aarch64"]:
-                    self.addf("Flags", "/proc/cpuinfo", r"Features\s+:\s(.+)", tostrlist)
-        elif ostype == "Darwin":
-            self.addc("Vendor", "sysctl", "-n machdep.cpu.vendor", r"(.*)")
-            self.addc("Name", "sysctl", "-n machdep.cpu.brand_string", r"(.*)")
-            self.addc("Family", "sysctl", "-n machdep.cpu.family", r"(.*)", int)
-            self.addc("Model", "sysctl", "-n machdep.cpu.model", r"(.*)", int)
-            self.addc("Stepping", "sysctl", "-n machdep.cpu.stepping", r"(.*)", int)
-
+        self.required(["Vendor", "Family", "Model", "Stepping"])
 
 ################################################################################
 # CPU Topology
 ################################################################################
+class CpuTopologyMacOSClass(InfoGroup):
+    def __init__(self, ident, extended=False, anonymous=False, ncpu=1, ncores=1, ncores_pack=1):
+        super(CpuTopologyMacOSClass, self).__init__(anonymous=anonymous, extended=extended)
+        self.name = "Cpu{}".format(ident)
+        smt = ncpu/ncores
+        self.const("ThreadId", int(ident % smt))
+        self.const("CoreId", int(ident//smt))
+        self.const("PackageId", int(ident//ncores_pack))
+        self.const("HWThread", ident)
+
+class CpuTopologyMacOS(ListInfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuTopologyMacOS, self).__init__(anonymous=anonymous, extended=extended)
+        self.name = "CpuTopology"
+        ncpu = process_cmd(("sysctl", "-a", r"hw.logicalcpu: (\d+)", int))
+        ncores_pack = process_cmd(("sysctl", "-a", r"machdep.cpu.cores_per_package: (\d+)", int))
+        ncores = process_cmd(("sysctl", "-a", r"machdep.cpu.core_count: (\d+)", int))
+        if isinstance(ncpu, int) and isinstance(ncores_pack, int) and isinstance(ncores, int):
+            self.userlist = list(range(ncpu))
+            self.subclass = CpuTopologyMacOSClass
+            self.subargs = {"ncpu" : ncpu, "ncores" : ncores, "ncores_pack" : ncores_pack}
+
 class CpuTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
         super(CpuTopologyClass, self).__init__(anonymous=anonymous, extended=extended)
@@ -1228,6 +1282,28 @@ class CpuTopology(PathMatchInfoGroup):
 ################################################################################
 # CPU Frequency
 ################################################################################
+class CpuFrequencyMacOsCpu(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuFrequencyMacOsCpu, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = "Cpus"
+        self.addc("MaxFreq", "sysctl", "-a", r"hw.cpufrequency_max: (\d+)", int)
+        self.addc("MinFreq", "sysctl", "-a", r"hw.cpufrequency_min: (\d+)", int)
+
+class CpuFrequencyMacOsBus(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuFrequencyMacOsBus, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = "Bus"
+        self.addc("MaxFreq", "sysctl", "-a", r"hw.busfrequency_max: (\d+)", int)
+        self.addc("MinFreq", "sysctl", "-a", r"hw.busfrequency_min: (\d+)", int)
+
+class CpuFrequencyMacOs(MultiClassInfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CpuFrequencyMacOs, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = "CpuFrequency"
+        self.classlist = [CpuFrequencyMacOsCpu, CpuFrequencyMacOsBus]
+        self.classargs = [{} for c in self.classlist]
+        self.addc("TimerFreq", "sysctl", "-a", r"hw.tbfrequency: (\d+)", int)
+
 class CpuFrequencyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
         super(CpuFrequencyClass, self).__init__(anonymous=anonymous, extended=extended)
@@ -1277,6 +1353,23 @@ class CpuFrequency(PathMatchInfoGroup):
 ################################################################################
 # NUMA Topology
 ################################################################################
+class NumaInfoMacOS(InfoGroup):
+    def __init__(self, anonymous=False, extended=False):
+        super(NumaInfoMacOS, self).__init__(anonymous=anonymous, extended=extended)
+        self.name = "NumaNode0"
+        self.addc("MemTotal", "sysctl", "-a", r"hw.memsize: (\d+)", int)
+        self.addc("MemFree", "sysctl", "-a", r"vm.page_free_count: (\d+)", MemInfoMacOS.pagescale)
+        self.addc("CpuList", "sysctl", "-a", r"hw.cacheconfig: (\d+)", NumaInfoMacOS.cpulist)
+    @staticmethod
+    def cpulist(value):
+        ncpu = process_cmd(("sysctl", "-n hw.ncpu", r"(\d+)", int))
+        clist = []
+        if isinstance(ncpu, int):
+            for i in range(ncpu//int(value)):
+                clist.append(list(range(i*ncpu, (i+1)*ncpu)))
+        return clist
+
+
 class NumaInfoHugepagesClass(InfoGroup):
     def __init__(self, size, extended=False, anonymous=False, node=0):
         name = "Hugepages-{}".format(size)
@@ -1321,6 +1414,50 @@ class NumaInfo(PathMatchInfoGroup):
 ################################################################################
 # Cache Topology
 ################################################################################
+class CacheTopologyMacOSClass(InfoGroup):
+    def __init__(self, ident, extended=False, anonymous=False):
+        super(CacheTopologyMacOSClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = ident.upper()
+        self.addc("Size", "sysctl", "-n hw.{}cachesize".format(ident), r"(\d+)", int)
+        self.const("Level", re.match(r"l(\d+)[id]*", ident).group(1))
+        if re.match(r"l\d+([id]*)", ident).group(1) == 'i':
+            self.const("Type", "Instruction")
+        elif re.match(r"l\d+([id]*)", ident).group(1) == 'd':
+            self.const("Type", "Data")
+        else:
+            self.const("Type", "Unified")
+        self.const("CpuList", CacheTopologyMacOSClass.getcpulist(ident))
+        if extended:
+            self.addc("CoherencyLineSize", "sysctl", "-n hw.cachelinesize", r"(\d+)", int)
+            key = "machdep.cpu.cache.{}_associativity".format(self.name)
+            out = process_cmd(("sysctl", "-n {}".format(key), r"(\d+)", int))
+            if isinstance(out, int):
+                self.addc("Associativity", "sysctl", "-n {}".format(key), r"(\d+)", int)
+    @staticmethod
+    def getcpulist(arg):
+        clist = []
+        level = re.match(r"l(\d+)[id]*", arg).group(1)
+        if level and int(level) > 0:
+            ncpus = process_cmd(("sysctl", "-n hw.ncpu", r"(\d+)", int))
+            cconfig = process_cmd(("sysctl", "-n hw.cacheconfig", r"([\d\s]+)", tointlist))
+            if cconfig and ncpus:
+                if len(cconfig) > int(level):
+                    sharedbycount = int(cconfig[int(level)])
+                    for i in range(ncpus//sharedbycount):
+                        clist.append(list(range(i*sharedbycount, (i+1)*sharedbycount)))
+        return clist
+
+
+
+class CacheTopologyMacOS(ListInfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(CacheTopologyMacOS, self).__init__(anonymous=anonymous, extended=extended)
+        self.name = "CacheTopology"
+        self.userlist = ["l1i", "l1d", "l2", "l3"]
+        self.subclass = CacheTopologyMacOSClass
+
+
+
 class CacheTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
         super(CacheTopologyClass, self).__init__(extended=extended, anonymous=anonymous)
@@ -1392,6 +1529,33 @@ class CacheTopology(PathMatchInfoGroup):
 ################################################################################
 # Infos about the uptime of the system
 ################################################################################
+class UptimeMacOs(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(UptimeMacOs, self).__init__(name="Uptime", extended=extended, anonymous=anonymous)
+        timematch = re.compile(r"\d+:\d+.*\s+(\d+:\d+).*")
+        self.addc("Uptime", "uptime", cmd_opts=None, match=r"(.*)", parse=UptimeMacOs.parsetime)
+        self.addc("UptimeReadable", "uptime", None, None, UptimeMacOs.parsereadable)
+        self.required("Uptime")
+    @staticmethod
+    def parsetime(string):
+        timematch = re.compile(r"\d+:\d+.*\s+(\d+):(\d+).*")
+        daymatch = re.compile(r"\d+:\d+\s+up (\d+) days.*")
+        tm = timematch.match(string)
+        if tm:
+            days = 0
+            dm = daymatch.match(string)
+            if dm:
+                days = dm.group(1)
+            hours, minutes = tm.groups()
+            uptime = int(days) * 86400 + int(hours) * 3600 + int(minutes) * 60
+            return float(uptime)
+        return None
+    @staticmethod
+    def parsereadable(string):
+        uptime = UptimeMacOs.parsetime(string)
+        return Uptime.totimedelta(uptime)
+
+
 class Uptime(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(Uptime, self).__init__(name="Uptime", extended=extended, anonymous=anonymous)
@@ -1422,6 +1586,14 @@ class Uptime(InfoGroup):
 ################################################################################
 # Infos about the load of the system
 ################################################################################
+class LoadAvgMacOs(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(LoadAvgMacOs, self).__init__(name="LoadAvg", extended=extended, anonymous=anonymous)
+        self.addc("LoadAvg1m", "uptime", None, r".*load averages:\s+([\d\.]+)", float)
+        self.addc("LoadAvg5m", "uptime", None, r".*load averages:\s+[\d\.]+\s+([\d+\.]+)", float)
+        self.addc("LoadAvg15m", "uptime", None, r".*load averages:\s+[\d\.]+\s+[\d+\.]+\s+([\d+\.]+)", float)
+
+
 class LoadAvg(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(LoadAvg, self).__init__(name="LoadAvg", extended=extended, anonymous=anonymous)
@@ -1439,6 +1611,21 @@ class LoadAvg(InfoGroup):
 ################################################################################
 # Infos about the memory of the system
 ################################################################################
+class MemInfoMacOS(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(MemInfoMacOS, self).__init__(name="MemInfo", extended=extended, anonymous=anonymous)
+        self.addc("MemTotal", "sysctl", "-a", r"hw.memsize: (\d+)", int)
+        self.addc("MemFree", "sysctl", "-a", r"vm.page_free_count: (\d+)", MemInfoMacOS.pagescale)
+        self.addc("SwapTotal", "sysctl", "-a", r"vm.swapusage: total =\s+([\d\,M]+)", MemInfoMacOS.tobytes)
+        self.addc("SwapFree", "sysctl", "-a", r"vm.swapusage:.*free =\s+([\d\,M]+)", MemInfoMacOS.tobytes)
+        self.required(["MemFree", "MemTotal"])
+    @staticmethod
+    def pagescale(string):
+        pagesize = process_cmd(("sysctl", "-n vm.pagesize", r"(\d+)", int))
+        return int(string) * pagesize
+    def tobytes(string):
+        return int(float(string) * 1024**2)
+
 class MemInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(MemInfo, self).__init__(name="MemInfo", extended=extended, anonymous=anonymous)

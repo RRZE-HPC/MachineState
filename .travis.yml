@@ -139,10 +139,13 @@ before_install:
 - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install "python@$MS_PY_VERSION"; fi
 # Workaround for cacheing issue on travis:
 - if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi
-- pip install codecov
-- pip install requests
+- pip3 install codecov
+- pip3 install requests
+- python3 --version
+- which python
+- which python3
 install:
-- pip install -e .
+- pip3 install -e .
 script:
 - coverage run -p tests/all_tests.py
 - coverage run -p `which machinestate` -e -s -i 4

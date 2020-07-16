@@ -7,11 +7,13 @@ Introduction
 This script should be executed before running benchmarks to determine the
 current system settings and the execution enviroment.
 
-Most information is gathered from sysfs/procfs files to reduce the dependecies.
+On Linux, most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
+On MacOS, most information is gathered through the `sysctl` command.
 
-An example JSON (in extended mode) from an Intel Skylake Desktop system can be found [here](./examples/skylake-desktop.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop.json)).
+An example JSON (in extended mode) from an Intel Skylake Desktop system running Linux can be found [here](./examples/skylake-desktop.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop.json)).
+An example JSON (in extended mode) from an Intel Skylake Desktop system running Linux can be found [here](./examples/skylake-desktop-macos.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop-macos.json)). 
 
 [![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 

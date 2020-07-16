@@ -124,34 +124,12 @@ matrix:
     #     - directories:
     #       - $HOME/Library/Caches/pip
 
-
-#os:
-#- linux
-#- osx
-#osx_image:
-#- xcode12
-#- xcode11.6
-#- xcode11.3
-#- xcode10.3
-#- xcode10.2
-#- xcode10.1
-#dist: xenial
-#arch:
-#  - amd64
-#  - ppc64le
-#  - arm64
-#language: python
-#python:
-#- '3.4'
-#- '3.5'
-#- '3.6'
-#- '3.7'
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi
 - brew search python
 - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install slurm open-mpi gcc clinfo modules; export PATH="/usr/local/opt/gcc@10/bin":$PATH; export CC=gcc-10; export CXX=g++-10; export FC=gfortran; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" -a "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
-- if [ "$TRAVIS_OS_NAME" == "osx" -a ! -z "$OSX_PY_VERSION" ]; then brew install "python@$OSX_PY_VERSION"; export PATH="/usr/local/opt/python@$OSX_PY_VERSION/bin:$PATH; fi
+- if [ "$TRAVIS_OS_NAME" == "osx" -a ! -z "$OSX_PY_VERSION" ]; then brew install "python@$OSX_PY_VERSION"; export PATH="/usr/local/opt/python@$OSX_PY_VERSION/bin":$PATH; fi
 
 # Workaround for cacheing issue on travis:
 - if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi

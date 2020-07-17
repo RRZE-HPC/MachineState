@@ -138,7 +138,7 @@ NVIDIA_PATH = "/opt/nvidia/bin"
 ################################################################################
 # Version information
 ################################################################################
-MACHINESTATE_VERSION = "0.2"
+MACHINESTATE_VERSION = "0.3"
 MACHINESTATE_SCHEMA_VERSION = "v1"
 __version__ = MACHINESTATE_VERSION
 

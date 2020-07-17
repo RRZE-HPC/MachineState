@@ -1,95 +1,95 @@
 matrix:
   include:
-    # - name: "Ubuntu Xenial AMD64 Python 3.4"
-    #   os: linux
-    #   dist: xenial
-    #   arch: amd64
-    #   python: 3.4
-    #   language: python
-    # - name: "Ubuntu Xenial AMD64 Python 3.5"
-    #   os: linux
-    #   dist: xenial
-    #   arch: amd64
-    #   python: 3.5
-    #   language: python
-    # - name: "Ubuntu Xenial AMD64 Python 3.6"
-    #   os: linux
-    #   dist: xenial
-    #   arch: amd64
-    #   python: 3.6
-    #   language: python
-    # - name: "Ubuntu Xenial AMD64 Python 3.7"
-    #   os: linux
-    #   dist: xenial
-    #   arch: amd64
-    #   python: 3.7
-    #   language: python
-    # - name: "Ubuntu Xenial AMD64 Python 3.8"
-    #   os: linux
-    #   dist: xenial
-    #   arch: amd64
-    #   python: 3.8
-    #   language: python
-    # - name: "Ubuntu Xenial PPC64 Python 3.4"
-    #   os: linux
-    #   dist: xenial
-    #   arch: ppc64le
-    #   python: 3.4
-    #   language: python
-    # - name: "Ubuntu Xenial PPC64 Python 3.5"
-    #   os: linux
-    #   dist: xenial
-    #   arch: ppc64le
-    #   python: 3.5
-    #   language: python
-    # - name: "Ubuntu Xenial PPC64 Python 3.6"
-    #   os: linux
-    #   dist: xenial
-    #   arch: ppc64le
-    #   python: 3.6
-    #   language: python
-    # - name: "Ubuntu Xenial PPC64 Python 3.7"
-    #   os: linux
-    #   dist: xenial
-    #   arch: ppc64le
-    #   python: 3.7
-    #   language: python
-    # - name: "Ubuntu Xenial PPC64 Python 3.8"
-    #   os: linux
-    #   dist: xenial
-    #   arch: ppc64le
-    #   python: 3.8
-    #   language: python
-    # - name: "Ubuntu Xenial ARM8 Python 3.4"
-    #   os: linux
-    #   dist: xenial
-    #   arch: arm64
-    #   python: 3.4
-    #   language: python
-    # - name: "Ubuntu Xenial ARM8 Python 3.5"
-    #   os: linux
-    #   dist: xenial
-    #   arch: arm64
-    #   python: 3.5
-    #   language: python
-    # - name: "Ubuntu Xenial ARM8 Python 3.6"
-    #   os: linux
-    #   dist: xenial
-    #   arch: arm64
-    #   python: 3.6
-    #   language: python
-    # - name: "Ubuntu Xenial ARM8 Python 3.7"
-    #   os: linux
-    #   dist: xenial
-    #   arch: arm64
-    #   python: 3.7
-    #   language: python
-    # - name: "Ubuntu Xenial ARM8 Python 3.8"
-    #   os: linux
-    #   dist: xenial
-    #   arch: arm64
-    #   python: 3.8
-    #   language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial AMD64 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: amd64
+      python: 3.8
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial PPC64 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: ppc64le
+      python: 3.8
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.4"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.4
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.5"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.5
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.6"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.6
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.7"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.7
+      language: python
+    - name: "Ubuntu Xenial ARM8 Python 3.8"
+      os: linux
+      dist: xenial
+      arch: arm64
+      python: 3.8
+      language: python
     - name: "MacOS 10.15.5 AMD64 Python 3.8"
       os: osx
       osx_image: xcode12
@@ -129,7 +129,6 @@ matrix:
       osx_image: xcode10.1
       arch: amd64
       language: shell
-      env: OSX_PY_VERSION="3.8"
       cache:
         - directories:
           - $HOME/Library/Caches/pip
@@ -137,33 +136,14 @@ matrix:
       os: osx
       osx_image: xcode10.1
       arch: amd64
-      language: shell
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.12 AMD64 Python 3.8"
-      os: osx
-      osx_image: xcode9.2
-      arch: amd64
-      language: shell
-      env: OSX_PY_VERSION="3.8"
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.12 AMD64 Python 3.7"
-      os: osx
-      osx_image: xcode9.2
-      arch: amd64
-      language: shell
       env: OSX_PY_VERSION="3.7"
+      language: shell
       cache:
         - directories:
           - $HOME/Library/Caches/pip
 
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi
-- brew update
-- brew search python
 - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install slurm open-mpi gcc clinfo modules; export PATH="/usr/local/opt/gcc@10/bin":$PATH; export CC=gcc-10; export CXX=g++-10; export FC=gfortran; fi
 - if [ "$TRAVIS_OS_NAME" == "linux" -a "$TRAVIS_CPU_ARCH" == "amd64" ]; then sudo apt-get install likwid; fi
 - if [ "$TRAVIS_OS_NAME" == "osx" -a ! -z "$OSX_PY_VERSION" ]; then brew install "python@$OSX_PY_VERSION"; export PATH="/usr/local/opt/python@$OSX_PY_VERSION/bin":$PATH; fi
@@ -172,10 +152,6 @@ before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" -a -e ~/.cache/pip/wheels ]; then sudo chown -Rv $USER:$GROUP ~/.cache/pip/wheels; fi
 - pip3 install codecov
 - pip3 install requests
-- python3 --version
-- python --version
-- which python
-- which python3
 install:
 - pip3 install -e .
 script:

@@ -38,26 +38,41 @@ $ python3
 
 The module cannot be used with Python2!
 
+The module is tested on Ubuntu Xenial for Python versions 3.4, 3.5, 3.6, 3.7 and 3.8 for the architectures AMD64, PPC64le and ARM8. For macOS, only Python versions 3.7 and 3.8 for the AMD64 architecture are tested.
+
 
 
 --------------------------------------------------------------------------------
 Checks
 --------------------------------------------------------------------------------
-- Hostname, operating system and kernel version
-- Users that are logged into the system that might disturb the runs
-- CPU information (family, model, vulnerabilities, ...) and cpuset
-- CPU, cache and NUMA topology
-- CPU/Uncore frequency settings (Uncore only if LIKWID is available)
-- Prefetchers and turbo frequencies (if LIKWID is available)
+General:
+- Hostname
 - The current load of the system
-- OS settings (NUMA balancing, huge pages, transparent huge pages, ...)
-- Power contraints (RAPL limits)
+- Number of users that are logged into the system that might disturb the runs
+- Shell environment
 - Module system
 - Installed compilers and MPI implementations
-- Shell environment
+- Information about the executable (if command is passed as cli argument)
+
+Linux:
+- Operating system and kernel version
+- CPU information (family, model, vulnerabilities, ...) and cpuset
+- CPU, cache and NUMA topology
+- CPU frequency settings
+- Memory information
+- Uncore frequency settings (Uncore only if LIKWID is available)
+- Prefetchers and turbo frequencies (if LIKWID is available)
+- OS settings (NUMA balancing, huge pages, transparent huge pages, ...)
+- Power contraints (RAPL limits)
 - Accelerator information (Nvidida GPUs and NEC Tsubasa)
 - Dmidecode system configuration (if available)
-- Information about the executable (if command is passed as cli argument)
+
+macOS:
+- Operating system version
+- CPU information (family, model, ...)
+- CPU, cache and NUMA topology
+- CPU frequency settings
+- Memory information
 
 **All sizes are converted to bytes, all frequencies are converted to Hz**
 

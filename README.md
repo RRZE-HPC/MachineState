@@ -7,11 +7,14 @@ Introduction
 This script should be executed before running benchmarks to determine the
 current system settings and the execution enviroment.
 
-Most information is gathered from sysfs/procfs files to reduce the dependecies.
+On Linux, most information is gathered from sysfs/procfs files to reduce the dependecies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
+On MacOS, most information is gathered through the `sysctl` command.
 
-An example JSON (in extended mode) from an Intel Skylake Desktop system can be found [here](./examples/skylake-desktop.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop.json)).
+An example JSON (in extended mode) from an Intel Skylake Desktop system running Linux can be found [here](./examples/skylake-desktop.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop.json)).
+
+An example JSON (in extended mode) from an Intel Skylake Desktop system running macOS can be found [here](./examples/skylake-desktop-macos.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop-macos.json)). 
 
 [![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 
@@ -36,26 +39,41 @@ $ python3
 
 The module cannot be used with Python2!
 
+The module is tested on Ubuntu Xenial for Python versions 3.4, 3.5, 3.6, 3.7 and 3.8 for the architectures AMD64, PPC64le and ARM8. For macOS, only Python versions 3.7 and 3.8 for the AMD64 architecture are tested.
+
 
 
 --------------------------------------------------------------------------------
 Checks
 --------------------------------------------------------------------------------
-- Hostname, operating system and kernel version
-- Users that are logged into the system that might disturb the runs
-- CPU information (family, model, vulnerabilities, ...) and cpuset
-- CPU, cache and NUMA topology
-- CPU/Uncore frequency settings (Uncore only if LIKWID is available)
-- Prefetchers and turbo frequencies (if LIKWID is available)
+General:
+- Hostname
 - The current load of the system
-- OS settings (NUMA balancing, huge pages, transparent huge pages, ...)
-- Power contraints (RAPL limits)
+- Number of users that are logged into the system that might disturb the runs
+- Shell environment
 - Module system
 - Installed compilers and MPI implementations
-- Shell environment
+- Information about the executable (if command is passed as cli argument)
+
+Linux:
+- Operating system and kernel version
+- CPU information (family, model, vulnerabilities, ...) and cpuset
+- CPU, cache and NUMA topology
+- CPU frequency settings
+- Memory information
+- Uncore frequency settings (Uncore only if LIKWID is available)
+- Prefetchers and turbo frequencies (if LIKWID is available)
+- OS settings (NUMA balancing, huge pages, transparent huge pages, ...)
+- Power contraints (RAPL limits)
 - Accelerator information (Nvidida GPUs and NEC Tsubasa)
 - Dmidecode system configuration (if available)
-- Information about the executable (if command is passed as cli argument)
+
+macOS:
+- Operating system version
+- CPU information (family, model, ...)
+- CPU, cache and NUMA topology
+- CPU frequency settings
+- Memory information
 
 **All sizes are converted to bytes, all frequencies are converted to Hz**
 

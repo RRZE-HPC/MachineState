@@ -28,7 +28,7 @@ setup(name='MachineState',
     author_email='thomas.gruber@fau.de',
 
     # The project's main homepage.
-    url='https://github.com/RRZE-HPC/Artifact-description',
+    url='https://github.com/RRZE-HPC/MachineState',
 
     # License
     license='GPLv3',

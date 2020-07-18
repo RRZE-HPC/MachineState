@@ -1,146 +1,236 @@
 matrix:
   include:
-    - name: "Ubuntu Xenial AMD64 Python 3.4"
+    # - name: "Ubuntu Xenial AMD64 Python 3.4"
+    #   os: linux
+    #   dist: xenial
+    #   arch: amd64
+    #   python: 3.4
+    #   language: python
+    # - name: "Ubuntu Xenial AMD64 Python 3.5"
+    #   os: linux
+    #   dist: xenial
+    #   arch: amd64
+    #   python: 3.5
+    #   language: python
+    # - name: "Ubuntu Xenial AMD64 Python 3.6"
+    #   os: linux
+    #   dist: xenial
+    #   arch: amd64
+    #   python: 3.6
+    #   language: python
+    # - name: "Ubuntu Xenial AMD64 Python 3.7"
+    #   os: linux
+    #   dist: xenial
+    #   arch: amd64
+    #   python: 3.7
+    #   language: python
+    # - name: "Ubuntu Xenial AMD64 Python 3.8"
+    #   os: linux
+    #   dist: xenial
+    #   arch: amd64
+    #   python: 3.8
+    #   language: python
+    - name: "Ubuntu Bionic AMD64 Python 3.4"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: amd64
       python: 3.4
       language: python
-    - name: "Ubuntu Xenial AMD64 Python 3.5"
+    - name: "Ubuntu Bionic AMD64 Python 3.5"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: amd64
       python: 3.5
       language: python
-    - name: "Ubuntu Xenial AMD64 Python 3.6"
+    - name: "Ubuntu Bionic AMD64 Python 3.6"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: amd64
       python: 3.6
       language: python
-    - name: "Ubuntu Xenial AMD64 Python 3.7"
+    - name: "Ubuntu Bionic AMD64 Python 3.7"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: amd64
       python: 3.7
       language: python
-    - name: "Ubuntu Xenial AMD64 Python 3.8"
+    - name: "Ubuntu Bionic AMD64 Python 3.8"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: amd64
       python: 3.8
       language: python
-    - name: "Ubuntu Xenial PPC64 Python 3.4"
+    # - name: "Ubuntu Xenial PPC64 Python 3.4"
+    #   os: linux
+    #   dist: xenial
+    #   arch: ppc64le
+    #   python: 3.4
+    #   language: python
+    # - name: "Ubuntu Xenial PPC64 Python 3.5"
+    #   os: linux
+    #   dist: xenial
+    #   arch: ppc64le
+    #   python: 3.5
+    #   language: python
+    # - name: "Ubuntu Xenial PPC64 Python 3.6"
+    #   os: linux
+    #   dist: xenial
+    #   arch: ppc64le
+    #   python: 3.6
+    #   language: python
+    # - name: "Ubuntu Xenial PPC64 Python 3.7"
+    #   os: linux
+    #   dist: xenial
+    #   arch: ppc64le
+    #   python: 3.7
+    #   language: python
+    # - name: "Ubuntu Xenial PPC64 Python 3.8"
+    #   os: linux
+    #   dist: xenial
+    #   arch: ppc64le
+    #   python: 3.8
+    #   language: python
+    - name: "Ubuntu Bionic PPC64 Python 3.4"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: ppc64le
       python: 3.4
       language: python
-    - name: "Ubuntu Xenial PPC64 Python 3.5"
+    - name: "Ubuntu Bionic PPC64 Python 3.5"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: ppc64le
       python: 3.5
       language: python
-    - name: "Ubuntu Xenial PPC64 Python 3.6"
+    - name: "Ubuntu Bionic PPC64 Python 3.6"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: ppc64le
       python: 3.6
       language: python
-    - name: "Ubuntu Xenial PPC64 Python 3.7"
+    - name: "Ubuntu Bionic PPC64 Python 3.7"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: ppc64le
       python: 3.7
       language: python
-    - name: "Ubuntu Xenial PPC64 Python 3.8"
+    - name: "Ubuntu Bionic PPC64 Python 3.8"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: ppc64le
       python: 3.8
       language: python
-    - name: "Ubuntu Xenial ARM8 Python 3.4"
+    # - name: "Ubuntu Xenial ARM8 Python 3.4"
+    #   os: linux
+    #   dist: xenial
+    #   arch: arm64
+    #   python: 3.4
+    #   language: python
+    # - name: "Ubuntu Xenial ARM8 Python 3.5"
+    #   os: linux
+    #   dist: xenial
+    #   arch: arm64
+    #   python: 3.5
+    #   language: python
+    # - name: "Ubuntu Xenial ARM8 Python 3.6"
+    #   os: linux
+    #   dist: xenial
+    #   arch: arm64
+    #   python: 3.6
+    #   language: python
+    # - name: "Ubuntu Xenial ARM8 Python 3.7"
+    #   os: linux
+    #   dist: xenial
+    #   arch: arm64
+    #   python: 3.7
+    #   language: python
+    # - name: "Ubuntu Xenial ARM8 Python 3.8"
+    #   os: linux
+    #   dist: xenial
+    #   arch: arm64
+    #   python: 3.8
+    #   language: python
+    - name: "Ubuntu Bionic ARM8 Python 3.4"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: arm64
       python: 3.4
       language: python
-    - name: "Ubuntu Xenial ARM8 Python 3.5"
+    - name: "Ubuntu Bionic ARM8 Python 3.5"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: arm64
       python: 3.5
       language: python
-    - name: "Ubuntu Xenial ARM8 Python 3.6"
+    - name: "Ubuntu Bionic ARM8 Python 3.6"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: arm64
       python: 3.6
       language: python
-    - name: "Ubuntu Xenial ARM8 Python 3.7"
+    - name: "Ubuntu Bionic ARM8 Python 3.7"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: arm64
       python: 3.7
       language: python
-    - name: "Ubuntu Xenial ARM8 Python 3.8"
+    - name: "Ubuntu Bionic ARM8 Python 3.8"
       os: linux
-      dist: xenial
+      dist: bionic
       arch: arm64
       python: 3.8
       language: python
-    - name: "MacOS 10.15.5 AMD64 Python 3.8"
-      os: osx
-      osx_image: xcode12
-      arch: amd64
-      language: shell
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.15.5 AMD64 Python 3.7"
-      os: osx
-      osx_image: xcode12
-      arch: amd64
-      language: shell
-      env: OSX_PY_VERSION="3.7"
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.14.6 AMD64 Python 3.8"
-      os: osx
-      osx_image: xcode11.3
-      arch: amd64
-      language: shell
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.14.6 AMD64 Python 3.7"
-      os: osx
-      osx_image: xcode11.3
-      arch: amd64
-      language: shell
-      env: OSX_PY_VERSION="3.7"
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.13 AMD64 Python 3.8"
-      os: osx
-      osx_image: xcode10.1
-      arch: amd64
-      language: shell
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
-    - name: "MacOS 10.13 AMD64 Python 3.7"
-      os: osx
-      osx_image: xcode10.1
-      arch: amd64
-      env: OSX_PY_VERSION="3.7"
-      language: shell
-      cache:
-        - directories:
-          - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.15.5 AMD64 Python 3.8"
+    #   os: osx
+    #   osx_image: xcode12
+    #   arch: amd64
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.15.5 AMD64 Python 3.7"
+    #   os: osx
+    #   osx_image: xcode12
+    #   arch: amd64
+    #   language: shell
+    #   env: OSX_PY_VERSION="3.7"
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.14.6 AMD64 Python 3.8"
+    #   os: osx
+    #   osx_image: xcode11.3
+    #   arch: amd64
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.14.6 AMD64 Python 3.7"
+    #   os: osx
+    #   osx_image: xcode11.3
+    #   arch: amd64
+    #   language: shell
+    #   env: OSX_PY_VERSION="3.7"
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.13 AMD64 Python 3.8"
+    #   os: osx
+    #   osx_image: xcode10.1
+    #   arch: amd64
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
+    # - name: "MacOS 10.13 AMD64 Python 3.7"
+    #   os: osx
+    #   osx_image: xcode10.1
+    #   arch: amd64
+    #   env: OSX_PY_VERSION="3.7"
+    #   language: shell
+    #   cache:
+    #     - directories:
+    #       - $HOME/Library/Caches/pip
 
 before_install:
 - if [ "$TRAVIS_OS_NAME" == "linux" ]; then sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo environment-modules; fi

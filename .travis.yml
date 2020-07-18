@@ -1,5 +1,35 @@
 matrix:
   include:
+    - name: "Ubuntu Trusty AMD64 Python 3.4"
+      os: linux
+      dist: trusty
+      arch: amd64
+      python: 3.4
+      language: python
+    - name: "Ubuntu Trusty AMD64 Python 3.5"
+      os: linux
+      dist: trusty
+      arch: amd64
+      python: 3.5
+      language: python
+    - name: "Ubuntu Trusty AMD64 Python 3.6"
+      os: linux
+      dist: trusty
+      arch: amd64
+      python: 3.6
+      language: python
+    - name: "Ubuntu Trusty AMD64 Python 3.7"
+      os: linux
+      dist: trusty
+      arch: amd64
+      python: 3.7
+      language: python
+    - name: "Ubuntu Trusty AMD64 Python 3.8"
+      os: linux
+      dist: trusty
+      arch: amd64
+      python: 3.8
+      language: python
     # - name: "Ubuntu Xenial AMD64 Python 3.4"
     #   os: linux
     #   dist: xenial
@@ -30,12 +60,6 @@ matrix:
     #   arch: amd64
     #   python: 3.8
     #   language: python
-    - name: "Ubuntu Bionic AMD64 Python 3.4"
-      os: linux
-      dist: bionic
-      arch: amd64
-      python: 3.4
-      language: python
     - name: "Ubuntu Bionic AMD64 Python 3.5"
       os: linux
       dist: bionic
@@ -90,12 +114,6 @@ matrix:
     #   arch: ppc64le
     #   python: 3.8
     #   language: python
-    - name: "Ubuntu Bionic PPC64 Python 3.4"
-      os: linux
-      dist: bionic
-      arch: ppc64le
-      python: 3.4
-      language: python
     - name: "Ubuntu Bionic PPC64 Python 3.5"
       os: linux
       dist: bionic
@@ -150,12 +168,6 @@ matrix:
     #   arch: arm64
     #   python: 3.8
     #   language: python
-    - name: "Ubuntu Bionic ARM8 Python 3.4"
-      os: linux
-      dist: bionic
-      arch: arm64
-      python: 3.4
-      language: python
     - name: "Ubuntu Bionic ARM8 Python 3.5"
       os: linux
       dist: bionic

@@ -1,0 +1,17 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "CCompilerInfo",
+   "$id": "#ccompilerinfo",
+   "description": "Information about C compilers",
+   "type": "object",
+   "propertyNames": {
+      "type" : "string",
+      "enum": ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
+   },
+   "patternProperties": {
+      "^[a-z]+$": {
+         "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/compilerinfoclass.json"
+      }
+   },
+   "additionalProperties": false
+}

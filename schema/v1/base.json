@@ -13,6 +13,8 @@
     "UserInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/userinfo.json" },
     "Uptime": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/uptime.json" },
     "CacheTopology": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cachetopology.json" },
+    "CompilerInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/compilerinfo.json" },
+    "PythonInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/pythoninfo.json" },
     "CpuTopology": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cputopology.json" }
   }
 } 

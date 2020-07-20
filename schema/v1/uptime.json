@@ -1,0 +1,18 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "Uptime",
+   "$id": "#uptime",
+   "description": "Information about the uptime of the system",
+   "type": "object",
+   "properties": {
+      "Uptime": {
+         "description": "Uptime of the system in seconds",
+         "type": "number"
+      },
+      "UptimeReadable": {
+         "description": "Uptime of the system in a readable format",
+         "type": "string"
+      }
+   },
+   "required": ["Uptime"]
+}

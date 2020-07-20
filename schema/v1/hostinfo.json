@@ -1,0 +1,24 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "HostInfo",
+   "$id": "#hostinfo",
+   "description": "Information the system (host)",
+   "type": "object",
+   "properties": {
+      "Hostname": {
+         "description": "Hostname of the system",
+         "type": "string"
+      }
+   },
+   "additionalProperties": {
+      "FQDN": {
+         "description": "Fully qualified domain name (FQDN) of the system",
+         "type": "string"
+      },
+      "Domainname": {
+         "description": "Domainname of the system",
+         "type": "string"
+      }
+   },
+   "required": ["Hostname"]
+}

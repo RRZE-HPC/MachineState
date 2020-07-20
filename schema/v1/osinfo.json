@@ -1,0 +1,22 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "OSInfo",
+   "$id": "#osinfo",
+   "description": "Information about the operating system",
+   "type": "object",
+   "properties": {
+      "Type": {
+         "description": "Type of the operating system",
+         "type": "string",
+         "enum" : ["Darwin", "Linux"]
+      },
+      "Version": {
+         "description": "Version of the operating system",
+         "type": "string",
+      }
+   },
+   "additionalProperties": {
+      "type" : "string"
+   },
+   "required": ["Type", "Version"]
+}

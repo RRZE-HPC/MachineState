@@ -1,0 +1,33 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "MemInfo",
+   "$id": "#meminfo",
+   "description": "Information the memory usage on the system",
+   "type": "object",
+   "properties": {
+      "MemTotal": {
+         "description": "Total memory in the system",
+         "type": "integer",
+         "minimum": 0
+      },
+      "MemFree": {
+         "description": "Free memory in the system",
+         "type": "integer",
+         "minimum": 0
+      },
+      "SwapTotal": {
+         "description": "Total swap memory in the system",
+         "type": "integer",
+         "minimum": 0
+      },
+      "SwapFree": {
+         "description": "Free swap memory in the system",
+         "type": "integer",
+         "minimum": 0
+      }
+   },
+   "additionalProperties": {
+      "type" : "integer"
+   },
+   "required": ["MemTotal", "MemFree", "SwapFree", "SwapTotal"]
+}

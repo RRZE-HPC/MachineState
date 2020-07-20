@@ -1,0 +1,31 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "CpuTopologyClass",
+   "$id": "#cputopologyclass",
+   "description": "Information about one hardware thread of the CPU",
+   "type": "object",
+   "properties": {
+      "CoreId": {
+         "description": "ID of CPU core",
+         "type": "integer",
+         "minimum": 0
+      },
+      "HWThread": {
+         "description": "ID of hardware thread",
+         "type": "integer",
+         "minimum": 0
+      },
+      "PackageId": {
+         "description": "ID of CPU package containing the current hardware thread",
+         "type": "integer",
+         "minimum": 0
+      },
+      "ThreadId": {
+         "description": "ID of the hardware thread in a CPU core.",
+         "type": "integer",
+         "minimum": 0
+      }
+   },
+   "additionalProperties": false,
+   "required": ["CoreId", "HWThread", "PackageId", "ThreadId"]
+}

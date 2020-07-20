@@ -1,0 +1,38 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "CacheTopologyClass",
+   "$id": "#cachetopologyclass",
+   "description": "Information about one cache of the CPU",
+   "type": "object",
+   "properties": {
+      "Level": {
+         "description": "Level of cache",
+         "type": "string",
+         "pattern" : "^[0-9]$"
+      },
+      "Size": {
+         "description": "Size of cache",
+         "type": "integer",
+         "minimum": 0
+      },
+      "Type": {
+         "description": "Type of cache",
+         "type": "string",
+         "enum": ["Data", "Instruction", "Unified"]
+      },
+      "CpuList": {
+         "description": "List of hardware threads sharing a cache.",
+         "type": "array",
+         "items" : {
+            "type" : "array",
+            "items" : { "type" : "integer"}
+         }
+      }
+   },
+   "additionalProperties": {
+      "CoherencyLineSize": {
+         "type" : "integer"
+      }
+   },
+   "required": ["Size", "Type", "Level", "CpuList"]
+}

@@ -1,0 +1,16 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "CacheTopology",
+   "$id": "#cachetopology",
+   "description": "Information about the cache topology",
+   "type": "object",
+   "propertyNames": {
+    "pattern": "^L[0-9][ID]*$"
+   },
+   "patternProperties": {
+      "^L[0-9][ID]*$": {
+         "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cachetopologyclass.json"
+      }
+   },
+   "additionalProperties": false
+}

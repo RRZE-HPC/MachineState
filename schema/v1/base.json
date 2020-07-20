@@ -5,6 +5,14 @@
   "properties": {
     "LoadAvg" : { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/loadavg.json" },
     "MachineState" : { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/machinestate.json" },
-    "CpuInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cpuinfo.json" }
+    "CpuInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cpuinfo.json" },
+    "HostInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/hostinfo.json" },
+    "MemInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/meminfo.json" },
+    "OSInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/osinfo.json" },
+    "ShellEnvironment": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/shellenvironment.json" },
+    "UserInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/userinfo.json" },
+    "Uptime": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/uptime.json" },
+    "CacheTopology": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cachetopology.json" },
+    "CpuTopology": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cputopology.json" }
   }
 } 

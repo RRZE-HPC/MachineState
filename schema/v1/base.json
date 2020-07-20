@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "base",
+  "title": "Base",
+  "properties": {
+    "LoadAvg" : { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/loadavg.json" },
+    "MachineState" : { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/machinestate.json" },
+    "CpuInfo": { "$ref": "file:///Users/ub55yzis/Work/MachineState/schema/v1/cpuinfo.json" }
+  }
+} 

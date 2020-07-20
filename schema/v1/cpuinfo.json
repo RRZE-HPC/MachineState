@@ -1,0 +1,76 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "CpuInfo",
+   "$id": "#cpuinfo",
+   "description": "Information about the CPU",
+   "type": "object",
+    
+   "properties": {
+    
+      "Family": {
+         "description": "Family ID of the CPU",
+         "type": "integer",
+         "minimum": 0
+      },
+      "Model": {
+         "description": "Model ID of CPU",
+         "type": "integer",
+         "minimum": 0
+      },
+      "MachineType": {
+         "description": "Type of architecture",
+         "type": "string",
+         "enum": [ "x86_64", "ppc64le", "armv8" ]
+      },
+      "Flags":{
+         "description": "CPU feature flag list",
+         "type": "array",
+         "items": {
+            "type": "string"
+         }
+      },
+      "Name" : {
+         "description": "Name of CPU",
+         "type": "string"
+      },
+      "Vendor": {
+         "description": "Vendor of CPU",
+         "type": "string"
+      },
+      "Stepping": {
+         "description": "Stepping of CPU",
+         "type": "integer",
+         "minimum": 0
+      },
+      "Microcode": {
+         "description": "Microcode of CPU",
+         "type": "string"
+      },
+      "ExtFlags":{
+         "description": "Extended CPU feature flag list",
+         "type": "array",
+         "items": {
+            "type": "string"
+         }
+      },
+      "Leaf7Flags":{
+         "description": "Extended CPU feature flag list",
+         "type": "array",
+         "items": {
+            "type": "string"
+         }
+      },
+      "ExtModel": {
+         "description": "Extended Model ID of CPU",
+         "type": "integer",
+         "minimum": 0
+      },
+      "ExtFamily": {
+         "description": "Extended Family ID of CPU",
+         "type": "integer",
+         "minimum": 0
+      }
+   },
+   "additionalProperties": false,
+   "required": ["Family", "Model", "MachineType", "Flags", "Stepping"]
+}

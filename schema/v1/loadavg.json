@@ -1,0 +1,28 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "LoadAvg",
+   "$id": "#loadavg",
+   "description": "Information about the loadavg values",
+   "type": "object",
+    
+   "properties": {
+    
+      "LoadAvg1m": {
+         "description": "Number of jobs in the run queue (state R) or waiting for disk I/O (state D) averaged over 1 minute",
+         "type": "number",
+         "minimum": 0
+      },
+      "LoadAvg5m": {
+         "description": "Number of jobs in the run queue (state R) or waiting for disk I/O (state D) averaged over 5 minutes",
+         "type": "number",
+         "minimum": 0
+      },
+      "LoadAvg15m": {
+         "description": "Number of jobs in the run queue (state R) or waiting for disk I/O (state D) averaged over 15 minutes",
+         "type": "number",
+         "minimum": 0
+      }
+   },
+   "additionalProperties": { "type": "integer" },
+   "required": ["LoadAvg1m", "LoadAvg5m", "LoadAvg15m"]
+}

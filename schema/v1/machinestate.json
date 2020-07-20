@@ -1,0 +1,32 @@
+{
+   "$schema": "http://json-schema.org/draft-07/schema#",
+   "title": "MachineState",
+   "$id": "#machinestate",
+   "description": "Information about the MachineState script",
+   "type": "object",
+   "properties": {
+    
+      "Anonymous": {
+         "description": "The anonymous configuration",
+         "type": "boolean"
+      },
+      "Extended": {
+         "description": "The extended configuration",
+         "type": "boolean"
+      },
+      "Timestamp": {
+         "description": "Date and time when the JSON was created",
+         "type": "string"
+      },
+      "Version": {
+         "description": "Version of the MachineState script",
+         "type": "string"
+      },
+      "SchemaVersion": {
+         "description": "Schema version produced by the MachineState script",
+         "type": "string"
+      }
+   },
+   "additionalProperties": false,
+   "required": ["Anonymous", "Extended", "Timestamp", "Version", "SchemaVersion"]
+}

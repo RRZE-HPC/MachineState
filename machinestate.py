@@ -1168,6 +1168,7 @@ class CpuTopologyMacOSClass(InfoGroup):
         self.const("CoreId", int(ident//smt))
         self.const("PackageId", int(ident//ncores_pack))
         self.const("HWThread", ident)
+        self.required("CoreId", "PackageId", "HWThread", "ThreadId")
 
 class CpuTopologyMacOS(ListInfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -1180,6 +1181,11 @@ class CpuTopologyMacOS(ListInfoGroup):
             self.userlist = list(range(ncpu))
             self.subclass = CpuTopologyMacOSClass
             self.subargs = {"ncpu" : ncpu, "ncores" : ncores, "ncores_pack" : ncores_pack}
+            self.const("NumHWThreads", ncpu)
+            self.const("SMTWidth", ncpu//ncores)
+            self.const("NumCores", ncores)
+            self.const("NumSockets", ncpu//ncores_pack)
+            self.const("NumNUMANodes", ncpu//ncores_pack)
 
 class CpuTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):

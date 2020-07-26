@@ -1199,6 +1199,7 @@ class CpuTopologyClass(InfoGroup):
         if extended:
             self.addf("Online", pjoin(base, "online"), r"(\d+)", tobool)
             self.const("NumaNode", CpuTopologyClass.getnumnode(ident))
+            # A64FX test system has die_id file but might be negative
         self.required("CoreId", "PackageId", "HWThread", "ThreadId")
 
     @staticmethod
@@ -1211,7 +1212,8 @@ class CpuTopologyClass(InfoGroup):
             outfp.close()
             if data:
                 dlist = tointlist(data)
-                return dlist.index(hwthread)
+                if len(dlist) > 0:
+                    return dlist.index(hwthread)
 
         return tid
 
@@ -1222,7 +1224,7 @@ class CpuTopologyClass(InfoGroup):
         dlist = [f for f in glob(base) if nmatch.match(f) ]
         if len(dlist) > 1:
             print("WARN: Hardware thread {} contains to {} NUMA nodes".format(hwthread, len(dlist)))
-        return int(nmatch.match(dlist[0]).group(1))
+        return max(int(nmatch.match(dlist[0]).group(1)), 0)
 
 class CpuTopology(PathMatchInfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -1245,7 +1247,7 @@ class CpuTopology(PathMatchInfoGroup):
             mat = re.compile(match)
             base = searchpath
             glist = sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
-            return len(glist)
+            return max(len(glist), 1)
         return 0
     @staticmethod
     def getnumnumanodes():
@@ -1255,15 +1257,20 @@ class CpuTopology(PathMatchInfoGroup):
             mat = re.compile(match)
             base = searchpath
             glist = sorted([int(mat.match(f).group(1)) for f in glob(base) if mat.match(f)])
-            return len(glist)
+            return max(len(glist), 1)
         return 0
+    @staticmethod
     def getsmtwidth():
         filefp = fopen("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
         if filefp:
             data = filefp.read().decode(ENCODING).strip()
             filefp.close()
-            return len(re.split(r",", data))
+            if data:
+                dlist = tointlist(data)
+                if dlist:
+                    return max(len(dlist), 1)
         return 1
+    @staticmethod
     def getnumpackages():
         flist = glob("/sys/devices/system/cpu/cpu*/topology/physical_package_id")
         plist = []
@@ -1271,23 +1278,38 @@ class CpuTopology(PathMatchInfoGroup):
             filefp = fopen(fname)
             if filefp:
                 data = filefp.read().decode(ENCODING).strip()
-                if data not in plist:
-                    plist.append(data)
                 filefp.close()
-        if len(plist) > 0:
-            return len(plist)
-        return 1
+                if data:
+                    pid = int(data)
+                    if pid not in plist:
+                        plist.append(pid)
+        return max(len(plist), 1)
+    @staticmethod
     def getnumcores():
-        flist = glob("/sys/devices/system/cpu/cpu*/topology/core_id")
-        plist = []
-        for fname in flist:
-            filefp = fopen(fname)
-            if filefp:
-                data = filefp.read().decode(ENCODING).strip()
-                if data not in plist:
-                    plist.append(data)
-                filefp.close()
-        return len(plist) * CpuTopology.getnumpackages()
+        dlist = glob("/sys/devices/system/cpu/cpu*/topology")
+        pcdict = {}
+        for dname in dlist:
+            cfname = pjoin(dname, "core_id")
+            pfname = pjoin(dname, "physical_package_id")
+            with fopen(pfname) as pfp:
+                with fopen(cfname) as cfp:
+                    pdata = pfp.read().decode(ENCODING).strip()
+                    cdata = cfp.read().decode(ENCODING).strip()
+                    if pdata and cdata:
+                        pid = int(pdata)
+                        cid = int(cdata)
+                        if pid in pcdict:
+                            if cid not in pcdict[pid]:
+                                pcdict[pid].append(cid)
+                        else:
+                            pcdict[pid] = [cid]
+        pcsum = [len(pcdict[x]) for x in pcdict]
+        pcmin = min(pcsum)
+        pcmax = max(pcsum)
+        pcavg = sum(pcsum)/len(pcsum)
+        if pcmin != pcavg or pcmax != pcavg:
+            print("WARN: Unbalanced CPU cores per socket")
+        return max(sum(pcsum), 1)
 
 ################################################################################
 # CPU Frequency

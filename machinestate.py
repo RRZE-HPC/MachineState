@@ -1141,7 +1141,7 @@ class CpuInfo(InfoGroup):
             self.addf("Model", "/proc/cpuinfo", r"model\s+:\s(.+)")
             self.addf("Stepping", "/proc/cpuinfo", r"revision\s+:\s(.+)")
 
-        
+
         if pexists("/sys/devices/system/cpu/smt/active"):
             self.addf("SMT", "/sys/devices/system/cpu/smt/active", r"(\d+)", tobool)
             self.required("SMT")
@@ -1191,11 +1191,14 @@ class CpuTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
         super(CpuTopologyClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "Cpu{}".format(ident)
-        base = "/sys/devices/system/cpu/cpu{}/topology".format(ident)
-        self.addf("CoreId", pjoin(base, "core_id"), r"(\d+)", int)
-        self.addf("PackageId", pjoin(base, "physical_package_id"), r"(\d+)", int)
+        base = "/sys/devices/system/cpu/cpu{}".format(ident)
+        self.addf("CoreId", pjoin(base, "topology/core_id"), r"(\d+)", int)
+        self.addf("PackageId", pjoin(base, "topology/physical_package_id"), r"(\d+)", int)
         self.const("HWThread", ident)
         self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
+        if extended:
+            self.addf("Online", pjoin(base, "online"), r"(\d+)", tobool)
+            self.const("NumaNode", CpuTopologyClass.getnumnode(ident))
         self.required("CoreId", "PackageId", "HWThread", "ThreadId")
 
     @staticmethod
@@ -1204,21 +1207,22 @@ class CpuTopologyClass(InfoGroup):
         outfp = fopen(base)
         tid = 0
         if outfp:
-            tid = 0
             data = outfp.read().decode(ENCODING).strip()
-            dlist = data.split(",")
-            if len(dlist) == 1:
-                tid = 0
-            elif len(dlist) > 1:
-                tid = dlist.index(str(hwthread))
-            elif "-" in data:
-                dlist = data.split("-")
-                if len(dlist) > 1:
-                    trange = range(int(dlist[0]), int(dlist[1])+1)
-                    tid = trange.index(hwthread)
-            outfp.close
+            outfp.close()
+            if data:
+                dlist = tointlist(data)
+                return dlist.index(hwthread)
+
         return tid
 
+    @staticmethod
+    def getnumnode(hwthread):
+        base = "/sys/devices/system/cpu/cpu{}/node*".format(hwthread)
+        nmatch = re.compile(r".+/node(\d+)")
+        dlist = [f for f in glob(base) if nmatch.match(f) ]
+        if len(dlist) > 1:
+            print("WARN: Hardware thread {} contains to {} NUMA nodes".format(hwthread, len(dlist)))
+        return int(nmatch.match(dlist[0]).group(1))
 
 class CpuTopology(PathMatchInfoGroup):
     def __init__(self, extended=False, anonymous=False):

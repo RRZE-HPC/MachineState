@@ -277,3 +277,12 @@ just dumps the output to stdout.
 
 The Python version (`machine-state.py`) collects all data and outputs it in JSON
 format. This version is currently under development.
+
+
+--------------------------------------------------------------------------------
+Additional information by others
+--------------------------------------------------------------------------------
+- [Low latency tuning guide by Erik Rigtorp](https://rigtorp.se/low-latency-guide/)
+- https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_for_real_time/7/html/tuning_guide/real_time_throttling
+- [What are Interrupt Threads and How do They Work? by Mike Anderson](https://elinux.org/images/e/ef/InterruptThreads-Slides_Anderson.pdf)
+- [perf Examples by Brendan Gregg](http://brendangregg.com/perf.html)

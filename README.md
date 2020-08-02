@@ -282,7 +282,15 @@ format. This version is currently under development.
 --------------------------------------------------------------------------------
 Additional information by others
 --------------------------------------------------------------------------------
+- [The Tuned Project](https://tuned-project.org/)
+- [Intel® 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html)
+- [Intel® 64 and IA-32 Architectures Optimization Reference Manual](https://software.intel.com/content/www/us/en/develop/download/intel-64-and-ia-32-architectures-optimization-reference-manual.html)
+- [AMD Tech Docs](https://developer.amd.com/resources/developer-guides-manuals/)
+- [ARM documetatation center](https://developer.arm.com/documentation/)
+- [Performance Optimization and Tuning Techniques for IBM Power Systems Processors Including IBM POWER8](http://www.redbooks.ibm.com/abstracts/sg248171.html)
+- [System Tuning Info for Linux Servers by Adrian Likins](http://people.redhat.com/alikins/system_tuning.html)
 - [Low latency tuning guide by Erik Rigtorp](https://rigtorp.se/low-latency-guide/)
 - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_for_real_time/7/html/tuning_guide/real_time_throttling
 - [What are Interrupt Threads and How do They Work? by Mike Anderson](https://elinux.org/images/e/ef/InterruptThreads-Slides_Anderson.pdf)
 - [perf Examples by Brendan Gregg](http://brendangregg.com/perf.html)
+- [Tuning your Linux system for Gaming Performance by user u/sn0w75 on Reddit](https://www.reddit.com/r/linux_gaming/comments/8j0evj/tuning_your_linux_system_for_gaming_performance/)

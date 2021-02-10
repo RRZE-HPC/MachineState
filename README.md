@@ -36,6 +36,11 @@ or
 $ python3
 >>> import machinestate
 ```
+or just for the current project
+```
+$ wget https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/machinestate.py
+$ ./machinestate.py
+```
 
 The module cannot be used with Python2!
 
@@ -82,11 +87,9 @@ Usage (CLI)
 --------------------------------------------------------------------------------
 Getting usage help:
 ```
-$ machinestate -h
 usage: machinestate.py [-h] [-e] [-a] [-c] [-s] [-i INDENT] [-o OUTPUT]
-                       [-j JSON] [--configfile CONFIGFILE]
+                       [-j JSON] [--html] [--configfile CONFIGFILE]
                        [executable]
-
 
 Reads and outputs system information as JSON document
 
@@ -102,8 +105,10 @@ optional arguments:
   -i INDENT, --indent INDENT
                         indention in JSON output (default: 4)
   -o OUTPUT, --output OUTPUT
-                        save JSON to file (default: stdout)
+                        save to file (default: stdout)
   -j JSON, --json JSON  compare given JSON with current state
+  --html                generate HTML page with CSS and JavaScript embedded
+                        instead of JSON
   --configfile CONFIGFILE
                         Location of configuration file
 ```
@@ -182,6 +187,17 @@ Compare JSON file created with `machinestate.py` with current state
 ```
 $ machinestate -j oldstate.json
 ```
+
+Output the MachineState data as collapsible HTML table (with CSS and JavaScript):
+```
+$ machinestate --html
+```
+
+You can also redirekt the HTML output to a file directly:
+```
+$ machinestate --html --output machine.html
+```
+You can embedd the file in your HTML page within an `<iframe>`ö.
 
 --------------------------------------------------------------------------------
 Configuration file
@@ -275,7 +291,7 @@ Differences between Shell and Python version
 The Shell version (`shell-version/machine-state.sh`) executes some commands and
 just dumps the output to stdout.
 
-The Python version (`machine-state.py`) collects all data and outputs it in JSON
+The Python version (`machinestate.py`) collects all data and outputs it in JSON
 format. This version is currently under development.
 
 

@@ -2875,7 +2875,7 @@ base_css = """
   color: #444;
   cursor: pointer;
   padding: 18px;
-  width: 100%;
+  width: 98vw;
   border: none;
   text-align: left;
   outline: none;
@@ -2888,7 +2888,7 @@ base_css = """
 }
 
 .accordion:after {
-  content: '\002B';
+  content: '\\002B';
   color: #777;
   font-weight: bold;
   float: right;
@@ -2896,7 +2896,7 @@ base_css = """
 }
 
 .active:after {
-  content: "\2212";
+  content: "\\2212";
 }
 
 .panel {
@@ -2905,6 +2905,7 @@ base_css = """
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.2s ease-out;
+  width: 97vw;
 }
 
 .option {
@@ -2921,12 +2922,12 @@ base_css = """
 
 .expandable {
   background-color: #4CAF50;
-  width: 50%;
+  width: 49vw;
 }
 
 .collapsible {
   background-color: #f44336;
-  width: 50%;
+  width: 49vw;
 }
 </style>
 """

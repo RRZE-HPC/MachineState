@@ -2844,7 +2844,7 @@ bExpand.addEventListener("click", function() {
 	var accNonActive = Array.prototype.filter.call(acc, function(elem, i, acc) {
 		return !elem.className.includes("active");
 	});
-	for (i = accNonActive.length - 1; i >= 0; i--) {
+	for (i = 0; i < accNonActive.length; i++) {
 		accNonActive[i].click();
 	}
 });

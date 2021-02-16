@@ -5,9 +5,9 @@
 Introduction
 --------------------------------------------------------------------------------
 This script should be executed before running benchmarks to determine the
-current system settings and the execution enviroment.
+current system settings and the execution environment.
 
-On Linux, most information is gathered from sysfs/procfs files to reduce the dependecies.
+On Linux, most information is gathered from sysfs/procfs files to reduce the dependencies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
 On MacOS, most information is gathered through the `sysctl` command.

@@ -26,8 +26,6 @@ jobs:
       if: startsWith(matrix.os, 'macos')
       run: |
         brew install slurm open-mpi gcc clinfo modules;
-        source /usr/local/opt/modules/init/zsh
-        source ~/.zshrc
         export PATH="/usr/local/opt/gcc@10/bin":$PATH;
         export CC=gcc-10; export CXX=g++-10;
         export FC=gfortran

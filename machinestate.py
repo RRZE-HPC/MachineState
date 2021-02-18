@@ -1907,7 +1907,8 @@ class CCompilerInfo(ListInfoGroup):
                                             extended=extended,
                                             subclass=CompilerInfoClass,
                                             anonymous=anonymous)
-        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang"]
+
+        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "xlC", "armclang", "fcc", "fccpx"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
             comp = os.environ["CC"]
@@ -1923,7 +1924,8 @@ class CPlusCompilerInfo(ListInfoGroup):
                                                 extended=extended,
                                                 subclass=CompilerInfoClass,
                                                 anonymous=anonymous)
-        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++"]
+
+        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "xlc++", "armclang++", "FCC", "FCCpx"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
             comp = os.environ["CXX"]
@@ -1939,7 +1941,10 @@ class FortranCompilerInfo(ListInfoGroup):
                                                   extended=extended,
                                                   subclass=CompilerInfoClass,
                                                   anonymous=anonymous)
-        self.compilerlist = ["f77", "f95", "gfortran", "ifort", "flang", "pgf90", "armflang"]
+
+        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90",
+                             "xlf", "xlf90", "xlf95", "xlf2003", "xlf2008",
+                             "armflang", "frt", "frtpx"]
         if "FC" in os.environ:
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
@@ -2014,6 +2019,8 @@ class MpiInfoClass(InfoGroup):
             return "IntelMPI"
         elif "slurm" in value.lower():
             return "Slurm"
+        elif "fujitsu" in value.lower():
+            return "Fujitsu"
         return "Unknown"
 
     @staticmethod

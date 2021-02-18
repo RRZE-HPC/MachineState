@@ -1908,7 +1908,7 @@ class CCompilerInfo(ListInfoGroup):
                                             subclass=CompilerInfoClass,
                                             anonymous=anonymous)
 
-        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "xlC", "armclang", "ncc", "fcc", "fccpx"]
+        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "xlC", "armclang", "fcc", "fccpx"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
             comp = os.environ["CC"]
@@ -1925,8 +1925,7 @@ class CPlusCompilerInfo(ListInfoGroup):
                                                 subclass=CompilerInfoClass,
                                                 anonymous=anonymous)
 
-        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "xlc++", "armclang++", "nc++", "FCC", "FCCpx"]
-
+        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "xlc++", "armclang++", "FCC", "FCCpx"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
             comp = os.environ["CXX"]
@@ -1945,18 +1944,28 @@ class FortranCompilerInfo(ListInfoGroup):
 
         self.compilerlist = ["gfortran", "ifort", "flang", "pgf90",
                              "xlf", "xlf90", "xlf95", "xlf2003", "xlf2008",
-                             "armflang", "nfort", "frt", "frtpx"]
+                             "armflang", "frt", "frtpx"]
         if "FC" in os.environ:
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
                 self.compilerlist.append(comp)
         self.userlist = [c for c in self.compilerlist if which(c)]
 
+class AcceleratorCompilerInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various compilers used with accelerators'''
+    def __init__(self, extended=False, anonymous=False):
+        super(AcceleratorCompilerInfo, self).__init__(name="Accelerator",
+                                                      extended=extended,
+                                                      subclass=CompilerInfoClass,
+                                                      anonymous=anonymous)
+        self.compilerlist = ["nvcc", "hipcc", "icx", "icpx", "dpcpp",
+                             "clocl", "nfort", "ncc", "nc++", "rocm-clang-ocl"]
+        self.userlist = [c for c in self.compilerlist if which(c)]
 
 class CompilerInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for various compilers'''
     def __init__(self, extended=False, anonymous=False):
-        clist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo]
+        clist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo, AcceleratorCompilerInfo]
         cargs = [{} for i in range(len(clist))]
         super(CompilerInfo, self).__init__(name="CompilerInfo",
                                            extended=extended,

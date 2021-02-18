@@ -1907,7 +1907,7 @@ class CCompilerInfo(ListInfoGroup):
                                             extended=extended,
                                             subclass=CompilerInfoClass,
                                             anonymous=anonymous)
-        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
+        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc", "fcc", "fccpx"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
             comp = os.environ["CC"]
@@ -1923,7 +1923,7 @@ class CPlusCompilerInfo(ListInfoGroup):
                                                 extended=extended,
                                                 subclass=CompilerInfoClass,
                                                 anonymous=anonymous)
-        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++"]
+        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++", "FCC", "FCCpx"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
             comp = os.environ["CXX"]
@@ -1939,7 +1939,7 @@ class FortranCompilerInfo(ListInfoGroup):
                                                   extended=extended,
                                                   subclass=CompilerInfoClass,
                                                   anonymous=anonymous)
-        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort"]
+        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort", "frt", "frtpx"]
         if "FC" in os.environ:
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
@@ -2004,6 +2004,8 @@ class MpiInfoClass(InfoGroup):
             return "IntelMPI"
         elif "slurm" in value.lower():
             return "Slurm"
+        elif "fujitsu" in value.lower():
+            return "Fujitsu"
         return "Unknown"
 
     @staticmethod

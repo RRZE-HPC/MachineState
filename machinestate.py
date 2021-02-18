@@ -1949,11 +1949,12 @@ class FortranCompilerInfo(ListInfoGroup):
 class AcceleratorCompilerInfo(ListInfoGroup):
     '''Class to spawn subclasses for various compilers used with accelerators'''
     def __init__(self, extended=False, anonymous=False):
-        super(CudaCompilerInfo, self).__init__(name="Accelerator",
-                                               extended=extended,
-                                               subclass=CompilerInfoClass,
-                                               anonymous=anonymous)
-        self.compilerlist = ["nvcc", "hipcc", "icx", "icpx", "dpcpp", "clocl", "nfort", "ncc", "nc++", "rocm-clang-ocl"]
+        super(AcceleratorCompilerInfo, self).__init__(name="Accelerator",
+                                                      extended=extended,
+                                                      subclass=CompilerInfoClass,
+                                                      anonymous=anonymous)
+        self.compilerlist = ["nvcc", "hipcc", "icx", "icpx", "dpcpp",
+                             "clocl", "nfort", "ncc", "nc++", "rocm-clang-ocl"]
         self.userlist = [c for c in self.compilerlist if which(c)]
 
 class CompilerInfo(MultiClassInfoGroup):

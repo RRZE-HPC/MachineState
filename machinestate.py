@@ -24,7 +24,7 @@ Provided functions:
 Provided classes:
 - HostInfo
 - CpuInfo
-- OSInfo
+- OperatingSystemInfo
 - KernelInfo
 - Uptime
 - CpuTopology
@@ -549,6 +549,21 @@ class InfoGroup:
         if isinstance(anonymous, bool):
             self.anonymous = anonymous
 
+    @classmethod
+    def from_dict(cls, data):
+        """Initialize from data dictionary produced by `get()`"""
+        if data['__classname__'] != cls.__name__:
+            raise ValueError("`from_dict` musst be called on class matching `__classname__`.")
+
+        c = cls()
+        for key, value in data.items():
+            if isinstance(value, dict) and '__classname__' in value:
+                c._instances.append(
+                    getattr(sys.modules[__name__], value['__classname__']).from_dict(value))
+            else:
+                c._data[key] = value
+        return c
+
     def addf(self, key, filename, match=None, parse=None, extended=False):
         """Add file to object including regex and parser"""
         self.files[key] = (filename, match, parse)
@@ -594,6 +609,7 @@ class InfoGroup:
             clsout = inst.get()
             outdict.update({inst.name : clsout})
         outdict.update(self._data)
+        outdict['__classname__'] = self.__class__.__name__
         return outdict
     def get_html(self):
         s = ""
@@ -737,6 +753,7 @@ class InfoGroup:
                 if instout is False:
                     return False
         return True
+
     def __class_args__(self):
         """Used by __repr__ to add class' arguments"""
         arglist = []
@@ -744,6 +761,7 @@ class InfoGroup:
         arglist.append("extended={}".format(self.extended))
         arglist.append("anonymous={}".format(self.anonymous))
         return arglist
+
     def __repr__(self):
         cls = str(self.__class__.__name__)
         args = ", ".join(self.__class_args__())
@@ -969,7 +987,7 @@ class MachineState(MultiClassInfoGroup):
                 MachineStateInfo,
                 HostInfo,
                 CpuInfo,
-                OSInfo,
+                OperatingSystemInfo,
                 KernelInfo,
                 Uptime,
                 CpuTopology,
@@ -1075,9 +1093,9 @@ class OSInfoMacOS(InfoGroup):
         self.addc("Version", "sysctl", "-n kern.osproductversion", r"([\d\.]+)")
         self.required("Version")
 
-class OSInfo(InfoGroup):
+class OperatingSystemInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(OSInfo, self).__init__(anonymous=anonymous, extended=extended)
+        super(OperatingSystemInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "OperatingSystemInfo"
         ostype = get_ostype()
         self.const("Type", ostype)
@@ -3003,7 +3021,7 @@ def main():
     sys.exit(0)
 
 #    # This part is for testing purposes
-#    n = OSInfo(extended=cliargs["extended"])
+#    n = OperatingSystemInfo(extended=cliargs["extended"])
 #    n.generate()
 #    n.update()
 #    ndict = n.get()

@@ -1441,6 +1441,7 @@ class NumaInfoHugepagesClass(InfoGroup):
 class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, anonymous=False, extended=False):
         super(NumaInfoClass, self).__init__(anonymous=anonymous, extended=extended)
+        self.node = node
         self.name = "NumaNode{}".format(node)
         base = "/sys/devices/system/node/node{}".format(node)
         meminfo = pjoin(base, "meminfo")

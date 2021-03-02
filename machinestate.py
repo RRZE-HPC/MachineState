@@ -1925,6 +1925,7 @@ class HugepagesClass(InfoGroup):
     def __init__(self, size, extended=False, anonymous=False):
         name = "Hugepages-{}".format(size)
         super(HugepagesClass, self).__init__(name=name, extended=extended, anonymous=anonymous)
+        self.size = size
         base = "/sys/kernel/mm/hugepages/hugepages-{}".format(size)
         self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
         self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)

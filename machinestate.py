@@ -977,6 +977,7 @@ class MachineState(MultiClassInfoGroup):
                 LoadAvg,
                 MemInfo,
                 CgroupInfo,
+                WritebackInfo,
                 WritebackWorkqueue,
                 CpuFrequency,
                 NumaInfo,
@@ -1724,6 +1725,10 @@ class KernelInfo(ListInfoGroup):
         if pexists("/proc/sys/kernel/softlockup_thresh"):
             self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
         self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
+        self.addf("Swappiness", "/proc/sys/vm/swappiness", parse=int)
+        self.addf("MinFreeBytes", "/proc/sys/vm/min_free_kbytes", parse=lambda x: int(x)*1024)
+        self.addf("WatermarkScaleFactor", "/proc/sys/vm/watermark_scale_factor", parse=int)
+        self.addf("VFSCachePressure", "/proc/sys/vm/vfs_cache_pressure", parse=int)
         self.required("Version", "CmdLine", "NMIWatchdog", "Watchdog")
 
         cls = KernelSchedInfo(extended=extended,
@@ -1767,8 +1772,39 @@ class WritebackWorkqueue(InfoGroup):
         self.required(["CPUmask", "MaxActive", "NUMA"])
 
 ################################################################################
+# Infos about the writeback behavior
+################################################################################
+class WritebackInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(WritebackInfo, self).__init__(name="WritebackInfo",
+                                            extended=extended,
+                                            anonymous=anonymous)
+        base = "/proc/sys/vm"
+        self.addf("DirtyRatio", pjoin(base, "dirty_ratio"), r"(\d+)", int)
+        self.addf("DirtyBackgroundRatio", pjoin(base, "dirty_background_ratio"), r"(\d+)", int)
+        self.addf("DirtyBytes", pjoin(base, "dirty_bytes"), r"(\d+)", int)
+        self.addf("DirtyBackgroundBytes", pjoin(base, "dirty_background_bytes"), r"(\d+)", int)
+        self.addf("DirtyExpireCentisecs", pjoin(base, "dirty_expire_centisecs"), r"(\d+)", int)
+        self.required(["DirtyRatio",
+                       "DirtyBytes",
+                       "DirtyBackgroundRatio",
+                       "DirtyBackgroundBytes"])
+
+################################################################################
 # Infos about transparent hugepages
 ################################################################################
+class TransparentHugepagesDaemon(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(TransparentHugepagesDaemon, self).__init__(name="TransparentHugepagesDaemon",
+                                                         extended=extended,
+                                                         anonymous=anonymous)
+        base = "/sys/kernel/mm/transparent_hugepage/khugepaged"
+        self.addf("Defrag", pjoin(base, "defrag"), r"(\d+)", int)
+        self.addf("PagesToScan", pjoin(base, "pages_to_scan"), r"(\d+)", int)
+        self.addf("ScanSleepMillisecs", pjoin(base, "scan_sleep_millisecs"), r"(\d+)", int)
+        self.addf("AllocSleepMillisecs", pjoin(base, "alloc_sleep_millisecs"), r"(\d+)", int)
+        self.required(["Defrag", "PagesToScan", "ScanSleepMillisecs", "AllocSleepMillisecs"])
+
 class TransparentHugepages(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(TransparentHugepages, self).__init__(name="TransparentHugepages",
@@ -1776,8 +1812,11 @@ class TransparentHugepages(InfoGroup):
                                                    anonymous=anonymous)
         base = "/sys/kernel/mm/transparent_hugepage"
         self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
+        self.addf("Defrag", pjoin(base, "defrag"), r".*\[(.*)\].*")
+        self.addf("ShmemEnabled", pjoin(base, "shmem_enabled"), r".*\[(.*)\].*")
         self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", tobool)
-        self.required(["State", "UseZeroPage"])
+        self.required(["State", "UseZeroPage", "Defrag", "ShmemEnabled"])
+        self._instances = [TransparentHugepagesDaemon(extended, anonymous)]
 
 
 ################################################################################

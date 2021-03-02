@@ -595,6 +595,20 @@ class InfoGroup:
             outdict.update({inst.name : clsout})
         outdict.update(self._data)
         return outdict
+    def get_html(self):
+        s = ""
+        s += "<button class=\"accordion\">{}</button>\n".format(self.name)
+        s += "<div class=\"panel\">\n<table style=\"width:100vw\">\n"
+        for k,v in self._data.items():
+            if isinstance(v, list):
+                s += "<tr>\n\t<td style=\"width: 20%\"><b>{}:</b></td>\n\t<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
+            else:
+                s += "<tr>\n\t<td style=\"width: 20%\"><b>{}:</b></td>\n\t<td>{}</td>\n</tr>\n".format(k, v)
+        for inst in self._instances:
+            s += "<tr>\n\t<td colspan=\"2\">{}</td>\n</tr>".format(inst.get_html())
+        s += "</table>\n</div>\n\n"
+        return s
+
     def get_json(self, sort=False, intend=4):
         """Get the object's and all subobjects' data as JSON document (string)"""
         outdict = self.get()
@@ -1030,6 +1044,19 @@ class MachineState(MultiClassInfoGroup):
             clsout = inst.get_config()
             outdict.update({inst.name : clsout})
         return json.dumps(outdict, sort_keys=sort, indent=intend)
+    def get_html(self):
+        s = ""
+        s += "<table style=\"width:100vw\">\n"
+#        for k,v in self._data.items():
+#            if isinstance(v, list):
+#                s += "<tr>\n\t<td>{}</td>\n\t<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
+#            else:
+#                s += "<tr>\n\t<td>{}</td>\n\t<td>{}</td>\n</tr>\n".format(k, v)
+        for inst in self._instances:
+            s += "<tr>\n\t<td colspan=\"2\">{}</td>\n</tr>".format(inst.get_html())
+        s += "</table>\n\n"
+        return s
+
 
 ################################################################################
 # Configuration Classes
@@ -2728,8 +2755,9 @@ def read_cli(cliargs):
                         help='sort JSON output (default: False)')
     parser.add_argument('-i', '--indent', default=4, type=int,
                         help='indention in JSON output (default: 4)')
-    parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
+    parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
+    parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(cliargs))
@@ -2803,6 +2831,147 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
 
     return configdict
 
+
+base_js = """
+<script>
+var acc = document.getElementsByClassName("accordion");
+var i;
+
+for (i = 0; i < acc.length; i++) {
+  acc[i].addEventListener("click", function() {
+    this.classList.toggle("active");
+    var children = this.parentNode.childNodes;
+    children.forEach(child => {
+        if(child.style) {
+    		if (child.style.maxHeight) {
+        		child.style.maxHeight = null;
+       		} else {
+	        	child.style.maxHeight = child.scrollHeight + "px";
+    	    }
+        }
+    });
+    adjust(this.parentNode);
+  });
+}
+
+var bExpand = document.getElementsByClassName("option expandable")[0];
+var bCollaps = document.getElementsByClassName("option collapsible")[0];
+
+bExpand.addEventListener("click", function() {
+	var accNonActive = Array.prototype.filter.call(acc, function(elem, i, acc) {
+		return !elem.className.includes("active");
+	});
+	for (i = 0; i < accNonActive.length; i++) {
+		accNonActive[i].click();
+	}
+});
+
+bCollaps.addEventListener("click", function() {
+	var accActive = Array.prototype.filter.call(acc, function(elem, i, acc) {
+		return elem.className.includes("active");
+	});
+	for (i = accActive.length - 1; i >= 0; i--) {
+		accActive[i].click();
+	}
+});
+
+function adjust(node) {
+	if(node.style) {
+        node.style.maxHeight = 10 * window.innerHeight + "px";
+    }
+    if(node.parentNode){
+    	adjust(node.parentNode);
+	}
+}
+</script>
+"""
+base_css = """
+<style>
+.accordion {
+  background-color: #eee;
+  color: #444;
+  cursor: pointer;
+  padding: 18px;
+  width: 98vw;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+  transition: 0.4s;
+}
+
+.active, .accordion:hover {
+  background-color: #ccc;
+}
+
+.accordion:after {
+  content: '\\002B';
+  color: #777;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+}
+
+.active:after {
+  content: "\\2212";
+}
+
+.panel {
+  padding: 0 18px;
+  background-color: white;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+  width: 97vw;
+}
+
+.option {
+  float: left;
+  background-color: #555555;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 15px;
+}
+
+.expandable {
+  background-color: #4CAF50;
+  width: 49vw;
+}
+
+.collapsible {
+  background-color: #f44336;
+  width: 49vw;
+}
+</style>
+"""
+
+base_html = """
+<html>
+<head>
+<meta name "viewport" content="width=device-width, initial-scale=1">
+{css}
+</head>
+
+<body>
+<button class="option expandable">Expand all</button>
+<button class="option collapsible">Collapse all</button>
+{table}
+{script}
+</body>
+</html>
+"""
+
+def get_html(cls, css=True, js=True):
+    add_css = base_css if css is True else ""
+    add_js = base_js if js is True else ""
+    table = cls.get_html()
+    return base_html.format(table=table, css=add_css, script=add_js)
+
+
 def main():
     try:
         # Read command line arguments
@@ -2837,10 +3006,16 @@ def main():
 
     # Determine output destination
     if not cliargs["output"]:
-        print(jsonout)
+        if cliargs["html"]:
+            print(get_html(mstate))
+        else:
+            print(jsonout)
     else:
         with open(cliargs["output"], "w") as outfp:
-            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+            if cliargs["html"]:
+                outfp.write(get_html(mstate))
+            else:
+                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
             outfp.write("\n")
     sys.exit(0)
 

@@ -539,23 +539,67 @@ class InfoGroup:
         # Keys in the group that are required to check equality
         self.required4equal = []
         self.name = None
-        
+        # Set attributes
         self.name = name
         self.extended = extended
         self.anonymous = anonymous
 
     @classmethod
     def from_dict(cls, data):
-        """Initialize from data dictionary produced by `get()`"""
-        if data['__classname__'] != cls.__name__:
-            raise ValueError("`from_dict` musst be called on class matching `__classname__`.")
+        """Initialize from data dictionary produced by `get(meta=True)`"""
+        if isinstance(data, dict) and not data.get('_meta', "").startswith(cls.__name__):
+            raise ValueError("`from_dict` musst be called on class matching `_meta` (call get(meta=True)).")
+        if isinstance(data, InfoGroup):
+            data = data.get(meta=True)
+        intmatch = re.compile(r"^(.*)=([\d]+)$")
+        floatmatch = re.compile(r"^(.*)=([\d\.eE+\-]+)$")
+        strmatch = re.compile(r"^(.*)='(.*)'$")
+        nonematch = re.compile(r"^(.*)='None'$")
+        truematch = re.compile(r"^(.*)='True'$")
+        falsematch = re.compile(r"^(.*)='True'$")
+        anymatch = re.compile(r"^(.*)=(.*)$")
+        mmatch = r"{}\((.*)\)".format(cls.__name__)
+        m = re.match(mmatch, data['_meta'])
+        initargs = {}
+        if m:
+            argstring = m.group(1)
+            for astr in [ x.strip() for x in argstring.split(",") if len(x) > 0]:
+                k = None
+                v = None
+                if intmatch.match(astr):
+                    k,v = intmatch.match(astr).groups()
+                    v = int(v)
+                elif floatmatch.match(astr):
+                    k,v = floatmatch.match(astr).groups()
+                    v = float(v)
+                elif nonematch.match(astr):
+                    k = nonematch.match(astr).group(1)
+                    v = None
+                elif truematch.match(astr):
+                    k = truematch.match(astr).group(1)
+                    v = True
+                elif falsematch.match(astr):
+                    k = falsematch.match(astr).group(1)
+                    v = False
+                elif strmatch.match(astr):
+                    k,v = strmatch.match(astr).groups()
+                    v = str(v)
+                elif anymatch.match(astr):
+                    k,v = anymatch.match(astr).groups()
+                    v = str(v)
+                if v == "None": v = None
+                if v == "True": v = True
+                if v == "False": v = False
+                if k is not None:
+                    initargs[k] = v
 
-        c = cls(**dict(data['__initargs__']))
+        c = cls(**dict(initargs))
         for key, value in data.items():
-            if isinstance(value, dict) and '__classname__' in value:
+            if isinstance(value, dict) and '_meta' in value:
+                clsname = value['_meta'].split("(")[0]
                 c._instances.append(
-                    getattr(sys.modules[__name__], value['__classname__']).from_dict(value))
-            else:
+                    getattr(sys.modules[__name__], clsname).from_dict(value))
+            elif key != "_meta":
                 c._data[key] = value
         return c
 
@@ -598,18 +642,19 @@ class InfoGroup:
             inst.update()
         self._data.update(outdict)
 
-    def get(self):
+    def get(self, meta=False):
         """Get the object's and all subobjects' data as dict"""
         outdict = {}
         for inst in self._instances:
-            clsout = inst.get()
+            clsout = inst.get(meta=meta)
             outdict.update({inst.name : clsout})
         outdict.update(self._data)
-        outdict['__classname__'] = self.__class__.__name__
-        outdict['__initargs__'] = self._init_args()
+        if meta:
+            outdict["_meta"] = self.__repr__()
         return outdict
 
     def get_html(self):
+        """Get the object's and all subobjects' data as collapsible HTML table used by get_html()"""
         s = ""
         s += "<button class=\"accordion\">{}</button>\n".format(self.name)
         s += "<div class=\"panel\">\n<table style=\"width:100vw\">\n"
@@ -623,9 +668,9 @@ class InfoGroup:
         s += "</table>\n</div>\n\n"
         return s
 
-    def get_json(self, sort=False, intend=4):
+    def get_json(self, sort=False, intend=4, meta=True):
         """Get the object's and all subobjects' data as JSON document (string)"""
-        outdict = self.get()
+        outdict = self.get(meta=meta)
         return json.dumps(outdict, sort_keys=sort, indent=intend)
 
     def get_config(self):
@@ -701,57 +746,94 @@ class InfoGroup:
 #        return schemedict
 
     def __eq__(self, other):
-        selfdict = self.get()
-        tcase = TestCase()
-        cname = str(self.__class__.__name__)
+        """Compare object with another object-like structure like Class,
+           dict, JSON document or path to JSON file"""
+        self_meta = False
+        def valuecmp(key, cls, left, right):
+            """Compare two values used only internally in __eq__"""
+            tcase = TestCase()
+            estr = "key '{}' for class {}".format(key, cls)
+            if isinstance(left, str) and isinstance(right, str):
+                lmatch = re.match(r"^([\d\.]+).*", left)
+                rmatch = re.match(r"^([\d\.]+).*", right)
+                if lmatch and rmatch:
+                    try:
+                        left = float(lmatch.group(1))
+                        right = float(rmatch.group(1))
+                    except:
+                        pass
+            if ((isinstance(left, int) and isinstance(right, int)) or
+                (isinstance(left, float) and isinstance(right, float))):
+                try:
+                    tcase.assertAlmostEqual(left, right, delta=left*0.2)
+                except BaseException as exce:
+                    print("ERROR: AlmostEqual check failed for {} (delta +/- 20%): {}".format(estr, exce))
+                    return False
+            elif left != right:
+                print("ERROR: Equality check failed for {}".format(estr))
+                return False
+            return True
+
+        # Load the other object
         if isinstance(other, str):
             if pexists(other):
                 jsonfp = fopen(other)
                 if jsonfp:
-                    other = json.loads(jsonfp.read().decode(ENCODING))
+                    other = jsonfp.read().decode(ENCODING)
                     jsonfp.close()
-            else:
-                other = json.loads(other)
-
-        for rkey in self.required4equal:
-            estr = "key '{}' for class {}".format(rkey, cname)
-            if rkey in other:
-                if rkey in selfdict:
-                    selfval = selfdict[rkey]
-                    otherval = other[rkey]
-                    if isinstance(selfval, str) and re.match(r"^([\d\.]+).*", str(selfval)):
-                        smatch = re.match(r"^([\d\.]+).*", selfval).group(1)
-                        omatch = re.match(r"^([\d\.]+).*", otherval).group(1)
-                        try:
-                            selfval = float(smatch)
-                            otherval = float(omatch)
-                        except:
-                            pass
-
-                    if isinstance(selfval, int) or isinstance(selfval, float):
-                        if selfval != otherval:
-                            try:
-                                tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
-                            except BaseException as exce:
-                                print("ERROR: Equality check failed for {} with delta +/- 20% of \
-                                        state value: {}".format(estr, exce))
-                                return False
-                    elif selfval != otherval:
-                        print("ERROR: Equality check failed for {}".format(estr))
-                        return False
-
-                else:
-                    print("ERROR: Required {} not found in current state.".format(estr))
-                    print("       Maybe key only available in extended mode.")
-                    return False
-            else:
-                print("ERROR: Required {} not found in input".format(estr))
-        for inst in self._instances:
-            if inst.name in other:
-                instout = (inst.__eq__(other[inst.name]))
-                if instout is False:
-                    return False
-        return True
+            try:
+                otherdict = json.loads(other)
+                self_meta = True
+            except:
+                raise ValueError("`__eq__` musst be called on InfoGroup class, \
+                                  dict, JSON or path to JSON file.")
+        elif isinstance(other, InfoGroup):
+            otherdict = other.get(meta=True)
+            self_meta = True
+        elif isinstance(other, dict):
+            otherdict = other
+            if "_meta" in otherdict:
+                self_meta = True
+        elif self.get() is None and other is None:
+            return True
+        else:
+            raise ValueError("`__eq__` musst be called on InfoGroup class, dict, \
+                              JSON or path to JSON file.")
+        # After here only dicts allowed
+        selfdict = self.get(meta=self_meta)
+        clsname = self.__class__.__name__
+        key_not_found = 'KEY_NOT_FOUND_IN_OTHER_DICT'
+        selfkeys = selfdict.keys()
+        otherkeys = otherdict.keys()
+        if set(selfkeys) & set(self.required4equal) != set(self.required4equal):
+            print("Required keys missing in object: {}".format(
+                  ", ".join(set(self.required4equal) - set(selfkeys)))
+                 )
+        if set(otherkeys) & set(self.required4equal) != set(self.required4equal):
+            print("Required keys missing in compare object: {}".format(
+                  ", ".join(set(self.required4equal) - set(otherkeys)))
+                 )
+            
+        inboth = set(selfkeys) & set(otherkeys)
+        diff = {k:(selfdict[k], otherdict[k])
+                for k in inboth
+                if ((not valuecmp(k, clsname, selfdict[k], otherdict[k]))
+                     and k in self.required4equal
+                   )
+               }
+        diff.update({k:(selfdict[k], key_not_found)
+                     for k in selfkeys - inboth
+                     if k in self.required4equal
+                    })
+        diff.update({k:(key_not_found, otherdict[k])
+                     for k in otherkeys - inboth
+                     if k in self.required4equal
+                    })
+#        for k in diff:
+#            print(k)
+#            print(v[0])
+#            print(v[1])
+        return len(diff) == 0
     
     def _init_args(self):
         """Get list of tuples with __init__ arguments"""
@@ -845,8 +927,11 @@ class ListInfoGroup(InfoGroup):
                  subargs=None):
         super(ListInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.userlist = userlist or []
-        self.subclass = subclass
-        self.subargs = subargs or {}
+        if isinstance(subclass, str) or isinstance(subclass, int) or isinstance(subclass, bool):
+            self.subclass = None
+        else:
+            self.subclass = subclass
+        self.subargs = subargs if isinstance(subargs, dict) else {}
 
     def generate(self):
         if self.userlist and self.subclass:
@@ -1567,12 +1652,12 @@ class CacheTopologyClass(InfoGroup):
     @staticmethod
     def kBtoBytes(value):
         return tobytes("{} kB".format(value))
-    def update(self):
-        super(CacheTopologyClass, self).update()
-        if "Level" in self._data:
-            self.name = "L{}".format(self._data["Level"])
-            if "Type" in self._data:
-                ctype = self._data["Type"]
+    def get(self, meta=True):
+        d = super(CacheTopologyClass, self).get(meta=meta)
+        if "Level" in d:
+            self.name = "L{}".format(d["Level"])
+            if "Type" in d:
+                ctype = d["Type"]
                 if ctype == "Data":
                     self.name += "D"
                 elif ctype == "Instruction":
@@ -2807,6 +2892,8 @@ def read_cli(cliargs):
                         help='indention in JSON output (default: 4)')
     parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
+    parser.add_argument('-m', '--no-meta', action='store_false', default=True,
+                        help='embed meta information in classes (recommended, default: True)')
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
@@ -3050,7 +3137,7 @@ def main():
     # Get JSON document string (either from the configuration or the state)
     jsonout = {}
     if not cliargs["config"]:
-        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"])
+        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"])
     else:
         jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
 
@@ -3065,7 +3152,7 @@ def main():
             if cliargs["html"]:
                 outfp.write(get_html(mstate))
             else:
-                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"]))
             outfp.write("\n")
     sys.exit(0)
 

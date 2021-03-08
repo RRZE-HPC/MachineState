@@ -20,6 +20,8 @@ jobs:
     - name: Pre-Install (Ubuntu)
       if: startsWith(matrix.os, 'ubuntu')
       run: |
+        sudo apt-get update
+        sudo apt-get upgrade 
         sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo
         sudo apt-get install environment-modules likwid
     - name: Pre-Install (MacOS)

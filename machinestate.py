@@ -2776,6 +2776,33 @@ class NecTsubasaInfo(ListInfoGroup):
                 self.subargs = {"vecmd_path" : vecmd_path}
 
 
+class RocmInfoClass(InfoGroup):
+    '''Class to read information for one AMD ROCm device (uses the rocm-smi command)'''
+    def __init__(self, device, rocm_path="", extended=False, anonymous=False):
+        super(RocmInfoClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = "Card{}".format(device)
+        rocmsmi = pjoin(rocm_path, "rocm-smi")
+        if pexists(rocmsmi):
+            rocmargs = "-n {} -a --json".format(device)
+
+class RocmInfo(ListInfoGroup):
+    '''Class to spawn subclasses for each AMD ROCm device (uses the rocm-smi command)'''
+    def __init__(self, rocm_path="", extended=False, anonymous=False):
+        super(NecTsubasaInfo, self).__init__(name="RocmInfo",
+                                             extended=extended,
+                                             anonymous=anonymous)
+        rocmsmi = pjoin(rocm_path, "rocm-smi")
+        if not pexists(rocmsmi):
+            rocmsmi = which("rocm-smi")
+            if rocmsmi is not None:
+                rocm_path = os.path.dirname(rocmsmi)
+        if rocmsmi and len(rocmsmi) > 0:
+            num_gpus = process_cmd((rocmsmi, "", r"^(\d+)", int))
+            if num_gpus > 0:
+                self.userlist = [i for i in range(num_gpus)]
+                self.subclass = RocmInfoClass
+                self.subargs = {"rocm_path" : rocm_path}
+
 ################################################################################
 # Skript code
 ################################################################################

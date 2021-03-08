@@ -2901,7 +2901,7 @@ def read_cli(cliargs):
     parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
     parser.add_argument('-m', '--no-meta', action='store_false', default=True,
-                        help='embed meta information in classes (recommended, default: True)')
+                        help='do not embed meta information in classes (recommended, default: True)')
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)

@@ -15,9 +15,15 @@ class TestFromDict(unittest.TestCase):
         self.ms = machinestate.MachineState()
         self.ms.generate()
         self.ms.update()
-        self.ci = machinestate.CpuInfo()
-        self.ci.generate()
-        self.ci.update()
+        data = self.ms.get()
+        if data["OperatingSystemInfo"]["Type"] == "Linux":
+            self.ci = machinestate.CpuInfo()
+            self.ci.generate()
+            self.ci.update()
+        else:
+            self.ci = machinestate.CpuInfoMacOS()
+            self.ci.generate()
+            self.ci.update()
     def test_fromdictCompareClass(self):
         mscopy = machinestate.MachineState.from_dict(self.ms.get(meta=True))
         self.assertEqual(self.ms, mscopy)

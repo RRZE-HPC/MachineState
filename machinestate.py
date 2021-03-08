@@ -594,12 +594,13 @@ class InfoGroup:
                     initargs[k] = v
 
         c = cls(**dict(initargs))
+        validkeys = list(c.files.keys()) + list(c.commands.keys()) + list(c.constants.keys())
         for key, value in data.items():
             if isinstance(value, dict) and '_meta' in value:
                 clsname = value['_meta'].split("(")[0]
                 c._instances.append(
                     getattr(sys.modules[__name__], clsname).from_dict(value))
-            elif key != "_meta":
+            elif key in validkeys or key in [n.name for n in c._instances]:
                 c._data[key] = value
         return c
 
@@ -1662,6 +1663,7 @@ class CacheTopologyClass(InfoGroup):
                     self.name += "D"
                 elif ctype == "Instruction":
                     self.name += "I"
+        return d
 
 class CacheTopology(PathMatchInfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -2201,15 +2203,21 @@ class ShellEnvironment(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(ShellEnvironment, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "ShellEnvironment"
+        for k,v in os.environ.items():
+            value = v
+            if self.anonymous:
+                value = ShellEnvironment.anonymous_shell_var(k, v)
+            self.const(k, value)
+
     def update(self):
         super(ShellEnvironment, self).update()
         outdict = {}
-        for key in os.environ:
-            value = os.environ[key]
+        for k,v in os.environ.items():
+            value = v
             if self.anonymous:
-                value = ShellEnvironment.anonymous_shell_var(key, value)
-            outdict.update({key : value})
-        self._data.update(outdict)
+                value = ShellEnvironment.anonymous_shell_var(k, v)
+            self._data[k] = value
+
     @staticmethod
     def anonymous_shell_var(key, value):
         out = value

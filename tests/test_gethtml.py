@@ -3,16 +3,17 @@
 High-level tests for get_html()
 """
 
-from machinestate import MachineState
+import machinestate
 import requests
 import unittest
+import json
 
 class TestGetHtml(unittest.TestCase):
     def test_getHTML(self):
-        ms = MachineState()
+        ms = machinestate.MachineState()
         ms.generate()
         ms.update()
-        html = get_html(ms)
+        html = machinestate.get_html(ms)
         r = requests.post('https://validator.w3.org/nu/', 
                             data=html, 
                             params={'out': 'json'}, 
@@ -20,5 +21,6 @@ class TestGetHtml(unittest.TestCase):
                             'Content-Type': 'text/html; charset=UTF-8'})
         res = r.json()
         self.assertIsNotNone(res)
-        self.assertIsNotNone(res.get("message", None))
-        self.assertEqual(res["message"], [])
+        self.assertNotEqual(res, {})
+        self.assertIsNotNone(res.get("messages", None))
+        self.assertEqual(len(res["messages"]), 0)

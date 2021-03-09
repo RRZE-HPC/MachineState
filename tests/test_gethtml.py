@@ -9,11 +9,16 @@ import unittest
 import json
 
 class TestGetHtml(unittest.TestCase):
+    def setUp(self):
+        self.ms = machinestate.MachineState()
+        self.ms.generate()
+        self.ms.update()
     def test_getHTML(self):
-        ms = machinestate.MachineState()
-        ms.generate()
-        ms.update()
-        html = machinestate.get_html(ms)
+        html = machinestate.get_html(self.ms)
+        self.assertIsNotNone(html)
+        self.assertNotEqual(html, "")
+    def test_validateHTML(self):
+        html = machinestate.get_html(self.ms)
         r = requests.post('https://validator.w3.org/nu/', 
                             data=html, 
                             params={'out': 'json'}, 
@@ -22,5 +27,13 @@ class TestGetHtml(unittest.TestCase):
         res = r.json()
         self.assertIsNotNone(res)
         self.assertNotEqual(res, {})
-        self.assertIsNotNone(res.get("messages", None))
-        self.assertEqual(len(res["messages"]), 0)
+        messages = res.get("messages", None)
+        self.assertIsNotNone(messages)
+        elist = []
+        for msg in messages:
+            if msg['type'] == "error":
+                elist.append("{}: L{}-{} - {}".format(msg['type'].title(),
+                                                      msg['firstLine'],
+                                                      msg['lastLine'],
+                                                      msg['message']))
+        self.assertEqual(len(elist), 0, msg="\n"+"\n".join(elist))

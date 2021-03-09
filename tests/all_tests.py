@@ -4,16 +4,17 @@ import sys
 
 suite = unittest.TestLoader().loadTestsFromNames(
     [
-        'test_infogroup',
-        'test_pathmatchinfo',
-        'test_listinfo',
-        'test_multiclassinfo',
-        'test_parsers',
-        'test_helpers',
-        'test_dmidecode_file',
-        'test_machinestate',
-        'test_repr',
-        'test_config',
+#        'test_infogroup',
+#        'test_pathmatchinfo',
+#        'test_listinfo',
+#        'test_multiclassinfo',
+#        'test_parsers',
+#        'test_helpers',
+#        'test_dmidecode_file',
+#        'test_machinestate',
+#        'test_repr',
+#        'test_config',
+        'test_gethtml',
     ]
 )
 

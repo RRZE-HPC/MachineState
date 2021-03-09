@@ -107,6 +107,7 @@ optional arguments:
   -o OUTPUT, --output OUTPUT
                         save to file (default: stdout)
   -j JSON, --json JSON  compare given JSON with current state
+  -m, --no-meta         embed meta information in classes (recommended, default: True)
   --html                generate HTML page with CSS and JavaScript embedded
                         instead of JSON
   --configfile CONFIGFILE
@@ -282,7 +283,24 @@ $ python3
 >>> ms.generate()
 >>> ms.update()
 >>> ms == oldstate
-False
+True
+```
+In case of 'False', it reports the value differences and missing keys. For integer and float values, it compares the values with a tolerance of 20%. Be aware that if you use `oldstate.get() == ms.get()`, it uses the default `dict` comparison which does not print anything and matches exact.
+
+
+If you want to load an old state and use the class tree
+```
+$ python3
+>>> oldstate = {}           # dictionary of oldstate or
+                            # path to JSON file of oldstate or
+                            # JSON document (as string)
+                            # or a MachineState class
+                            # It has to contain the '_meta' entries
+                            # you get when calling get_json() or
+                            # get(meta=True)
+>>> ms = machinestate.MachineState.from_dict(oldstate)
+>>> ms == oldstate
+True
 ```
 
 --------------------------------------------------------------------------------

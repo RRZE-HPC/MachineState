@@ -653,20 +653,22 @@ class InfoGroup:
         if meta:
             outdict["_meta"] = self.__repr__()
         return outdict
-
-    def get_html(self):
+    def get_html(self, level=0):
         """Get the object's and all subobjects' data as collapsible HTML table used by get_html()"""
         s = ""
         s += "<button class=\"accordion\">{}</button>\n".format(self.name)
         s += "<div class=\"panel\">\n<table style=\"width:100vw\">\n"
         for k,v in self._data.items():
             if isinstance(v, list):
-                s += "<tr>\n\t<td style=\"width: 20%\"><b>{}:</b></td>\n\t<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
+                s += "<tr>\n<td style=\"width: 20%\"><b>{}:</b></td>\n<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
             else:
-                s += "<tr>\n\t<td style=\"width: 20%\"><b>{}:</b></td>\n\t<td>{}</td>\n</tr>\n".format(k, v)
+                s += "<tr>\n<td style=\"width: 20%\"><b>{}:</b></td>\n<td>{}</td>\n</tr>\n".format(k, v)
         for inst in self._instances:
-            s += "<tr>\n\t<td colspan=\"2\">{}</td>\n</tr>".format(inst.get_html())
-        s += "</table>\n</div>\n\n"
+            if len(self._data) > 0 and level > 0:
+                s += "<tr>\n<td colspan=\"2\">\n{}</td>\n</tr>".format(inst.get_html(level+1))
+            else:
+                s += "<tr>\n<td>{}</td>\n</tr>".format(inst.get_html(level+1))
+        s += "</table>\n</div>\n"
         return s
 
     def get_json(self, sort=False, intend=4, meta=True):
@@ -1140,7 +1142,7 @@ class MachineState(MultiClassInfoGroup):
             outdict.update({inst.name : clsout})
         return json.dumps(outdict, sort_keys=sort, indent=intend)
 
-    def get_html(self):
+    def get_html(self, level=0):
         s = ""
         s += "<table style=\"width:100vw\">\n"
 #        for k,v in self._data.items():
@@ -1149,7 +1151,7 @@ class MachineState(MultiClassInfoGroup):
 #            else:
 #                s += "<tr>\n\t<td>{}</td>\n\t<td>{}</td>\n</tr>\n".format(k, v)
         for inst in self._instances:
-            s += "<tr>\n\t<td colspan=\"2\">{}</td>\n</tr>".format(inst.get_html())
+            s += "<tr>\n\t<td>{}</td>\n</tr>".format(inst.get_html(level+1))
         s += "</table>\n\n"
         return s
 
@@ -3151,9 +3153,12 @@ base_css = """
 """
 
 base_html = """
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta name "viewport" content="width=device-width, initial-scale=1">
+<title>MachineState</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
 {css}
 </head>
 

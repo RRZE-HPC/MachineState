@@ -15,6 +15,7 @@ suite = unittest.TestLoader().loadTestsFromNames(
         'test_repr',
         'test_config',
         'test_fromdict',
+        'test_gethtml',
     ]
 )
 

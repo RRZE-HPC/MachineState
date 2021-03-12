@@ -970,15 +970,6 @@ class ListInfoGroup(InfoGroup):
             outdict.update({inst.name : inst.get_config()})
         outdict["Config"] = selfdict
         return outdict
-    def __class_args__(self):
-        arglist = super(ListInfoGroup, self).__class_args__()
-        arglist.append("userlist={}".format(self.userlist))
-        if self.subclass:
-            arglist.append("subclass={}".format(self.subclass.__name__))
-        else:
-            arglist.append("subclass=None")
-        arglist.append("subargs={}".format(self.subargs))
-        return arglist
 
 class MultiClassInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list of class types given by the user.

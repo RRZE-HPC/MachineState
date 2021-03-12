@@ -364,19 +364,23 @@ def process_file(args):
     fname, *matchconvert = args
     filefp = fopen(fname)
     if filefp:
-        data = filefp.read().decode(ENCODING).strip()
-        if matchconvert:
-            fmatch, *convert = matchconvert
-            if fmatch:
-                data = match_data(data, fmatch)
-            if convert:
-                fconvert, = convert
-                if fconvert:
-                    try:
-                        data = fconvert(data)
-                    except BaseException:
-                        pass
-        filefp.close()
+        try:
+            data = filefp.read().decode(ENCODING).strip()
+            if matchconvert:
+                fmatch, *convert = matchconvert
+                if fmatch:
+                    data = match_data(data, fmatch)
+                if convert:
+                    fconvert, = convert
+                    if fconvert:
+                        try:
+                            data = fconvert(data)
+                        except BaseException:
+                            pass
+        except OSError as e:
+            sys.stderr.write("Failed to read file {}: {}\n".format(fname, e))
+        finally:
+            filefp.close()
     return data
 
 def process_files(filedict):
@@ -392,19 +396,24 @@ def process_files(filedict):
         filefp = fopen(fname)
         data = None
         if filefp:
-            data = filefp.read().decode(ENCODING)
-            for args in sortdict[fname]:
-                key, fmatch, fparse = args
-                tmpdata = str(data.strip()) if data.strip() else ""
-                if fmatch is not None:
-                    tmpdata = match_data(tmpdata, fmatch)
-                if fparse is not None:
-                    try:
-                        tmpdata = fparse(tmpdata)
-                    except BaseException:
-                        pass
-                outdict[key] = tmpdata
-            filefp.close()
+            try:
+                rawdata = filefp.read()
+                data = rawdata.decode(ENCODING)
+                for args in sortdict[fname]:
+                    key, fmatch, fparse = args
+                    tmpdata = str(data.strip()) if data.strip() else ""
+                    if fmatch is not None:
+                        tmpdata = match_data(tmpdata, fmatch)
+                    if fparse is not None:
+                        try:
+                            tmpdata = fparse(tmpdata)
+                        except BaseException:
+                            pass
+                    outdict[key] = tmpdata
+            except OSError as e:
+                sys.stderr.write("Failed to read file {}: {}\n".format(fname, e))
+            finally:
+                filefp.close()
     return outdict
 
 def process_cmds(cmddict):

@@ -16,7 +16,7 @@ An example JSON (in extended mode) from an Intel Skylake Desktop system running 
 
 An example JSON (in extended mode) from an Intel Skylake Desktop system running macOS can be found [here](./examples/skylake-desktop-macos.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop-macos.json)). 
 
-[![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
+![test-n-publish action status](https://github.com/RRZE-HPC/MachineState/workflows/test-n-publish/badge.svg) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 
 --------------------------------------------------------------------------------
 Installation
@@ -35,6 +35,11 @@ $ machinestate
 or
 $ python3
 >>> import machinestate
+```
+or just for the current project
+```
+$ wget https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/machinestate.py
+$ ./machinestate.py
 ```
 
 The module cannot be used with Python2!
@@ -82,11 +87,9 @@ Usage (CLI)
 --------------------------------------------------------------------------------
 Getting usage help:
 ```
-$ machinestate -h
 usage: machinestate.py [-h] [-e] [-a] [-c] [-s] [-i INDENT] [-o OUTPUT]
-                       [-j JSON] [--configfile CONFIGFILE]
+                       [-j JSON] [--html] [--configfile CONFIGFILE]
                        [executable]
-
 
 Reads and outputs system information as JSON document
 
@@ -102,8 +105,11 @@ optional arguments:
   -i INDENT, --indent INDENT
                         indention in JSON output (default: 4)
   -o OUTPUT, --output OUTPUT
-                        save JSON to file (default: stdout)
+                        save to file (default: stdout)
   -j JSON, --json JSON  compare given JSON with current state
+  -m, --no-meta         embed meta information in classes (recommended, default: True)
+  --html                generate HTML page with CSS and JavaScript embedded
+                        instead of JSON
   --configfile CONFIGFILE
                         Location of configuration file
 ```
@@ -182,6 +188,17 @@ Compare JSON file created with `machinestate.py` with current state
 ```
 $ machinestate -j oldstate.json
 ```
+
+Output the MachineState data as collapsible HTML table (with CSS and JavaScript):
+```
+$ machinestate --html
+```
+
+You can also redirekt the HTML output to a file directly:
+```
+$ machinestate --html --output machine.html
+```
+You can embedd the file in your HTML page within an `<iframe>`ö.
 
 --------------------------------------------------------------------------------
 Configuration file
@@ -266,7 +283,24 @@ $ python3
 >>> ms.generate()
 >>> ms.update()
 >>> ms == oldstate
-False
+True
+```
+In case of 'False', it reports the value differences and missing keys. For integer and float values, it compares the values with a tolerance of 20%. Be aware that if you use `oldstate.get() == ms.get()`, it uses the default `dict` comparison which does not print anything and matches exact.
+
+
+If you want to load an old state and use the class tree
+```
+$ python3
+>>> oldstate = {}           # dictionary of oldstate or
+                            # path to JSON file of oldstate or
+                            # JSON document (as string)
+                            # or a MachineState class
+                            # It has to contain the '_meta' entries
+                            # you get when calling get_json() or
+                            # get(meta=True)
+>>> ms = machinestate.MachineState.from_dict(oldstate)
+>>> ms == oldstate
+True
 ```
 
 --------------------------------------------------------------------------------
@@ -275,7 +309,7 @@ Differences between Shell and Python version
 The Shell version (`shell-version/machine-state.sh`) executes some commands and
 just dumps the output to stdout.
 
-The Python version (`machine-state.py`) collects all data and outputs it in JSON
+The Python version (`machinestate.py`) collects all data and outputs it in JSON
 format. This version is currently under development.
 
 

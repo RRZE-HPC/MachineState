@@ -3080,9 +3080,10 @@ class OpenCLInfoPlatformClass(ListInfoGroup):
             suffix = process_cmd((clcmd, cmdopts, r"\s+CL_PLATFORM_ICD_SUFFIX_KHR\s+(.+)", str))
             self.const("IcdSuffix", suffix)
             num_devs = process_cmd((clcmd, cmdopts, r".*{}.*#DEVICES\s*(\d+)".format(suffix), int))
-            self.userlist = [r for r in range(num_devs)]
-            self.subargs = {"clinfo_path" : clinfo_path, "suffix" : suffix}
-            self.subclass = OpenCLInfoPlatformDeviceClass
+            if num_devs and num_devs > 0:
+                self.userlist = [r for r in range(num_devs)]
+                self.subargs = {"clinfo_path" : clinfo_path, "suffix" : suffix}
+                self.subclass = OpenCLInfoPlatformDeviceClass
 
 class OpenCLInfoLoaderClass(InfoGroup):
     '''Class to read information for one OpenCL loader (uses the clinfo command)'''

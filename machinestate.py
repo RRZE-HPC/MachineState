@@ -955,6 +955,14 @@ class MachineState(MultiClassInfoGroup):
                  vecmd_path=VEOS_BASE,
                  clinfo_path=CLINFO_PATH):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
+        self.debug = debug
+        self.dmifile = dmifile
+        self.likwid_enable = likwid_enable
+        self.likwid_path = likwid_path
+        self.nvidia_path = nvidia_path
+        self.modulecmd = modulecmd
+        self.vecmd_path = vecmd_path
+        self.clinfo_path = clinfo_path
         ostype = get_ostype()
         if ostype == "Linux":
             self.classlist = [

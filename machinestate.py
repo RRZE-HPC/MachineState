@@ -556,7 +556,7 @@ class InfoGroup:
         strmatch = re.compile(r"^(.*)='(.*)'$")
         nonematch = re.compile(r"^(.*)='None'$")
         truematch = re.compile(r"^(.*)='True'$")
-        falsematch = re.compile(r"^(.*)='True'$")
+        falsematch = re.compile(r"^(.*)='False'$")
         anymatch = re.compile(r"^(.*)=(.*)$")
         mmatch = r"{}\((.*)\)".format(cls.__name__)
         m = re.match(mmatch, data['_meta'])

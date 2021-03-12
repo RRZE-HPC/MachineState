@@ -3089,6 +3089,7 @@ class OpenCLInfoLoaderClass(InfoGroup):
     def __init__(self, loader, extended=False, anonymous=False, clinfo_path=""):
         super(OpenCLInfoLoaderClass, self).__init__(name=loader, extended=extended, anonymous=anonymous)
         self.clinfo_path = clinfo_path
+        self.loader = loader
         clcmd = pjoin(clinfo_path, "clinfo")
         if not pexists(clcmd):
             clcmd = which("clinfo")

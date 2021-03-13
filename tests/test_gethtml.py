@@ -24,16 +24,17 @@ class TestGetHtml(unittest.TestCase):
                             params={'out': 'json'}, 
                             headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36', 
                             'Content-Type': 'text/html; charset=UTF-8'})
-        res = r.json()
-        self.assertIsNotNone(res)
-        self.assertNotEqual(res, {})
-        messages = res.get("messages", None)
-        self.assertIsNotNone(messages)
-        elist = []
-        for msg in messages:
-            if msg['type'] == "error":
-                elist.append("{}: L{}-{} - {}".format(msg['type'].title(),
-                                                      msg['firstLine'],
-                                                      msg['lastLine'],
-                                                      msg['message']))
-        self.assertEqual(len(elist), 0, msg="\n"+"\n".join(elist))
+        if r and r.status_code == requests.codes.ok:
+            res = r.json()
+            self.assertIsNotNone(res)
+            self.assertNotEqual(res, {})
+            messages = res.get("messages", None)
+            self.assertIsNotNone(messages)
+            elist = []
+            for msg in messages:
+                if msg['type'] == "error":
+                    elist.append("{}: L{}-{} - {}".format(msg['type'].title(),
+                                                          msg['firstLine'],
+                                                          msg['lastLine'],
+                                                          msg['message']))
+            self.assertEqual(len(elist), 0, msg="\n"+"\n".join(elist))

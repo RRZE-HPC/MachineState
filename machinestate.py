@@ -757,7 +757,7 @@ class InfoGroup:
 #        schemedict["properties"] = pdict
 #        return schemedict
 
-    def __eq__(self, other):
+    def compare(self, other):
         """Compare object with another object-like structure like Class,
            dict, JSON document or path to JSON file"""
         self_meta = False
@@ -779,10 +779,10 @@ class InfoGroup:
                 try:
                     tcase.assertAlmostEqual(left, right, delta=left*0.2)
                 except BaseException as exce:
-                    print("ERROR: AlmostEqual check failed for {} (delta +/- 20%): {}".format(estr, exce))
+                    print("ERROR: AlmostEqual check failed for {} (delta +/- 20%): {} <-> {}".format(estr, left, right))
                     return False
             elif left != right:
-                print("ERROR: Equality check failed for {}".format(estr))
+                print("ERROR: Equality check failed for {}: {} <-> {}".format(estr, left, right))
                 return False
             return True
 
@@ -816,17 +816,21 @@ class InfoGroup:
         clsname = self.__class__.__name__
         key_not_found = 'KEY_NOT_FOUND_IN_OTHER_DICT'
         selfkeys = selfdict.keys()
+        ownkeys = [k for k,v in selfdict.items() if not isinstance(v, dict)]
+        subkeys = [k for k,v in selfdict.items() if isinstance(v, dict)]
         otherkeys = otherdict.keys()
-        if set(selfkeys) & set(self.required4equal) != set(self.required4equal):
+        otherownkeys = [k for k,v in otherdict.items() if not isinstance(v, dict)]
+        othersubkeys = [k for k,v in otherdict.items() if isinstance(v, dict)]
+        if set(ownkeys) & set(self.required4equal) != set(self.required4equal):
             print("Required keys missing in object: {}".format(
-                  ", ".join(set(self.required4equal) - set(selfkeys)))
+                  ", ".join(set(self.required4equal) - set(ownkeys)))
                  )
-        if set(otherkeys) & set(self.required4equal) != set(self.required4equal):
+        if set(otherownkeys) & set(self.required4equal) != set(self.required4equal):
             print("Required keys missing in compare object: {}".format(
-                  ", ".join(set(self.required4equal) - set(otherkeys)))
+                  ", ".join(set(self.required4equal) - set(otherownkeys)))
                  )
             
-        inboth = set(selfkeys) & set(otherkeys)
+        inboth = set(selfkeys) & set(otherkeys) & set(self.required4equal)
         diff = {k:(selfdict[k], otherdict[k])
                 for k in inboth
                 if ((not valuecmp(k, clsname, selfdict[k], otherdict[k]))
@@ -834,17 +838,22 @@ class InfoGroup:
                    )
                }
         diff.update({k:(selfdict[k], key_not_found)
-                     for k in selfkeys - inboth
+                     for k in set(ownkeys) - inboth
                      if k in self.required4equal
                     })
         diff.update({k:(key_not_found, otherdict[k])
-                     for k in otherkeys - inboth
+                     for k in set(otherownkeys) - inboth
                      if k in self.required4equal
                     })
-#        for k in diff:
-#            print(k)
-#            print(v[0])
-#            print(v[1])
+        for inst in self._instances:
+            if inst.name in subkeys and inst.name in othersubkeys:
+                instdiff = inst.compare(otherdict[inst.name])
+                if len(instdiff) > 0:
+                    diff[inst.name] = instdiff
+        return diff
+    
+    def __eq__(self, other):
+        diff = self.compare(other)
         return len(diff) == 0
     
     def _init_args(self):

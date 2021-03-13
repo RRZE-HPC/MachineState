@@ -359,6 +359,54 @@ def match_data(data, regex_str):
                 break
     return out
 
+class Constant():
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+    def valid(self):
+        return True
+    def get(self):
+        return {self.key : self.value}
+
+class File():
+    def __init__(self, key, path, regex=None, parser=None):
+        self.key = key
+        self.path = path
+        self.regex = regex
+        self.parser = parser
+    def valid(self):
+        if os.access(self.path, os.R_OK):
+            try:
+                filefp = fopen(fname)
+                data = filefp.read(1)
+                filefp.close()
+                return True
+            except:
+                pass
+        return False
+    def get(self):
+        data = None
+        filefp = fopen(fname)
+        if filefp:
+            try:
+                data = filefp.read().decode(ENCODING).strip()
+                if matchconvert:
+                    fmatch, *convert = matchconvert
+                    if fmatch:
+                        data = match_data(data, fmatch)
+                    if convert:
+                        fconvert, = convert
+                        if fconvert:
+                            try:
+                                data = fconvert(data)
+                            except BaseException:
+                                pass
+            except OSError as e:
+                sys.stderr.write("Failed to read file {}: {}\n".format(fname, e))
+            finally:
+                filefp.close()
+        return {self.key : data}
+
 def process_file(args):
     data = None
     fname, *matchconvert = args
@@ -445,6 +493,38 @@ def process_cmds(cmddict):
                     pass
             outdict[key] = tmpdata
     return outdict
+
+class Command():
+    def __init__(key, cmd, cmd_args=None, regex=None, parser=None):
+        self.key = key
+        self.cmd = cmd
+        self.cmd_args = cmd_args
+        self.regex = regex
+        self.parser = parser
+    def valid(self):
+        if self.cmd:
+            if os.access(self.cmd, X_OK):
+                return True
+            if which(self.cmd):
+                return True
+        return False
+    def get(self):
+        data = None
+        if self.cmd:
+            abspath = which(self.cmd)
+            if abspath and len(abspath) > 0:
+                exe = "LANG=C {} {}; exit 0;".format(self.cmd, self.cmd_args)
+                data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+                if data and len(data) >= 0:
+                    if self.regex:
+                        data = match_data(data, self.regex)
+                if self.parser:
+                    try:
+                        data = self.parser(data)
+                    except BaseException:
+                        data = None
+                        pass
+        return {self.key : data}
 
 def process_cmd(args):
     data = None

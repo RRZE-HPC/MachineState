@@ -38,3 +38,5 @@ class TestGetHtml(unittest.TestCase):
                                                           msg['lastLine'],
                                                           msg['message']))
             self.assertEqual(len(elist), 0, msg="\n"+"\n".join(elist))
+        else:
+            self.skipTest("Cannot validate using validator.w3.org")

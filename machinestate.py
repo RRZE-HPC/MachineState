@@ -1074,6 +1074,7 @@ class MachineState(MultiClassInfoGroup):
         self.modulecmd = modulecmd
         self.vecmd_path = vecmd_path
         self.clinfo_path = clinfo_path
+        self.rocm_path = rocm_path
         ostype = get_ostype()
         if ostype == "Linux":
             self.classlist = [

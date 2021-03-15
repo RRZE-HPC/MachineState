@@ -15,7 +15,10 @@ ENCODING = getpreferredencoding()
 
 class TestPathMatchInfoGroup(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False, searchpath=""):
-        super(TestPathMatchInfoGroup, self).__init__(anonymous=anonymous, extended=extended, name="File{}".format(ident))
+        super(TestPathMatchInfoGroup, self).__init__(
+            anonymous=anonymous, extended=extended, name="File{}".format(ident))
+        self.ident = ident
+        self.searchpath = searchpath
         path = os.path.join(searchpath, "{}*".format(ident))
         files = glob.glob(path)
         self.addf("File{}".format(ident), files[0], r"(.+)")

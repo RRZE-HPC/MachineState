@@ -51,11 +51,12 @@ Provided classes:
 - UsersInfo
 - IrqAffinity
 - CpuAffinity (uses os.get_schedaffinity(), likwid-pin or taskset)
-- ModulesInfo (if modulecmd is present)
-- NvidiaInfo (if nvidia-smi is present)
-- NecTsubasaInfo (if vecmd is present)
-- PrefetcherInfo (if likwid-features is present)
-- TurboInfo (if likwid-powermeter is present)
+- ModulesInfo (if modulecmd command is present)
+- NvidiaInfo (if nvidia-smi command is present)
+- NecTsubasaInfo (if vecmd command is present)
+- OpenCLInfo (if clinfo command is present)
+- PrefetcherInfo (if likwid-features command is present)
+- TurboInfo (if likwid-powermeter command is present)
 - DmiDecodeFile (if DMIDECODE_FILE is setup properly)
 
 The module contains more classes but all except the above ones are used only internally

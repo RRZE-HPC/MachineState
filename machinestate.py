@@ -54,6 +54,7 @@ Provided classes:
 - ModulesInfo (if modulecmd is present)
 - NvidiaInfo (if nvidia-smi is present)
 - NecTsubasaInfo (if vecmd is present)
+- RocmInfo (if rocm-smi is present)
 - PrefetcherInfo (if likwid-features is present)
 - TurboInfo (if likwid-powermeter is present)
 - DmiDecodeFile (if DMIDECODE_FILE is setup properly)
@@ -133,7 +134,8 @@ MODULECMD_PATH = "tclsh /apps/modules/modulecmd.tcl"
 VEOS_BASE = "/opt/nec/ve/bin"
 # The NvidiaInfo class requires this path if nvidia-smi is not in $PATH
 NVIDIA_PATH = "/opt/nvidia/bin"
-
+#The RocmInfo class requires this path to call rocm-smi if not in $PATH
+ROCM_PATH = "/opt/rocm/bin"
 
 ################################################################################
 # Version information
@@ -961,7 +963,8 @@ class MachineState(MultiClassInfoGroup):
                  likwid_path=LIKWID_PATH,
                  nvidia_path=NVIDIA_PATH,
                  modulecmd=MODULECMD_PATH,
-                 vecmd_path=VEOS_BASE):
+                 vecmd_path=VEOS_BASE,
+                 rocm_path=ROCM_PATH):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
         ostype = get_ostype()
         if ostype == "Linux":
@@ -1011,6 +1014,8 @@ class MachineState(MultiClassInfoGroup):
             self.classargs.append({"dmifile" : dmifile})
             self.classlist.append(ExecutableInfo)
             self.classargs.append({"executable" : executable})
+            self.classlist.append(RocmInfo)
+            self.classargs.append({"rocm_path" : rocm_path})
             if likwid_enable:
                 if likwid_path is None or not pexists(likwid_path):
                     path = which("likwid-topology")
@@ -2775,33 +2780,86 @@ class NecTsubasaInfo(ListInfoGroup):
                 self.subclass = NecTsubasaInfoClass
                 self.subargs = {"vecmd_path" : vecmd_path}
 
-
+################################################################################
+# Infos about AMD ROCm devices
+################################################################################
 class RocmInfoClass(InfoGroup):
-    '''Class to read information for one AMD ROCm device (uses the rocm-smi command)'''
-    def __init__(self, device, rocm_path="", extended=False, anonymous=False):
-        super(RocmInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Card{}".format(device)
-        rocmsmi = pjoin(rocm_path, "rocm-smi")
-        if pexists(rocmsmi):
-            rocmargs = "-n {} -a --json".format(device)
+    '''Class for a single ROCm devices'''
+    def __init__(self, device, extended=False, anonymous=False, rocm_path=ROCM_PATH):
+        super(RocmInfoClass, self).__init__(name="Card{}".format(device),
+                                            extended=extended,
+                                            anonymous=anonymous)
+        self.device = device
+        self.rocm_path = rocm_path
+        rocmcmd = pjoin(self.rocm_path, "rocm-smi")
+        if not os.access(rocmcmd, os.X_OK) and which("rocm-smi"):
+            rocmcmd = which("rocm-smi")
+        rocm_args = "-d {} -a --json | python3 -m json.tool".format(self.device)
+        self.addc("Vendor", rocmcmd, rocm_args, r'^\s+"Card vendor\":\s+\"(.*)\"[,]?$', str)
+        self.addc("VBiosVersion", rocmcmd, rocm_args, r'^\s+"VBIOS version\":\s+\"(.*)\"[,]?$', str)
+        self.addc("SKU", rocmcmd, rocm_args, r'^\s+"Card SKU\":\s+\"(.*)\"[,]?$', str)
+        self.addc("Model", rocmcmd, rocm_args, r'^\s+"Card model\":\s+\"(.*)\"[,]?$', str)
+        self.addc("Series", rocmcmd, rocm_args, r'^\s+"Card series\":\s+\"(.*)\"[,]?$', str)
+        self.addc("ID", rocmcmd, rocm_args, r'^\s+"GPU ID\":\s+\"(.*)\"[,]?$', str)
+        self.addc("MemoryVendor", rocmcmd, rocm_args, r'^\s+"GPU memory vendor\":\s+\"(.*)\"[,]?$', str)
+        self.addc("MaxPackagePowerWatt", rocmcmd, rocm_args, r'^\s+"Max Graphics Package Power \(W\)\":\s+\"(.*)\"[,]?$', float)
+        self.addc("PerformanceLevel", rocmcmd, rocm_args, r'^\s+"Performance Level\":\s+\"(.*)\"[,]?$', str)
+        self.addc("SerialNumber", rocmcmd, rocm_args, r'^\s+"Serial Number\":\s+\"(.*)\"[,]?$', str)
+        self.addc("VoltageMilliVolt", rocmcmd, rocm_args, r'^\s+"Voltage \(mV\)\":\s+\"(.*)\"[,]?$', int)
+        self.addc("TemperatureEdge", rocmcmd, rocm_args, r'^\s+"Temperature \(Sensor edge\) \(C\)\":\s+\"(.*)\"[,]?$', int)
+        self.addc("TemperatureJunction", rocmcmd, rocm_args, r'^\s+"Temperature \(Sensor junction\) \(C\)\":\s+\"(.*)\"[,]?$', int)
+        self.addc("TemperatureMemory", rocmcmd, rocm_args, r'^\s+"Temperature \(Sensor memory\) \(C\)\":\s+\"(.*)\"[,]?$', int)
+        self.addc("FClk", rocmcmd, rocm_args, r'^\s+"fclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
+        self.addc("MClk", rocmcmd, rocm_args, r'^\s+"mclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
+        self.addc("SClk", rocmcmd, rocm_args, r'^\s+"sclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
+        self.addc("SocClk", rocmcmd, rocm_args, r'^\s+"socclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
+        self.addc("PcieClk", rocmcmd, rocm_args, r'^\s+"pcie clock level\":\s+\"(.*)\"[,]?$', str)
+        self.required("VBiosVersion", "SKU", "Model", "Series", "PerformanceLevel", "FClk", "MClk", "SClk", "SocClk", "PcieClk")
+        if self.extended:
+            self.addc("DmcuFirmwareVersion", rocmcmd, rocm_args, r'^\s+"DMCU firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("CeFirmwareVersion", rocmcmd, rocm_args, r'^\s+"CE firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("AsdFirmwareVersion", rocmcmd, rocm_args, r'^\s+"ASD firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("McFirmwareVersion", rocmcmd, rocm_args, r'^\s+"MC firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("MeFirmwareVersion", rocmcmd, rocm_args, r'^\s+"ME firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("MecFirmwareVersion", rocmcmd, rocm_args, r'^\s+"MEC firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("Mec2FirmwareVersion", rocmcmd, rocm_args, r'^\s+"MEC2 firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("PfpFirmwareVersion", rocmcmd, rocm_args, r'^\s+"PFP firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("RlcFirmwareVersion", rocmcmd, rocm_args, r'^\s+"RLC firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("RlcSrlcFirmwareVersion", rocmcmd, rocm_args, r'^\s+"RLC SRLC firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("RlcSrlgFirmwareVersion", rocmcmd, rocm_args, r'^\s+"RLC SRLG firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("RlcSrlsFirmwareVersion", rocmcmd, rocm_args, r'^\s+"RLC SRLS firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("SdmaFirmwareVersion", rocmcmd, rocm_args, r'^\s+"SDMA firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("Sdma2FirmwareVersion", rocmcmd, rocm_args, r'^\s+"SDMA2 firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("SmcFirmwareVersion", rocmcmd, rocm_args, r'^\s+"SMC firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("SosFirmwareVersion", rocmcmd, rocm_args, r'^\s+"SOS firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("TaRasFirmwareVersion", rocmcmd, rocm_args, r'^\s+"TA RAS firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("TaXgmiFirmwareVersion", rocmcmd, rocm_args, r'^\s+"TA XGMI firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("UvdFirmwareVersion", rocmcmd, rocm_args, r'^\s+"UVD firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("VceFirmwareVersion", rocmcmd, rocm_args, r'^\s+"VCE firmware version\":\s+\"(.*)\"[,]?$', str)
+            self.addc("VcnFirmwareVersion", rocmcmd, rocm_args, r'^\s+"VCN firmware version\":\s+\"(.*)\"[,]?$', str)
 
 class RocmInfo(ListInfoGroup):
-    '''Class to spawn subclasses for each AMD ROCm device (uses the rocm-smi command)'''
-    def __init__(self, rocm_path="", extended=False, anonymous=False):
-        super(NecTsubasaInfo, self).__init__(name="RocmInfo",
-                                             extended=extended,
-                                             anonymous=anonymous)
-        rocmsmi = pjoin(rocm_path, "rocm-smi")
-        if not pexists(rocmsmi):
-            rocmsmi = which("rocm-smi")
-            if rocmsmi is not None:
-                rocm_path = os.path.dirname(rocmsmi)
-        if rocmsmi and len(rocmsmi) > 0:
-            num_gpus = process_cmd((rocmsmi, "", r"^(\d+)", int))
-            if num_gpus > 0:
-                self.userlist = [i for i in range(num_gpus)]
-                self.subclass = RocmInfoClass
-                self.subargs = {"rocm_path" : rocm_path}
+    '''Class to spawn subclasses for ROCm devices'''
+    def __init__(self, extended=False, anonymous=False, rocm_path=ROCM_PATH):
+        super(RocmInfo, self).__init__(name="RocmInfo",
+                                       extended=extended,
+                                       anonymous=anonymous)
+        self.rocm_path = rocm_path
+        rocmcmd = pjoin(self.rocm_path, "rocm-smi")
+        if not os.access(rocmcmd, os.X_OK) and which("rocm-smi"):
+            rocmcmd = which("rocm-smi")
+        data = process_cmd(("rocm-smi"))
+        if data is not None:
+            for l in data.split("\n"):
+                m = re.match(r"^(\d+)\s+[\d\.]+c.*", l)
+                if m:
+                    dev = int(m.group(1))
+                    if dev not in devicelist:
+                        self.userlist.append(dev)
+            self.subclass = RocmInfoClass
+            self.subargs = {"rocm_path" : self.rocm_path}
+            self.addc("DriverVersion", rocmcmd, "--showdriverversion", r"Driver version:\s+([\d\.]+)")
+            self.required("DriverVersion")
 
 ################################################################################
 # Skript code
@@ -2860,6 +2918,7 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                   "modulecmd" : MODULECMD_PATH,
                   "vecmd_path" : VEOS_BASE,
                   "nvidia_path" : NVIDIA_PATH,
+                  "rocm_path" : ROCM_PATH,
                   "debug" : DEBUG_OUTPUT,
                   "anonymous" : False,
                   "extended" : False,

@@ -1343,7 +1343,11 @@ class CpuTopologyClass(InfoGroup):
         self.addf("PackageId", pjoin(base, "physical_package_id"), r"(\d+)", int)
         self.const("HWThread", ident)
         self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
-        self.required("CoreId", "PackageId", "HWThread", "ThreadId")
+        self.const("Present", CpuTopologyClass.inlist("present", ident))
+        self.const("Online", CpuTopologyClass.inlist("online", ident))
+        self.const("Isolated", CpuTopologyClass.inlist("isolated", ident))
+        self.const("Possible", CpuTopologyClass.inlist("possible", ident))
+        self.required("CoreId", "PackageId", "HWThread", "ThreadId", "Online", "Possible", "Isolated")
 
     @staticmethod
     def getthreadid(hwthread):
@@ -1365,6 +1369,15 @@ class CpuTopologyClass(InfoGroup):
                     tid = trange.index(hwthread)
             outfp.close
         return tid
+    @staticmethod
+    def inlist(filename, hwthread):
+        fp = fopen(pjoin("/sys/devices/system/cpu", filename))
+        if fp is not None:
+            data = fp.read().decode(ENCODING).strip()
+            if data is not None and len(data) > 0:
+                l = tointlist(data)
+                return int(hwthread) in l
+        return False
 
 
 class CpuTopology(PathMatchInfoGroup):

@@ -1009,15 +1009,6 @@ class InfoGroup:
                     })
         for inst in self._instances:
             if inst.name in selfdict and inst.name in otherdict:
-                     for k in set(ownkeys) - inboth
-                     if k in self.required4equal
-                    })
-        diff.update({k:(key_not_found, otherdict[k])
-                     for k in set(otherownkeys) - inboth
-                     if k in self.required4equal
-                    })
-        for inst in self._instances:
-            if inst.name in subkeys and inst.name in othersubkeys
                 instdiff = inst.compare(otherdict[inst.name])
                 if len(instdiff) > 0:
                     diff[inst.name] = instdiff

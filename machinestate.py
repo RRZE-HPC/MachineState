@@ -2994,7 +2994,7 @@ class RocmInfoClass(InfoGroup):
         self.addc("SClk", rocmcmd, rocm_args, r'^\s+"sclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
         self.addc("SocClk", rocmcmd, rocm_args, r'^\s+"socclk clock speed[:]?\":\s+\"\((.*)\)\"[,]?$', tohertz)
         self.addc("PcieClk", rocmcmd, rocm_args, r'^\s+"pcie clock level\":\s+\"(.*)\"[,]?$', str)
-        self.required("VBiosVersion", "SKU", "Model", "Series", "PerformanceLevel", "FClk", "MClk", "SClk", "SocClk", "PcieClk")
+        self.required("Vendor", "VBiosVersion", "SKU", "Model", "Series", "PerformanceLevel", "MemoryVendor", "PcieClk")
         if self.extended:
             self.addc("DmcuFirmwareVersion", rocmcmd, rocm_args, r'^\s+"DMCU firmware version\":\s+\"(.*)\"[,]?$', str)
             self.addc("CeFirmwareVersion", rocmcmd, rocm_args, r'^\s+"CE firmware version\":\s+\"(.*)\"[,]?$', str)
@@ -3025,10 +3025,16 @@ class RocmInfo(ListInfoGroup):
                                        extended=extended,
                                        anonymous=anonymous)
         self.rocm_path = rocm_path
-        rocmcmd = pjoin(self.rocm_path, "rocm-smi")
-        if not os.access(rocmcmd, os.X_OK) and which("rocm-smi"):
-            rocmcmd = which("rocm-smi")
-        data = process_cmd(("rocm-smi"))
+        rocmsmi = pjoin(self.rocm_path, "rocm-smi")
+        if not os.access(rocmsmi, os.X_OK) and which("rocm-smi"):
+            rocmsmi = which("rocm-smi")
+        rocminfo = pjoin(self.rocm_path, "rocminfo")
+        if not os.access(rocminfo, os.X_OK) and which("rocminfo"):
+            rocminfo = which("rocminfo")
+        hipconfig = pjoin(self.rocm_path, "hipconfig")
+        if not os.access(hipconfig, os.X_OK) and which("hipconfig"):
+            hipconfig = which("hipconfig")
+        data = process_cmd((rocmsmi))
         if data is not None:
             for l in data.split("\n"):
                 m = re.match(r"^(\d+)\s+[\d\.]+c.*", l)
@@ -3038,8 +3044,21 @@ class RocmInfo(ListInfoGroup):
                         self.userlist.append(dev)
             self.subclass = RocmInfoClass
             self.subargs = {"rocm_path" : self.rocm_path}
-            self.addc("DriverVersion", rocmcmd, "--showdriverversion", r"Driver version:\s+([\d\.]+)")
+            self.addc("DriverVersion", rocmsmi, "--showdriverversion", r"Driver version:\s+([\d\.]+)", str)
+            self.addc("RocmSmiVersion", rocmsmi, "--help", r"ROCM-SMI version: (\d+\.\d+\.\d+)", str)
+            self.addc("RocmKernelVersion", rocmsmi, "--help", r"Kernel version: (\d+\.\d+\.\d+)", str)
+            self.addc("RuntimeVersion", rocminfo, regex=r"Runtime Version:\s+(\d+\.\d+\.\d+)", parse=str)
+            self.addc("HipVersion", hipconfig, "--version")
+            self.addc("HipRuntime", hipconfig, "--runtime")
+            self.addc("HipCompiler", hipconfig, "--compiler")
+            self.addc("HipPlatform", hipconfig, "--platform")
+            self.addc("HipC++Options", hipconfig, "--cpp_config")
             self.required("DriverVersion")
+            self.required("RuntimeVersion")
+            self.required("HipVersion")
+            self.required("HipRuntime")
+            self.required("HipCompiler")
+            self.required("HipPlatform")
 
 ################################################################################            
 # Infos from clinfo (OpenCL devices and runtime)

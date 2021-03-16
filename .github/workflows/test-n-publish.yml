@@ -1,0 +1,64 @@
+name: test-n-publish
+
+on: [push, pull_request]
+
+jobs:
+  test-n-publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04, macos-10.15]
+        python-version: [3.5, 3.6, 3.7, 3.8, 3.9]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      name: Set up Python ${{ matrix.python-version }}
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Pre-Install (Ubuntu)
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        sudo apt-get update
+        sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo
+        sudo apt-get install environment-modules likwid
+    - name: Pre-Install (MacOS)
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        brew install slurm open-mpi gcc clinfo modules;
+        export PATH="/usr/local/opt/gcc@10/bin":$PATH;
+        export CC=gcc-10; export CXX=g++-10;
+        export FC=gfortran
+    - name: Pre-Install (generic)
+      run: |
+        python -m pip install codecov
+        python -m pip install requests
+        python -m pip install --upgrade pip
+    - name: Install
+      run: |
+        python -m pip install -e .
+    - name: Test
+      run: |
+        coverage run -p tests/all_tests.py
+        coverage run -p `which machinestate` -e -s -i 4
+        coverage run -p `which machinestate` -e -s -i 4 -o output-ext.json
+        coverage run -p `which machinestate` -s -i 4 -o output.json
+        CC=testcompiler CXX=testccompiler FC=testfortran coverage run -p `which machinestate` -c
+        coverage run -p `which machinestate` -e -s -a -m hostname
+        coverage run -p `which machinestate` -j output.json
+        coverage run -p `which machinestate` -e -j output.json
+        coverage run -p `which machinestate` -j output-ext.json
+        coverage run -p `which machinestate` --html
+        coverage run -p `which machinestate` --html -o output.html
+    - uses: codecov/codecov-action@v1
+    - name: Build package
+      run: |
+        python setup.py build sdist
+    - name: Publish to PyPI
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && startsWith(matrix.os, 'ubuntu')
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        skip_existing: true
+        user: __token__
+        password: ${{ secrets.pypi_password }}

@@ -24,7 +24,7 @@ Provided functions:
 Provided classes:
 - HostInfo
 - CpuInfo
-- OSInfo
+- OperatingSystemInfo
 - KernelInfo
 - Uptime
 - CpuTopology
@@ -51,11 +51,12 @@ Provided classes:
 - UsersInfo
 - IrqAffinity
 - CpuAffinity (uses os.get_schedaffinity(), likwid-pin or taskset)
-- ModulesInfo (if modulecmd is present)
-- NvidiaInfo (if nvidia-smi is present)
-- NecTsubasaInfo (if vecmd is present)
-- PrefetcherInfo (if likwid-features is present)
-- TurboInfo (if likwid-powermeter is present)
+- ModulesInfo (if modulecmd command is present)
+- NvidiaInfo (if nvidia-smi command is present)
+- NecTsubasaInfo (if vecmd command is present)
+- OpenCLInfo (if clinfo command is present)
+- PrefetcherInfo (if likwid-features command is present)
+- TurboInfo (if likwid-powermeter command is present)
 - DmiDecodeFile (if DMIDECODE_FILE is setup properly)
 
 The module contains more classes but all except the above ones are used only internally
@@ -112,6 +113,7 @@ from unittest import TestCase
 from shutil import which
 from getpass import getuser
 from grp import getgrgid
+import inspect
 
 ################################################################################
 # Configuration
@@ -133,12 +135,13 @@ MODULECMD_PATH = "tclsh /apps/modules/modulecmd.tcl"
 VEOS_BASE = "/opt/nec/ve/bin"
 # The NvidiaInfo class requires this path if nvidia-smi is not in $PATH
 NVIDIA_PATH = "/opt/nvidia/bin"
-
+# The OpenCLInfo class requires this path if clinfo is not in $PATH
+CLINFO_PATH = "/usr/bin"
 
 ################################################################################
 # Version information
 ################################################################################
-MACHINESTATE_VERSION = "0.3"
+MACHINESTATE_VERSION = "0.4.1"
 MACHINESTATE_SCHEMA_VERSION = "v1"
 __version__ = MACHINESTATE_VERSION
 
@@ -179,7 +182,7 @@ def tostrlist(value):
     if value is not None:
         if isinstance(value, int):
             value = str(value)
-        return re.split(r"[,\s]", value)
+        return re.split(r"[,\s\|]+", value)
 
 def tointlist(value):
     r'''Returns string split at \s and , in list of integers. Supports lists like 0,1-4,7.
@@ -363,19 +366,23 @@ def process_file(args):
     fname, *matchconvert = args
     filefp = fopen(fname)
     if filefp:
-        data = filefp.read().decode(ENCODING).strip()
-        if matchconvert:
-            fmatch, *convert = matchconvert
-            if fmatch:
-                data = match_data(data, fmatch)
-            if convert:
-                fconvert, = convert
-                if fconvert:
-                    try:
-                        data = fconvert(data)
-                    except BaseException:
-                        pass
-        filefp.close()
+        try:
+            data = filefp.read().decode(ENCODING).strip()
+            if matchconvert:
+                fmatch, *convert = matchconvert
+                if fmatch:
+                    data = match_data(data, fmatch)
+                if convert:
+                    fconvert, = convert
+                    if fconvert:
+                        try:
+                            data = fconvert(data)
+                        except BaseException:
+                            pass
+        except OSError as e:
+            sys.stderr.write("Failed to read file {}: {}\n".format(fname, e))
+        finally:
+            filefp.close()
     return data
 
 def process_files(filedict):
@@ -391,19 +398,24 @@ def process_files(filedict):
         filefp = fopen(fname)
         data = None
         if filefp:
-            data = filefp.read().decode(ENCODING)
-            for args in sortdict[fname]:
-                key, fmatch, fparse = args
-                tmpdata = str(data.strip()) if data.strip() else ""
-                if fmatch is not None:
-                    tmpdata = match_data(tmpdata, fmatch)
-                if fparse is not None:
-                    try:
-                        tmpdata = fparse(tmpdata)
-                    except BaseException:
-                        pass
-                outdict[key] = tmpdata
-            filefp.close()
+            try:
+                rawdata = filefp.read()
+                data = rawdata.decode(ENCODING)
+                for args in sortdict[fname]:
+                    key, fmatch, fparse = args
+                    tmpdata = str(data.strip()) if data.strip() else ""
+                    if fmatch is not None:
+                        tmpdata = match_data(tmpdata, fmatch)
+                    if fparse is not None:
+                        try:
+                            tmpdata = fparse(tmpdata)
+                        except BaseException:
+                            pass
+                    outdict[key] = tmpdata
+            except OSError as e:
+                sys.stderr.write("Failed to read file {}: {}\n".format(fname, e))
+            finally:
+                filefp.close()
     return outdict
 
 def process_cmds(cmddict):
@@ -538,16 +550,70 @@ class InfoGroup:
         # Keys in the group that are required to check equality
         self.required4equal = []
         self.name = None
-        if isinstance(name, str):
-            self.name = name
+        # Set attributes
+        self.name = name
+        self.extended = extended
+        self.anonymous = anonymous
 
-        self.extended = False
-        if isinstance(extended, bool):
-            self.extended = extended
+    @classmethod
+    def from_dict(cls, data):
+        """Initialize from data dictionary produced by `get(meta=True)`"""
+        if isinstance(data, dict) and not data.get('_meta', "").startswith(cls.__name__):
+            raise ValueError("`from_dict` musst be called on class matching `_meta` (call get(meta=True)).")
+        if isinstance(data, InfoGroup):
+            data = data.get(meta=True)
+        intmatch = re.compile(r"^(.*)=([\d]+)$")
+        floatmatch = re.compile(r"^(.*)=([\d\.eE+\-]+)$")
+        strmatch = re.compile(r"^(.*)='(.*)'$")
+        nonematch = re.compile(r"^(.*)='None'$")
+        truematch = re.compile(r"^(.*)='True'$")
+        falsematch = re.compile(r"^(.*)='False'$")
+        anymatch = re.compile(r"^(.*)=(.*)$")
+        mmatch = r"{}\((.*)\)".format(cls.__name__)
+        m = re.match(mmatch, data['_meta'])
+        initargs = {}
+        if m:
+            argstring = m.group(1)
+            for astr in [ x.strip() for x in argstring.split(",") if len(x) > 0]:
+                k = None
+                v = None
+                if intmatch.match(astr):
+                    k,v = intmatch.match(astr).groups()
+                    v = int(v)
+                elif floatmatch.match(astr):
+                    k,v = floatmatch.match(astr).groups()
+                    v = float(v)
+                elif nonematch.match(astr):
+                    k = nonematch.match(astr).group(1)
+                    v = None
+                elif truematch.match(astr):
+                    k = truematch.match(astr).group(1)
+                    v = True
+                elif falsematch.match(astr):
+                    k = falsematch.match(astr).group(1)
+                    v = False
+                elif strmatch.match(astr):
+                    k,v = strmatch.match(astr).groups()
+                    v = str(v)
+                elif anymatch.match(astr):
+                    k,v = anymatch.match(astr).groups()
+                    v = str(v)
+                if v == "None": v = None
+                if v == "True": v = True
+                if v == "False": v = False
+                if k is not None:
+                    initargs[k] = v
 
-        self.anonymous = False
-        if isinstance(anonymous, bool):
-            self.anonymous = anonymous
+        c = cls(**dict(initargs))
+        validkeys = list(c.files.keys()) + list(c.commands.keys()) + list(c.constants.keys())
+        for key, value in data.items():
+            if isinstance(value, dict) and '_meta' in value:
+                clsname = value['_meta'].split("(")[0]
+                c._instances.append(
+                    getattr(sys.modules[__name__], clsname).from_dict(value))
+            elif key in validkeys or key in [n.name for n in c._instances]:
+                c._data[key] = value
+        return c
 
     def addf(self, key, filename, match=None, parse=None, extended=False):
         """Add file to object including regex and parser"""
@@ -587,18 +653,40 @@ class InfoGroup:
         for inst in self._instances:
             inst.update()
         self._data.update(outdict)
-    def get(self):
+
+    def get(self, meta=False):
         """Get the object's and all subobjects' data as dict"""
         outdict = {}
         for inst in self._instances:
-            clsout = inst.get()
+            clsout = inst.get(meta=meta)
             outdict.update({inst.name : clsout})
         outdict.update(self._data)
+        if meta:
+            outdict["_meta"] = self.__repr__()
         return outdict
-    def get_json(self, sort=False, intend=4):
+    def get_html(self, level=0):
+        """Get the object's and all subobjects' data as collapsible HTML table used by get_html()"""
+        s = ""
+        s += "<button class=\"accordion\">{}</button>\n".format(self.name)
+        s += "<div class=\"panel\">\n<table style=\"width:100vw\">\n"
+        for k,v in self._data.items():
+            if isinstance(v, list):
+                s += "<tr>\n<td style=\"width: 20%\"><b>{}:</b></td>\n<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
+            else:
+                s += "<tr>\n<td style=\"width: 20%\"><b>{}:</b></td>\n<td>{}</td>\n</tr>\n".format(k, v)
+        for inst in self._instances:
+            if len(self._data) > 0 and level > 0:
+                s += "<tr>\n<td colspan=\"2\">\n{}</td>\n</tr>".format(inst.get_html(level+1))
+            else:
+                s += "<tr>\n<td>{}</td>\n</tr>".format(inst.get_html(level+1))
+        s += "</table>\n</div>\n"
+        return s
+
+    def get_json(self, sort=False, intend=4, meta=True):
         """Get the object's and all subobjects' data as JSON document (string)"""
-        outdict = self.get()
+        outdict = self.get(meta=meta)
         return json.dumps(outdict, sort_keys=sort, indent=intend)
+
     def get_config(self):
         """Get the object's and all subobjects' configuration as JSON document (string)"""
         outdict = {}
@@ -671,68 +759,118 @@ class InfoGroup:
 #        schemedict["properties"] = pdict
 #        return schemedict
 
-    def __eq__(self, other):
-        selfdict = self.get()
-        tcase = TestCase()
-        cname = str(self.__class__.__name__)
+    def compare(self, other):
+        """Compare object with another object-like structure like Class,
+           dict, JSON document or path to JSON file"""
+        self_meta = False
+        def valuecmp(key, cls, left, right):
+            """Compare two values used only internally in __eq__"""
+            tcase = TestCase()
+            estr = "key '{}' for class {}".format(key, cls)
+            if isinstance(left, str) and isinstance(right, str):
+                lmatch = re.match(r"^([\d\.]+).*", left)
+                rmatch = re.match(r"^([\d\.]+).*", right)
+                if lmatch and rmatch:
+                    try:
+                        left = float(lmatch.group(1))
+                        right = float(rmatch.group(1))
+                    except:
+                        pass
+            if ((isinstance(left, int) and isinstance(right, int)) or
+                (isinstance(left, float) and isinstance(right, float))):
+                try:
+                    tcase.assertAlmostEqual(left, right, delta=left*0.2)
+                except BaseException as exce:
+                    print("ERROR: AlmostEqual check failed for {} (delta +/- 20%): {} <-> {}".format(estr, left, right))
+                    return False
+            elif left != right:
+                print("ERROR: Equality check failed for {}: {} <-> {}".format(estr, left, right))
+                return False
+            return True
+
+        # Load the other object
         if isinstance(other, str):
             if pexists(other):
                 jsonfp = fopen(other)
                 if jsonfp:
-                    other = json.loads(jsonfp.read().decode(ENCODING))
+                    other = jsonfp.read().decode(ENCODING)
                     jsonfp.close()
-            else:
-                other = json.loads(other)
-
-        for rkey in self.required4equal:
-            estr = "key '{}' for class {}".format(rkey, cname)
-            if rkey in other:
-                if rkey in selfdict:
-                    selfval = selfdict[rkey]
-                    otherval = other[rkey]
-                    if isinstance(selfval, str) and re.match(r"^([\d\.]+).*", str(selfval)):
-                        smatch = re.match(r"^([\d\.]+).*", selfval).group(1)
-                        omatch = re.match(r"^([\d\.]+).*", otherval).group(1)
-                        try:
-                            selfval = float(smatch)
-                            otherval = float(omatch)
-                        except:
-                            pass
-
-                    if isinstance(selfval, int) or isinstance(selfval, float):
-                        if selfval != otherval:
-                            try:
-                                tcase.assertAlmostEqual(selfval, otherval, delta=selfval*0.2)
-                            except BaseException as exce:
-                                print("ERROR: Equality check failed for {} with delta +/- 20% of \
-                                        state value: {}".format(estr, exce))
-                                return False
-                    elif selfval != otherval:
-                        print("ERROR: Equality check failed for {}".format(estr))
-                        return False
-
-                else:
-                    print("ERROR: Required {} not found in current state.".format(estr))
-                    print("       Maybe key only available in extended mode.")
-                    return False
-            else:
-                print("ERROR: Required {} not found in input".format(estr))
+            try:
+                otherdict = json.loads(other)
+                self_meta = True
+            except:
+                raise ValueError("`__eq__` musst be called on InfoGroup class, \
+                                  dict, JSON or path to JSON file.")
+        elif isinstance(other, InfoGroup):
+            otherdict = other.get(meta=True)
+            self_meta = True
+        elif isinstance(other, dict):
+            otherdict = other
+            if "_meta" in otherdict:
+                self_meta = True
+        elif self.get() is None and other is None:
+            return True
+        else:
+            raise ValueError("`__eq__` musst be called on InfoGroup class, dict, \
+                              JSON or path to JSON file.")
+        # After here only dicts allowed
+        selfdict = self.get(meta=self_meta)
+        clsname = self.__class__.__name__
+        key_not_found = 'KEY_NOT_FOUND_IN_OTHER_DICT'
+        selfkeys = selfdict.keys()
+        ownkeys = [k for k,v in selfdict.items() if not isinstance(v, dict)]
+        subkeys = [k for k,v in selfdict.items() if isinstance(v, dict)]
+        otherkeys = otherdict.keys()
+        otherownkeys = [k for k,v in otherdict.items() if not isinstance(v, dict)]
+        othersubkeys = [k for k,v in otherdict.items() if isinstance(v, dict)]
+        if set(ownkeys) & set(self.required4equal) != set(self.required4equal):
+            print("Required keys missing in object: {}".format(
+                  ", ".join(set(self.required4equal) - set(ownkeys)))
+                 )
+        if set(otherownkeys) & set(self.required4equal) != set(self.required4equal):
+            print("Required keys missing in compare object: {}".format(
+                  ", ".join(set(self.required4equal) - set(otherownkeys)))
+                 )
+            
+        inboth = set(selfkeys) & set(otherkeys) & set(self.required4equal)
+        diff = {k:(selfdict[k], otherdict[k])
+                for k in inboth
+                if ((not valuecmp(k, clsname, selfdict[k], otherdict[k]))
+                     and k in self.required4equal
+                   )
+               }
+        diff.update({k:(selfdict[k], key_not_found)
+                     for k in set(ownkeys) - inboth
+                     if k in self.required4equal
+                    })
+        diff.update({k:(key_not_found, otherdict[k])
+                     for k in set(otherownkeys) - inboth
+                     if k in self.required4equal
+                    })
         for inst in self._instances:
-            if inst.name in other:
-                instout = (inst.__eq__(other[inst.name]))
-                if instout is False:
-                    return False
-        return True
-    def __class_args__(self):
-        """Used by __repr__ to add class' arguments"""
-        arglist = []
-        arglist.append("name=\"{}\"".format(self.name))
-        arglist.append("extended={}".format(self.extended))
-        arglist.append("anonymous={}".format(self.anonymous))
+            if inst.name in subkeys and inst.name in othersubkeys:
+                instdiff = inst.compare(otherdict[inst.name])
+                if len(instdiff) > 0:
+                    diff[inst.name] = instdiff
+        return diff
+    
+    def __eq__(self, other):
+        diff = self.compare(other)
+        return len(diff) == 0
+    
+    def _init_args(self):
+        """Get list of tuples with __init__ arguments"""
+        parameters = inspect.signature(self.__init__).parameters.values()
+        arglist = [
+            (p.name, getattr(self, p.name))
+            for p in parameters
+            if p.default is not getattr(self, p.name)
+        ]
         return arglist
+
     def __repr__(self):
         cls = str(self.__class__.__name__)
-        args = ", ".join(self.__class_args__())
+        args = ", ".join(["{}={!r}".format(k,v) for k,v in self._init_args()])
         return "{}({})".format(cls, args)
 
 class PathMatchInfoGroup(InfoGroup):
@@ -798,16 +936,6 @@ class PathMatchInfoGroup(InfoGroup):
         for inst in self._instances:
             outdict.update({inst.name : inst.get_config()})
         return outdict
-    def __class_args__(self):
-        arglist = super(PathMatchInfoGroup, self).__class_args__()
-        arglist.append("searchpath=\"{}\"".format(self.searchpath))
-        arglist.append("match=r\"{}\"".format(self.match))
-        if self.subclass:
-            arglist.append("subclass={}".format(self.subclass.__name__))
-        else:
-            arglist.append("subclass=None")
-        arglist.append("subargs={}".format(self.subargs))
-        return arglist
 
 class ListInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list given by the user. All subclasses have the same
@@ -821,17 +949,12 @@ class ListInfoGroup(InfoGroup):
                  subclass=None,
                  subargs=None):
         super(ListInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
-        self.userlist = []
-        self.subclass = None
-        self.subargs = {}
-
-        if userlist and isinstance(userlist, list):
-            self.userlist = userlist
-        if subargs and isinstance(subargs, dict):
-            self.subargs = subargs
-        if subclass:
-            if callable(subclass) and type(subclass) == type(InfoGroup):
-                self.subclass = subclass
+        self.userlist = userlist or []
+        if isinstance(subclass, str) or isinstance(subclass, int) or isinstance(subclass, bool):
+            self.subclass = None
+        else:
+            self.subclass = subclass
+        self.subargs = subargs if isinstance(subargs, dict) else {}
 
     def generate(self):
         if self.userlist and self.subclass:
@@ -842,6 +965,7 @@ class ListInfoGroup(InfoGroup):
                                     **self.subargs)
                 cls.generate()
                 self._instances.append(cls)
+
     def get_config(self):
         outdict = super(ListInfoGroup, self).get_config()
         selfdict = {}
@@ -857,15 +981,6 @@ class ListInfoGroup(InfoGroup):
             outdict.update({inst.name : inst.get_config()})
         outdict["Config"] = selfdict
         return outdict
-    def __class_args__(self):
-        arglist = super(ListInfoGroup, self).__class_args__()
-        arglist.append("userlist={}".format(self.userlist))
-        if self.subclass:
-            arglist.append("subclass={}".format(self.subclass.__name__))
-        else:
-            arglist.append("subclass=None")
-        arglist.append("subargs={}".format(self.subargs))
-        return arglist
 
 class MultiClassInfoGroup(InfoGroup):
     '''Class for creating subclasses based on a list of class types given by the user.
@@ -907,6 +1022,7 @@ class MultiClassInfoGroup(InfoGroup):
             except BaseException as exce:
                 #print("{}.generate: {}".format(cltype.__name__, exce))
                 raise exce
+
     def get_config(self):
         outdict = super(MultiClassInfoGroup, self).get_config()
         outdict["Type"] = str(self.__class__.__name__)
@@ -916,12 +1032,7 @@ class MultiClassInfoGroup(InfoGroup):
         for inst in self._instances:
             outdict.update({inst.name : inst.get_config()})
         return outdict
-    def __class_args__(self):
-        arglist = super(MultiClassInfoGroup, self).__class_args__()
-        cllist = [str(x.__name__) for x in self.classlist if x]
-        arglist.append("classlist={}".format(cllist))
-        arglist.append("classargs={}".format(self.classargs))
-        return arglist
+
 
 class MachineStateInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -935,6 +1046,7 @@ class MachineStateInfo(InfoGroup):
         self.const("Timestamp", datetime.now().ctime())
         self.required("SchemaVersion", "Extended", "Anonymous")
 
+
 class MachineState(MultiClassInfoGroup):
     '''Main MachineState Class spawning all configuration specific subclasses'''
     def __init__(self,
@@ -947,15 +1059,25 @@ class MachineState(MultiClassInfoGroup):
                  likwid_path=LIKWID_PATH,
                  nvidia_path=NVIDIA_PATH,
                  modulecmd=MODULECMD_PATH,
-                 vecmd_path=VEOS_BASE):
+                 vecmd_path=VEOS_BASE,
+                 clinfo_path=CLINFO_PATH):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
+        self.debug = debug
+        self.dmifile = dmifile
+        self.likwid_enable = likwid_enable
+        self.executable = executable
+        self.likwid_path = likwid_path
+        self.nvidia_path = nvidia_path
+        self.modulecmd = modulecmd
+        self.vecmd_path = vecmd_path
+        self.clinfo_path = clinfo_path
         ostype = get_ostype()
         if ostype == "Linux":
             self.classlist = [
                 MachineStateInfo,
                 HostInfo,
                 CpuInfo,
-                OSInfo,
+                OperatingSystemInfo,
                 KernelInfo,
                 Uptime,
                 CpuTopology,
@@ -963,6 +1085,7 @@ class MachineState(MultiClassInfoGroup):
                 LoadAvg,
                 MemInfo,
                 CgroupInfo,
+                WritebackInfo,
                 WritebackWorkqueue,
                 CpuFrequency,
                 NumaInfo,
@@ -996,6 +1119,8 @@ class MachineState(MultiClassInfoGroup):
             self.classargs.append({"dmifile" : dmifile})
             self.classlist.append(ExecutableInfo)
             self.classargs.append({"executable" : executable})
+            self.classlist.append(OpenCLInfo)
+            self.classargs.append({"clinfo_path" : clinfo_path})
             if likwid_enable:
                 if likwid_path is None or not pexists(likwid_path):
                     path = which("likwid-topology")
@@ -1024,12 +1149,29 @@ class MachineState(MultiClassInfoGroup):
                 NumaInfoMacOS,
             ]
             self.classargs = [{} for x in self.classlist]
+            self.classlist.append(OpenCLInfo)
+            self.classargs.append({"clinfo_path" : clinfo_path})
+
     def get_config(self, sort=False, intend=4):
         outdict = {}
         for inst in self._instances:
             clsout = inst.get_config()
             outdict.update({inst.name : clsout})
         return json.dumps(outdict, sort_keys=sort, indent=intend)
+
+    def get_html(self, level=0):
+        s = ""
+        s += "<table style=\"width:100vw\">\n"
+#        for k,v in self._data.items():
+#            if isinstance(v, list):
+#                s += "<tr>\n\t<td>{}</td>\n\t<td>{}</td>\n</tr>\n".format(k, ", ".join([str(x) for x in v]))
+#            else:
+#                s += "<tr>\n\t<td>{}</td>\n\t<td>{}</td>\n</tr>\n".format(k, v)
+        for inst in self._instances:
+            s += "<tr>\n\t<td>{}</td>\n</tr>".format(inst.get_html(level+1))
+        s += "</table>\n\n"
+        return s
+
 
 ################################################################################
 # Configuration Classes
@@ -1048,9 +1190,9 @@ class OSInfoMacOS(InfoGroup):
         self.addc("Version", "sysctl", "-n kern.osproductversion", r"([\d\.]+)")
         self.required("Version")
 
-class OSInfo(InfoGroup):
+class OperatingSystemInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(OSInfo, self).__init__(anonymous=anonymous, extended=extended)
+        super(OperatingSystemInfo, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "OperatingSystemInfo"
         ostype = get_ostype()
         self.const("Type", ostype)
@@ -1161,8 +1303,12 @@ class CpuInfo(InfoGroup):
 ################################################################################
 class CpuTopologyMacOSClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False, ncpu=1, ncores=1, ncores_pack=1):
-        super(CpuTopologyMacOSClass, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "Cpu{}".format(ident)
+        super(CpuTopologyMacOSClass, self).__init__(
+            name="Cpu{}".format(ident), anonymous=anonymous, extended=extended)
+        self.ident = ident
+        self.ncpu = ncpu
+        self.ncores = ncores
+        self.ncores_pack = ncores_pack
         smt = ncpu/ncores
         self.const("ThreadId", int(ident % smt))
         self.const("CoreId", int(ident//smt))
@@ -1172,8 +1318,8 @@ class CpuTopologyMacOSClass(InfoGroup):
 
 class CpuTopologyMacOS(ListInfoGroup):
     def __init__(self, extended=False, anonymous=False):
-        super(CpuTopologyMacOS, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "CpuTopology"
+        super(CpuTopologyMacOS, self).__init__(
+            name="CpuTopology", anonymous=anonymous, extended=extended)
         ncpu = process_cmd(("sysctl", "-a", r"hw.logicalcpu: (\d+)", int))
         ncores_pack = process_cmd(("sysctl", "-a", r"machdep.cpu.cores_per_package: (\d+)", int))
         ncores = process_cmd(("sysctl", "-a", r"machdep.cpu.core_count: (\d+)", int))
@@ -1338,8 +1484,9 @@ class CpuFrequencyMacOs(MultiClassInfoGroup):
 
 class CpuFrequencyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
-        super(CpuFrequencyClass, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "Cpu{}".format(ident)
+        super(CpuFrequencyClass, self).__init__(
+            name="Cpu{}".format(ident), anonymous=anonymous, extended=extended)
+        self.ident = ident
         base = "/sys/devices/system/cpu/cpu{}/cpufreq".format(ident)
         if pexists(pjoin(base, "scaling_max_freq")):
             self.addf("MaxFreq", pjoin(base, "scaling_max_freq"), r"(\d+)", tohertz)
@@ -1387,8 +1534,9 @@ class CpuFrequency(PathMatchInfoGroup):
 ################################################################################
 class NumaInfoMacOSClass(InfoGroup):
     def __init__(self, node, anonymous=False, extended=False):
-        super(NumaInfoMacOSClass, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "NumaNode{}".format(node)
+        super(NumaInfoMacOSClass, self).__init__(
+            name="NumaNode{}".format(node), anonymous=anonymous, extended=extended)
+        self.node = node
         self.addc("MemTotal", "sysctl", "-a", r"hw.memsize: (\d+)", int)
         self.addc("MemFree", "sysctl", "-a", r"vm.page_free_count: (\d+)", MemInfoMacOS.pagescale)
         self.addc("CpuList", "sysctl", "-a", r"hw.cacheconfig: (\d+)", NumaInfoMacOSClass.cpulist)
@@ -1411,10 +1559,11 @@ class NumaInfoMacOS(ListInfoGroup):
 
 class NumaInfoHugepagesClass(InfoGroup):
     def __init__(self, size, extended=False, anonymous=False, node=0):
-        name = "Hugepages-{}".format(size)
-        super(NumaInfoHugepagesClass, self).__init__(name=name,
+        super(NumaInfoHugepagesClass, self).__init__(name="Hugepages-{}".format(size),
                                                      extended=extended,
                                                      anonymous=anonymous)
+        self.size = size
+        self.node = node
         base = "/sys/devices/system/node/node{}/hugepages/hugepages-{}".format(node, size)
         self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
         self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
@@ -1423,6 +1572,7 @@ class NumaInfoHugepagesClass(InfoGroup):
 class NumaInfoClass(PathMatchInfoGroup):
     def __init__(self, node, anonymous=False, extended=False):
         super(NumaInfoClass, self).__init__(anonymous=anonymous, extended=extended)
+        self.node = node
         self.name = "NumaNode{}".format(node)
         base = "/sys/devices/system/node/node{}".format(node)
         meminfo = pjoin(base, "meminfo")
@@ -1455,8 +1605,9 @@ class NumaInfo(PathMatchInfoGroup):
 ################################################################################
 class CacheTopologyMacOSClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
-        super(CacheTopologyMacOSClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = ident.upper()
+        super(CacheTopologyMacOSClass, self).__init__(
+            name=ident.upper(), extended=extended, anonymous=anonymous)
+        self.ident = ident
         self.addc("Size", "sysctl", "-n hw.{}cachesize".format(ident), r"(\d+)", int)
         self.const("Level", re.match(r"l(\d+)[id]*", ident).group(1))
         if re.match(r"l\d+([id]*)", ident).group(1) == 'i':
@@ -1499,8 +1650,9 @@ class CacheTopologyMacOS(ListInfoGroup):
 
 class CacheTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
-        super(CacheTopologyClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "L{}".format(ident)
+        super(CacheTopologyClass, self).__init__(
+            name="L{}".format(ident), extended=extended, anonymous=anonymous)
+        self.ident = ident
         base = "/sys/devices/system/cpu/cpu0/cache/index{}".format(ident)
         fparse = CacheTopologyClass.kBtoBytes
         if pexists(base):
@@ -1546,16 +1698,17 @@ class CacheTopologyClass(InfoGroup):
     @staticmethod
     def kBtoBytes(value):
         return tobytes("{} kB".format(value))
-    def update(self):
-        super(CacheTopologyClass, self).update()
-        if "Level" in self._data:
-            self.name = "L{}".format(self._data["Level"])
-            if "Type" in self._data:
-                ctype = self._data["Type"]
+    def get(self, meta=True):
+        d = super(CacheTopologyClass, self).get(meta=meta)
+        if "Level" in d:
+            self.name = "L{}".format(d["Level"])
+            if "Type" in d:
+                ctype = d["Type"]
                 if ctype == "Data":
                     self.name += "D"
                 elif ctype == "Instruction":
                     self.name += "I"
+        return d
 
 class CacheTopology(PathMatchInfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -1699,6 +1852,7 @@ class KernelSchedInfo(InfoGroup):
 
 class KernelRcuInfo(InfoGroup):
     def __init__(self, command, extended=False, anonymous=False):
+        self.command = command
         super(KernelRcuInfo, self).__init__(name=command,
                                             extended=extended,
                                             anonymous=anonymous)
@@ -1723,6 +1877,10 @@ class KernelInfo(ListInfoGroup):
         if pexists("/proc/sys/kernel/softlockup_thresh"):
             self.addf("SoftwareWatchdog", "/proc/sys/kernel/softlockup_thresh", parse=int)
         self.addf("VMstatPolling", "/proc/sys/vm/stat_interval", parse=int)
+        self.addf("Swappiness", "/proc/sys/vm/swappiness", parse=int)
+        self.addf("MinFreeBytes", "/proc/sys/vm/min_free_kbytes", parse=lambda x: int(x)*1024)
+        self.addf("WatermarkScaleFactor", "/proc/sys/vm/watermark_scale_factor", parse=int)
+        self.addf("VFSCachePressure", "/proc/sys/vm/vfs_cache_pressure", parse=int)
         self.required("Version", "CmdLine", "NMIWatchdog", "Watchdog")
 
         cls = KernelSchedInfo(extended=extended,
@@ -1766,8 +1924,39 @@ class WritebackWorkqueue(InfoGroup):
         self.required(["CPUmask", "MaxActive", "NUMA"])
 
 ################################################################################
+# Infos about the writeback behavior
+################################################################################
+class WritebackInfo(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(WritebackInfo, self).__init__(name="WritebackInfo",
+                                            extended=extended,
+                                            anonymous=anonymous)
+        base = "/proc/sys/vm"
+        self.addf("DirtyRatio", pjoin(base, "dirty_ratio"), r"(\d+)", int)
+        self.addf("DirtyBackgroundRatio", pjoin(base, "dirty_background_ratio"), r"(\d+)", int)
+        self.addf("DirtyBytes", pjoin(base, "dirty_bytes"), r"(\d+)", int)
+        self.addf("DirtyBackgroundBytes", pjoin(base, "dirty_background_bytes"), r"(\d+)", int)
+        self.addf("DirtyExpireCentisecs", pjoin(base, "dirty_expire_centisecs"), r"(\d+)", int)
+        self.required(["DirtyRatio",
+                       "DirtyBytes",
+                       "DirtyBackgroundRatio",
+                       "DirtyBackgroundBytes"])
+
+################################################################################
 # Infos about transparent hugepages
 ################################################################################
+class TransparentHugepagesDaemon(InfoGroup):
+    def __init__(self, extended=False, anonymous=False):
+        super(TransparentHugepagesDaemon, self).__init__(name="TransparentHugepagesDaemon",
+                                                         extended=extended,
+                                                         anonymous=anonymous)
+        base = "/sys/kernel/mm/transparent_hugepage/khugepaged"
+        self.addf("Defrag", pjoin(base, "defrag"), r"(\d+)", int)
+        self.addf("PagesToScan", pjoin(base, "pages_to_scan"), r"(\d+)", int)
+        self.addf("ScanSleepMillisecs", pjoin(base, "scan_sleep_millisecs"), r"(\d+)", int)
+        self.addf("AllocSleepMillisecs", pjoin(base, "alloc_sleep_millisecs"), r"(\d+)", int)
+        self.required(["Defrag", "PagesToScan", "ScanSleepMillisecs", "AllocSleepMillisecs"])
+
 class TransparentHugepages(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(TransparentHugepages, self).__init__(name="TransparentHugepages",
@@ -1775,8 +1964,11 @@ class TransparentHugepages(InfoGroup):
                                                    anonymous=anonymous)
         base = "/sys/kernel/mm/transparent_hugepage"
         self.addf("State", pjoin(base, "enabled"), r".*\[(.*)\].*")
+        self.addf("Defrag", pjoin(base, "defrag"), r".*\[(.*)\].*")
+        self.addf("ShmemEnabled", pjoin(base, "shmem_enabled"), r".*\[(.*)\].*")
         self.addf("UseZeroPage", pjoin(base, "use_zero_page"), r"(\d+)", tobool)
-        self.required(["State", "UseZeroPage"])
+        self.required(["State", "UseZeroPage", "Defrag", "ShmemEnabled"])
+        self._instances = [TransparentHugepagesDaemon(extended, anonymous)]
 
 
 ################################################################################
@@ -1788,6 +1980,9 @@ class PowercapInfoConstraintClass(InfoGroup):
         super(PowercapInfoConstraintClass, self).__init__(name="Constraint{}".format(ident),
                                                           extended=extended,
                                                           anonymous=anonymous)
+        self.ident = ident
+        self.package = package
+        self.domain = domain
         base = "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:{}".format(package)
         fptr = fopen(pjoin(base, "constraint_{}_name".format(ident)))
         if fptr:
@@ -1807,6 +2002,8 @@ class PowercapInfoClass(PathMatchInfoGroup):
     '''Class to spawn subclasses for each contraint in a powercap domain'''
     def __init__(self, ident, extended=False, anonymous=False, package=0):
         super(PowercapInfoClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.ident = ident
+        self.package = package
         base = "/sys/devices/virtual/powercap/intel-rapl"
         base = pjoin(base, "intel-rapl:{}/intel-rapl:{}:{}".format(package, package, ident))
         fptr = fopen(pjoin(base, "name".format(ident)))
@@ -1832,6 +2029,7 @@ class PowercapInfoPackageClass(PathMatchInfoGroup):
                                                        match=r".*/constraint_(\d+)_name",
                                                        subclass=PowercapInfoConstraintClass,
                                                        subargs={"package" : ident})
+        self.ident = ident
         self.addf("Enabled", pjoin(base, "enabled"), r"(\d+)", tobool)
 
 class PowercapInfoPackage(PathMatchInfoGroup):
@@ -1845,7 +2043,7 @@ class PowercapInfoPackage(PathMatchInfoGroup):
                                                   subargs={"package" : package},
                                                   match=r".*/intel-rapl\:\d+:(\d+)",
                                                   subclass=PowercapInfoClass)
-
+        self.package = package
         fptr = fopen(pjoin(base, "name"))
         if fptr:
             self.name = totitle(fptr.read().decode(ENCODING).strip())
@@ -1897,6 +2095,7 @@ class HugepagesClass(InfoGroup):
     def __init__(self, size, extended=False, anonymous=False):
         name = "Hugepages-{}".format(size)
         super(HugepagesClass, self).__init__(name=name, extended=extended, anonymous=anonymous)
+        self.size = size
         base = "/sys/kernel/mm/hugepages/hugepages-{}".format(size)
         self.addf("Count", pjoin(base, "nr_hugepages"), r"(\d+)", int)
         self.addf("Free", pjoin(base, "free_hugepages"), r"(\d+)", int)
@@ -1918,6 +2117,7 @@ class CompilerInfoClass(InfoGroup):
     '''Class to read version and path of a given executable'''
     def __init__(self, executable, extended=False, anonymous=False):
         super(CompilerInfoClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.executable = executable
         self.name = executable
         self.addc("Version", executable, "--version", r"(\d+\.\d+\.\d+)")
         abscmd = which(executable)
@@ -1933,7 +2133,8 @@ class CCompilerInfo(ListInfoGroup):
                                             extended=extended,
                                             subclass=CompilerInfoClass,
                                             anonymous=anonymous)
-        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "armclang", "ncc"]
+
+        self.compilerlist = ["gcc", "icc", "clang", "pgcc", "xlc", "xlC", "armclang", "fcc", "fccpx"]
         self.subclass = CompilerInfoClass
         if "CC" in os.environ:
             comp = os.environ["CC"]
@@ -1949,7 +2150,8 @@ class CPlusCompilerInfo(ListInfoGroup):
                                                 extended=extended,
                                                 subclass=CompilerInfoClass,
                                                 anonymous=anonymous)
-        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "armclang++", "nc++"]
+
+        self.compilerlist = ["g++", "icpc", "clang++", "pg++", "xlc++", "armclang++", "FCC", "FCCpx"]
         self.subclass = CompilerInfoClass
         if "CXX" in os.environ:
             comp = os.environ["CXX"]
@@ -1965,18 +2167,31 @@ class FortranCompilerInfo(ListInfoGroup):
                                                   extended=extended,
                                                   subclass=CompilerInfoClass,
                                                   anonymous=anonymous)
-        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90", "armflang", "nfort"]
+
+        self.compilerlist = ["gfortran", "ifort", "flang", "pgf90",
+                             "xlf", "xlf90", "xlf95", "xlf2003", "xlf2008",
+                             "armflang", "frt", "frtpx"]
         if "FC" in os.environ:
             comp = os.environ["FC"]
             if comp not in self.compilerlist:
                 self.compilerlist.append(comp)
         self.userlist = [c for c in self.compilerlist if which(c)]
 
+class AcceleratorCompilerInfo(ListInfoGroup):
+    '''Class to spawn subclasses for various compilers used with accelerators'''
+    def __init__(self, extended=False, anonymous=False):
+        super(AcceleratorCompilerInfo, self).__init__(name="Accelerator",
+                                                      extended=extended,
+                                                      subclass=CompilerInfoClass,
+                                                      anonymous=anonymous)
+        self.compilerlist = ["nvcc", "hipcc", "icx", "icpx", "dpcpp",
+                             "clocl", "nfort", "ncc", "nc++", "rocm-clang-ocl"]
+        self.userlist = [c for c in self.compilerlist if which(c)]
 
 class CompilerInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for various compilers'''
     def __init__(self, extended=False, anonymous=False):
-        clist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo]
+        clist = [CCompilerInfo, CPlusCompilerInfo, FortranCompilerInfo, AcceleratorCompilerInfo]
         cargs = [{} for i in range(len(clist))]
         super(CompilerInfo, self).__init__(name="CompilerInfo",
                                            extended=extended,
@@ -1990,8 +2205,9 @@ class CompilerInfo(MultiClassInfoGroup):
 class PythonInfoClass(InfoGroup):
     '''Class to read information about a Python executable'''
     def __init__(self, executable, extended=False, anonymous=False):
-        super(PythonInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = executable
+        super(PythonInfoClass, self).__init__(
+            name=executable, extended=extended, anonymous=anonymous)
+        self.executable = executable
         abspath = which(executable)
         if abspath and len(abspath) > 0:
             self.addc("Version", abspath, "--version 2>&1", r"(\d+\.\d+\.\d+)")
@@ -2015,6 +2231,7 @@ class MpiInfoClass(InfoGroup):
     '''Class to read information about an MPI or job scheduler executable'''
     def __init__(self, executable, extended=False, anonymous=False):
         super(MpiInfoClass, self).__init__(name=executable, extended=extended, anonymous=anonymous)
+        self.executable = executable
         self.addc("Version", executable, "--version", r"(.+)", MpiInfoClass.mpiversion)
         self.addc("Implementor", executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
         abscmd = which(executable)
@@ -2030,6 +2247,8 @@ class MpiInfoClass(InfoGroup):
             return "IntelMPI"
         elif "slurm" in value.lower():
             return "Slurm"
+        elif "fujitsu" in value.lower():
+            return "Fujitsu"
         return "Unknown"
 
     @staticmethod
@@ -2084,15 +2303,21 @@ class ShellEnvironment(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(ShellEnvironment, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "ShellEnvironment"
+        for k,v in os.environ.items():
+            value = v
+            if self.anonymous:
+                value = ShellEnvironment.anonymous_shell_var(k, v)
+            self.const(k, value)
+
     def update(self):
         super(ShellEnvironment, self).update()
         outdict = {}
-        for key in os.environ:
-            value = os.environ[key]
+        for k,v in os.environ.items():
+            value = v
             if self.anonymous:
-                value = ShellEnvironment.anonymous_shell_var(key, value)
-            outdict.update({key : value})
-        self._data.update(outdict)
+                value = ShellEnvironment.anonymous_shell_var(k, v)
+            self._data[k] = value
+
     @staticmethod
     def anonymous_shell_var(key, value):
         out = value
@@ -2111,8 +2336,10 @@ class ShellEnvironment(InfoGroup):
 class PrefetcherInfoClass(InfoGroup):
     '''Class to read prefetcher settings for one HW thread (uses the likwid-features command)'''
     def __init__(self, ident, extended=False, anonymous=False, likwid_base=None):
-        super(PrefetcherInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Cpu{}".format(ident)
+        super(PrefetcherInfoClass, self).__init__(
+            name="Cpu{}".format(ident), extended=extended, anonymous=anonymous)
+        self.ident = ident
+        self.likwid_base = likwid_base
         names = ["HW_PREFETCHER", "CL_PREFETCHER", "DCU_PREFETCHER", "IP_PREFETCHER"]
         cmd_opts = "-c {} -l".format(ident)
         cmd = "likwid-features"
@@ -2133,6 +2360,7 @@ class PrefetcherInfo(PathMatchInfoGroup):
         super(PrefetcherInfo, self).__init__(name="PrefetcherInfo",
                                              extended=extended,
                                              anonymous=anonymous)
+        self.likwid_base = likwid_base
         cmd = "likwid-features"
         abscmd = cmd
         if likwid_base and os.path.isdir(likwid_base):
@@ -2157,6 +2385,7 @@ class TurboInfo(InfoGroup):
     '''
     def __init__(self, extended=False, anonymous=False, likwid_base=None):
         super(TurboInfo, self).__init__(name="TurboInfo", extended=extended, anonymous=anonymous)
+        self.likwid_base = likwid_base
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
         error_match = r"Cannot gather values.*"
@@ -2200,6 +2429,7 @@ class ClocksourceInfoClass(InfoGroup):
     '''Class to read information for one clocksource device'''
     def __init__(self, ident, extended=False, anonymous=False):
         super(ClocksourceInfoClass, self).__init__(anonymous=anonymous, extended=extended)
+        self.ident = ident
         self.name = "Clocksource{}".format(ident)
         base = "/sys/devices/system/clocksource/clocksource{}".format(ident)
         self.addf("Current", pjoin(base, "current_clocksource"), r"(\s+)", str)
@@ -2223,22 +2453,28 @@ class ClocksourceInfo(PathMatchInfoGroup):
 ################################################################################
 class ExecutableInfoExec(InfoGroup):
     '''Class to read basic information of given executable'''
-    def __init__(self, extended=False, anonymous=False, executable=""):
-        super(ExecutableInfoExec, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "ExecutableInfo"
+    def __init__(self, extended=False, anonymous=False, executable=None):
+        super(ExecutableInfoExec, self).__init__(
+            name="ExecutableInfo", anonymous=anonymous, extended=extended)
+        self.executable = executable
 
         if executable is not None:
-            self.executable = executable
             abscmd = which(self.executable)
             self.const("Name", str(self.executable))
+            self.required("Name")
             if abscmd and len(abscmd) > 0:
                 self.const("Abspath", abscmd)
                 self.const("Size", psize(abscmd))
-                pfunc = ExecutableInfoExec.getcompiledwith
-                self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
+                self.required("Size")
+                if which("readelf"):
+                    comp_regex = r"\s*\[\s*\d+\]\s+(.+)"
+                    self.addc("CompiledWith", "readelf", "-p .comment {}".format(abscmd), comp_regex)
+                    flags_regex = r"^\s*\<c\>\s+DW_AT_producer\s+:\s+\(.*\):\s*(.*)$"
+                    self.addc("CompilerFlags", "readelf", "-wi {}".format(abscmd), flags_regex)
                 if extended:
                     self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
-            self.required(["Name", "Size", "MD5sum"])
+                    self.required("MD5sum")
+
     @staticmethod
     def getmd5sum(filename):
         hash_md5 = hashlib.md5()
@@ -2246,50 +2482,51 @@ class ExecutableInfoExec(InfoGroup):
             for chunk in iter(lambda: md5fp.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-    @staticmethod
-    def getcompiledwith(value):
-        for line in re.split(r"\n", value):
-            if "CC" in line:
-                return line
-        return "Not detectable"
 
 class ExecutableInfoLibraries(InfoGroup):
     '''Class to read all libraries linked with given executable'''
     def __init__(self, executable, extended=False, anonymous=False):
-        super(ExecutableInfoLibraries, self).__init__(anonymous=anonymous, extended=extended)
-        self.name = "LinkedLibraries"
-        self.ldd = None
+        super(ExecutableInfoLibraries, self).__init__(
+            name="LinkedLibraries", anonymous=anonymous, extended=extended)
+        self.executable = executable
         if executable is not None:
             self.executable = which(executable)
-            self.ldd = None
-            if self.executable and len(self.executable) > 0:
-                self.ldd = "LANG=C ldd {}; exit 0".format(self.executable)
-    def update(self):
+            if which("objdump"):
+                parser = ExecutableInfoLibraries.parseNeededLibs
+                self.addc("NeededLibraries", "objdump", "-p {}".format(executable), parse=parser)
+            if which("ldd"):
+                parser = ExecutableInfoLibraries.parseLinkedLibs
+                self.addc("LinkedLibraries", "ldd", executable, parse=parser)
+    def parseLinkedLibs(data):
         libdict = {}
-        if self.ldd is not None:
-            rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
-            data = rawdata.decode(ENCODING)
-            libregex = re.compile(r"\s*([^\s]+)\s+.*")
-            pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
-            for line in data.split("\n"):
-                libmat = libregex.search(line)
-                if libmat:
-                    lib = libmat.group(1)
-                    pathmat = pathregex.search(line)
-                    if pathmat:
-                        libdict.update({lib : pathmat.group(1)})
-                    elif pexists(lib):
-                        libdict.update({lib : lib})
-                    else:
-                        libdict.update({lib : None})
-            self.required(list(libdict.keys()))
-        self._data = libdict
+        libregex = re.compile(r"\s*([^\s]+)\s+.*")
+        pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^(]+).*")
+        for line in data.split("\n"):
+            libmat = libregex.search(line)
+            if libmat:
+                lib = libmat.group(1)
+                pathmat = pathregex.search(line)
+                if pathmat:
+                    libdict.update({lib : pathmat.group(1)})
+                elif pexists(lib):
+                    libdict.update({lib : lib})
+                else:
+                    libdict.update({lib : None})
+        return libdict
+    def parseNeededLibs(data):
+        libs = []
+        for line in data.split("\n"):
+            m = re.match(r"^\s+NEEDED\s+(.*)$", line)
+            if m:
+                libs.append(m.group(1))
+        return libs
+
 
 class ExecutableInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for analyzing a given executable'''
     def __init__(self, executable, extended=False, anonymous=False):
-        super(ExecutableInfo, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "ExecutableInfo"
+        super(ExecutableInfo, self).__init__(
+            name="ExecutableInfo", extended=extended, anonymous=anonymous)
         self.executable = executable
         self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
         clsargs = {"executable" : self.executable}
@@ -2301,9 +2538,14 @@ class ExecutableInfo(MultiClassInfoGroup):
 class CoretempInfoHwmonClassX86(InfoGroup):
     '''Class to read information for one X86 coretemps sensor inside one hwmon entry and device'''
     def __init__(self, sensor, extended=False, anonymous=False, socket=0, hwmon=0):
-        super(CoretempInfoHwmonClassX86, self).__init__(extended=extended, anonymous=anonymous)
         base = "/sys/devices/platform/coretemp.{}/hwmon/hwmon{}/".format(socket, hwmon)
-        self.name = process_file((pjoin(base, "temp{}_label".format(sensor)),))
+        super(CoretempInfoHwmonClassX86, self).__init__(
+            name=process_file((pjoin(base, "temp{}_label".format(sensor)),)),
+            extended=extended,
+            anonymous=anonymous)
+        self.sensor = sensor
+        self.socket = socket
+        self.hwmon = hwmon
         self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
         self.required("Input")
         if extended:
@@ -2314,8 +2556,10 @@ class CoretempInfoHwmonClassX86(InfoGroup):
 class CoretempInfoHwmonX86(PathMatchInfoGroup):
     '''Class to spawn subclasses for one hwmon entry inside a X86 coretemps device'''
     def __init__(self, hwmon, extended=False, anonymous=False, socket=0):
-        super(CoretempInfoHwmonX86, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Hwmon{}".format(hwmon)
+        super(CoretempInfoHwmonX86, self).__init__(
+            name="Hwmon{}".format(hwmon), extended=extended, anonymous=anonymous)
+        self.hwmon = hwmon
+        self.socket = socket
         self.subclass = CoretempInfoHwmonClassX86
         self.subargs = {"socket" : socket, "hwmon" : hwmon}
         base = "/sys/devices/platform/coretemp.{}".format(socket)
@@ -2325,8 +2569,8 @@ class CoretempInfoHwmonX86(PathMatchInfoGroup):
 class CoretempInfoSocketX86(PathMatchInfoGroup):
     '''Class to spawn subclasses for one X86 coretemps device'''
     def __init__(self, socket, extended=False, anonymous=False):
-        super(CoretempInfoSocketX86, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Package{}".format(socket)
+        super(CoretempInfoSocketX86, self).__init__(
+            name="Package{}".format(socket), extended=extended, anonymous=anonymous)
         self.socket = socket
         self.subargs = {"socket" : socket}
         self.subclass = CoretempInfoHwmonX86
@@ -2336,9 +2580,11 @@ class CoretempInfoSocketX86(PathMatchInfoGroup):
 class CoretempInfoHwmonClassARM(InfoGroup):
     '''Class to read information for one ARM coretemps sensor inside one hwmon entry'''
     def __init__(self, sensor, extended=False, anonymous=False, hwmon=0):
-        super(CoretempInfoHwmonClassARM, self).__init__(extended=extended, anonymous=anonymous)
+        super(CoretempInfoHwmonClassARM, self).__init__(
+            name="Core{}".format(sensor), extended=extended, anonymous=anonymous)
+        self.sensor = sensor
+        self.hwmon = hwmon
         base = "/sys/devices/virtual/hwmon/hwmon{}".format(hwmon)
-        self.name = "Core{}".format(sensor)
         self.addf("Input", pjoin(base, "temp{}_input".format(sensor)), r"(\d+)", int)
         self.required("Input")
         if extended:
@@ -2347,8 +2593,9 @@ class CoretempInfoHwmonClassARM(InfoGroup):
 class CoretempInfoSocketARM(PathMatchInfoGroup):
     '''Class to spawn subclasses for ARM coretemps for one hwmon entry'''
     def __init__(self, hwmon, extended=False, anonymous=False):
-        super(CoretempInfoSocketARM, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Hwmon{}".format(hwmon)
+        super(CoretempInfoSocketARM, self).__init__(
+            name="Hwmon{}".format(hwmon), extended=extended, anonymous=anonymous)
+        self.hwmon = hwmon
         self.searchpath = "/sys/devices/virtual/hwmon/hwmon{}/temp*_input".format(hwmon)
         self.match = r".*/temp(\d+)_input$"
         self.subclass = CoretempInfoHwmonClassARM
@@ -2403,6 +2650,7 @@ class ThermalZoneInfoClass(InfoGroup):
         super(ThermalZoneInfoClass, self).__init__(name="ThermalZone{}".format(zone),
                                                    extended=extended,
                                                    anonymous=anonymous)
+        self.zone = zone
         base = "/sys/devices/virtual/thermal/thermal_zone{}".format(zone)
         if pexists(pjoin(base, "device/description")):
             with (open(pjoin(base, "device/description"), "rb")) as filefp:
@@ -2466,6 +2714,7 @@ class DmiDecodeFile(InfoGroup):
         super(DmiDecodeFile, self).__init__(name="DmiDecodeFile",
                                             extended=extended,
                                             anonymous=anonymous)
+        self.dmifile = dmifile
         if pexists(dmifile):
             self.addf("DmiDecode", dmifile)
 
@@ -2505,6 +2754,7 @@ class ModulesInfo(InfoGroup):
         super(ModulesInfo, self).__init__(name="ModulesInfo",
                                           extended=extended,
                                           anonymous=anonymous)
+        self.modulecmd = modulecmd
         parse = ModulesInfo.parsemodules
         cmd_opts = "sh list -t 2>&1"
         cmd = modulecmd
@@ -2537,6 +2787,7 @@ class IrqAffinityClass(InfoGroup):
         super(IrqAffinityClass, self).__init__(name="irq{}".format(irq),
                                                extended=extended,
                                                anonymous=anonymous)
+        self.irq = irq
         self.addf("SMPAffinity", "/proc/irq/{}/smp_affinity".format(irq), parse=masktolist)
 
 class IrqAffinity(PathMatchInfoGroup):
@@ -2557,8 +2808,10 @@ class IrqAffinity(PathMatchInfoGroup):
 class InfinibandInfoClassPort(InfoGroup):
     '''Class to read the information of a single port of an InfiniBand/OmniPath driver.'''
     def __init__(self, port, extended=False, anonymous=False, driver=""):
-        super(InfinibandInfoClassPort, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Port{}".format(port)
+        super(InfinibandInfoClassPort, self).__init__(
+            name="Port{}".format(port), extended=extended, anonymous=anonymous)
+        self.port = port
+        self.driver = driver
         ibpath = "/sys/class/infiniband/{}/ports/{}".format(driver, port)
         self.addf("Rate", pjoin(ibpath, "rate"), r"(.+)")
         self.addf("PhysState", pjoin(ibpath, "phys_state"), r"(.+)")
@@ -2568,8 +2821,9 @@ class InfinibandInfoClassPort(InfoGroup):
 class InfinibandInfoClass(PathMatchInfoGroup):
     '''Class to read the information of an InfiniBand/OmniPath driver.'''
     def __init__(self, driver, extended=False, anonymous=False):
-        super(InfinibandInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = driver
+        super(InfinibandInfoClass, self).__init__(
+            name=driver, extended=extended, anonymous=anonymous)
+        self.driver = driver
         ibpath = "/sys/class/infiniband/{}".format(driver)
         self.addf("BoardId", pjoin(ibpath, "board_id"), r"(.+)")
         self.addf("FirmwareVersion", pjoin(ibpath, "fw_ver"), r"([\d\.]+)")
@@ -2605,6 +2859,8 @@ class NvidiaSmiInfoClass(InfoGroup):
         super(NvidiaSmiInfoClass, self).__init__(name="Card{}".format(device),
                                                  extended=extended,
                                                  anonymous=anonymous)
+        self.device = device
+        self.nvidia_path = nvidia_path
         cmd = pjoin(nvidia_path, "nvidia-smi")
         if pexists(cmd):
             self.cmd = cmd
@@ -2636,6 +2892,7 @@ class NvidiaSmiInfo(ListInfoGroup):
         super(NvidiaSmiInfo, self).__init__(name="NvidiaInfo",
                                             extended=extended,
                                             anonymous=anonymous)
+        self.nvidia_path = nvidia_path
         self.cmd = "nvidia-smi"
         cmd = pjoin(nvidia_path, "nvidia-smi")
         if pexists(cmd):
@@ -2662,8 +2919,11 @@ class NvidiaSmiInfo(ListInfoGroup):
 class NecTsubasaInfoTemps(InfoGroup):
     '''Class to read temperature information for one NEC Tsubasa device (uses the vecmd command)'''
     def __init__(self, tempkeys, vecmd_path="", extended=False, anonymous=False, device=0):
-        super(NecTsubasaInfoTemps, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Temperatures"
+        super(NecTsubasaInfoTemps, self).__init__(
+            name="Temperatures", extended=extended, anonymous=anonymous)
+        self.tempkeys = tempkeys
+        self.vecmd_path = vecmd_path
+        self.deive = device
         vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         for tempkey in tempkeys:
@@ -2672,8 +2932,10 @@ class NecTsubasaInfoTemps(InfoGroup):
 class NecTsubasaInfoClass(InfoGroup):
     '''Class to read information for one NEC Tsubasa device (uses the vecmd command)'''
     def __init__(self, device, vecmd_path="", extended=False, anonymous=False):
-        super(NecTsubasaInfoClass, self).__init__(extended=extended, anonymous=anonymous)
-        self.name = "Card{}".format(device)
+        super(NecTsubasaInfoClass, self).__init__(
+            name="Card{}".format(device), extended=extended, anonymous=anonymous)
+        self.device = device
+        self.vecmd_path = vecmd_path
         vecmd = pjoin(vecmd_path, "vecmd")
         veargs = "-N {} info".format(device)
         if pexists(vecmd):
@@ -2706,6 +2968,7 @@ class NecTsubasaInfo(ListInfoGroup):
         super(NecTsubasaInfo, self).__init__(name="NecTsubasaInfo",
                                              extended=extended,
                                              anonymous=anonymous)
+        self.vecmd_path = vecmd_path
         vecmd = pjoin(vecmd_path, "vecmd")
         if not pexists(vecmd):
             vecmd = which("vecmd")
@@ -2718,6 +2981,186 @@ class NecTsubasaInfo(ListInfoGroup):
                 self.subclass = NecTsubasaInfoClass
                 self.subargs = {"vecmd_path" : vecmd_path}
 
+################################################################################
+# Infos from clinfo (OpenCL devices and runtime)
+################################################################################
+class OpenCLInfoPlatformDeviceClass(InfoGroup):
+    '''Class to read information for one OpenCL device in one platform(uses the clinfo command)'''
+    def __init__(self, device, suffix, extended=False, anonymous=False, clinfo_path=""):
+        super(OpenCLInfoPlatformDeviceClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.device = device
+        self.suffix = suffix
+        self.clinfo_path = clinfo_path
+        clcmd = pjoin(clinfo_path, "clinfo")
+        if not pexists(clcmd):
+            clcmd = which("clinfo")
+        if clcmd and len(clcmd) > 0:
+            cmdopts = "--raw --offline | grep '[{}/{}]'".format(self.suffix, self.device)
+            self.name = process_cmd((clcmd, cmdopts, r"CL_DEVICE_NAME\s+(.+)", str))
+            self.const("Name", self.name)
+            self.addc("ImagePitchAlignment", clcmd, cmdopts, r"CL_DEVICE_IMAGE_PITCH_ALIGNMENT\s+(\d+)", int)
+            self.addc("Vendor", clcmd, cmdopts, r"CL_DEVICE_VENDOR\s+(.+)", str)
+            self.addc("DriverVersion", clcmd, cmdopts, r"CL_DRIVER_VERSION\s+(.+)", str)
+            self.addc("VendorId", clcmd, cmdopts, r"CL_DEVICE_VENDOR_ID\s+(.+)", str)
+            self.addc("OpenCLVersion", clcmd, cmdopts, r"CL_DEVICE_OPENCL_C_VERSION\s+(.+)", str)
+            self.addc("Type", clcmd, cmdopts, r"CL_DEVICE_TYPE\s+(.+)", str)
+            self.addc("MaxComputeUnits", clcmd, cmdopts, r"CL_DEVICE_MAX_COMPUTE_UNITS\s+(\d+)", int)
+            self.addc("MaxClockFrequency", clcmd, cmdopts, r"CL_DEVICE_MAX_CLOCK_FREQUENCY\s+(\d+)", int)
+            self.addc("DeviceAvailable", clcmd, cmdopts, r"CL_DEVICE_AVAILABLE\s+(.+)", str)
+            self.addc("CompilerAvailable", clcmd, cmdopts, r"CL_DEVICE_COMPILER_AVAILABLE\s+(.+)", str)
+            self.addc("LinkerAvailable", clcmd, cmdopts, r"CL_DEVICE_LINKER_AVAILABLE\s+(.+)", str)
+            self.addc("Profile", clcmd, cmdopts, r"CL_DEVICE_PROFILE\s+(.+)", str)
+            self.addc("PartitionMaxSubDevices", clcmd, cmdopts, r"CL_DEVICE_PARTITION_MAX_SUB_DEVICES\s+(\d+)", int)
+            self.addc("PartitionProperties", clcmd, cmdopts, r"CL_DEVICE_PARTITION_PROPERTIES\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("PartitionAffinityDomain", clcmd, cmdopts, r"CL_DEVICE_PARTITION_AFFINITY_DOMAIN\s+(.+)", str)
+            self.addc("MaxWorkItemDims", clcmd, cmdopts, r"CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS\s+(\d+)", int)
+            self.addc("MaxWorkItemSizes", clcmd, cmdopts, r"CL_DEVICE_MAX_WORK_ITEM_SIZES\s+(.+)", tointlist)
+            self.addc("MaxWorkGroupSize", clcmd, cmdopts, r"CL_DEVICE_MAX_WORK_GROUP_SIZE\s+(\d+)", int)
+            self.addc("PreferredWorkGroupSizeMultiple", clcmd, cmdopts, r"CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE\s+(\d+)", int)
+            self.addc("MaxNumSubGroups", clcmd, cmdopts, r"CL_DEVICE_MAX_NUM_SUB_GROUPS\s+(\d+)", int)
+            self.addc("SubGroupSizesIntel", clcmd, cmdopts, r"CL_DEVICE_SUB_GROUP_SIZES_INTEL\s+([\d\s]+)", tointlist)
+            self.addc("PreferredVectorWidthChar", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR\s+(\d+)", int)
+            self.addc("NativeVectorWidthChar", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_CHAR\s+(\d+)", int)
+            self.addc("PreferredVectorWidthShort", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_SHORT\s+(\d+)", int)
+            self.addc("NativeVectorWidthShort", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_SHORT\s+(\d+)", int)
+            self.addc("PreferredVectorWidthInt", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT\s+(\d+)", int)
+            self.addc("NativeVectorWidthInt", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_INT\s+(\d+)", int)
+            self.addc("PreferredVectorWidthLong", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_LONG\s+(\d+)", int)
+            self.addc("NativeVectorWidthLong", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_LONG\s+(\d+)", int)
+            self.addc("PreferredVectorWidthFloat", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT\s+(\d+)", int)
+            self.addc("NativeVectorWidthFloat", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_FLOAT\s+(\d+)", int)
+            self.addc("PreferredVectorWidthDouble", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE\s+(\d+)", int)
+            self.addc("NativeVectorWidthDouble", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_DOUBLE\s+(\d+)", int)
+            self.addc("PreferredVectorWidthHalf", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_VECTOR_WIDTH_HALF\s+(\d+)", int)
+            self.addc("NativeVectorWidthHalf", clcmd, cmdopts, r"CL_DEVICE_NATIVE_VECTOR_WIDTH_HALF\s+(\d+)", int)
+            self.addc("HalfFpConfig", clcmd, cmdopts, r"CL_DEVICE_HALF_FP_CONFIG\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("SingleFpConfig", clcmd, cmdopts, r"CL_DEVICE_SINGLE_FP_CONFIG\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("DoubleFpConfig", clcmd, cmdopts, r"CL_DEVICE_DOUBLE_FP_CONFIG\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("AddressBits", clcmd, cmdopts, r"CL_DEVICE_ADDRESS_BITS\s+(\d+)", int)
+            self.addc("EndianLittle", clcmd, cmdopts, r"CL_DEVICE_ENDIAN_LITTLE\s+(.+)", str)
+            self.addc("GlobalMemSize", clcmd, cmdopts, r"CL_DEVICE_GLOBAL_MEM_SIZE\s+(\d+)", int)
+            self.addc("MaxMemAllocSize", clcmd, cmdopts, r"CL_DEVICE_MAX_MEM_ALLOC_SIZE\s+(\d+)", int)
+            self.addc("ErrorCorrection", clcmd, cmdopts, r"CL_DEVICE_ERROR_CORRECTION_SUPPORT\s+(.+)", str)
+            self.addc("HostUnifiedMemory", clcmd, cmdopts, r"CL_DEVICE_HOST_UNIFIED_MEMORY\s+(.+)", str)
+            self.addc("SvmCapabilities", clcmd, cmdopts, r"CL_DEVICE_SVM_CAPABILITIES\s+(.+)", str)
+            self.addc("MinDataTypeAlignSize", clcmd, cmdopts, r"CL_DEVICE_MIN_DATA_TYPE_ALIGN_SIZE\s+(\d+)", int)
+            self.addc("MemBaseAddrAlign", clcmd, cmdopts, r"CL_DEVICE_MEM_BASE_ADDR_ALIGN\s+(\d+)", int)
+            self.addc("PreferredPlatformAtomicAlign", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_PLATFORM_ATOMIC_ALIGNMENT\s+(\d+)", int)
+            self.addc("PreferredGlobalAtomicAlign", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_GLOBAL_ATOMIC_ALIGNMENT\s+(\d+)", int)
+            self.addc("PreferredLocalAtomicAlign", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_LOCAL_ATOMIC_ALIGNMENT\s+(\d+)", int)
+            self.addc("MaxGlobalVariableSize", clcmd, cmdopts, r"CL_DEVICE_MAX_GLOBAL_VARIABLE_SIZE\s+(\d+)", int)
+            self.addc("GlobalVariablePreferredTotalSize", clcmd, cmdopts, r"CL_DEVICE_GLOBAL_VARIABLE_PREFERRED_TOTAL_SIZE\s+(\d+)", int)
+            self.addc("GlobalMemCacheType", clcmd, cmdopts, r"CL_DEVICE_GLOBAL_MEM_CACHE_TYPE\s+(.+)", str)
+            self.addc("GlobalMemCacheSize", clcmd, cmdopts, r"CL_DEVICE_GLOBAL_MEM_CACHE_SIZE\s+(\d+)", int)
+            self.addc("GlobalMemCachelineSize", clcmd, cmdopts, r"CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE\s+(\d+)", int)
+            self.addc("ImageSupport", clcmd, cmdopts, r"CL_DEVICE_IMAGE_SUPPORT\s+(.+)", str)
+            self.addc("MaxSamplers", clcmd, cmdopts, r"CL_DEVICE_MAX_SAMPLERS\s+(\d+)", int)
+            self.addc("ImageMaxBufferSize", clcmd, cmdopts, r"CL_DEVICE_IMAGE_MAX_BUFFER_SIZE\s+(\d+)", int)
+            self.addc("ImageMaxArraySize", clcmd, cmdopts, r"CL_DEVICE_IMAGE_MAX_ARRAY_SIZE\s+(\d+)", int)
+            self.addc("ImageBaseAddressAlign", clcmd, cmdopts, r"CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT\s+(\d+)", int)
+            self.addc("ImagePitchAlign", clcmd, cmdopts, r"CL_DEVICE_IMAGE_PITCH_ALIGNMENT\s+(\d+)", int)
+            self.addc("Image2dMaxHeight", clcmd, cmdopts, r"CL_DEVICE_IMAGE2D_MAX_HEIGHT\s+(\d+)", int)
+            self.addc("Image2dMaxWidth", clcmd, cmdopts, r"CL_DEVICE_IMAGE2D_MAX_WIDTH\s+(\d+)", int)
+            self.addc("PlanarYuvMaxHeightIntel", clcmd, cmdopts, r"CL_DEVICE_PLANAR_YUV_MAX_HEIGHT_INTEL\s+(\d+)", int)
+            self.addc("PlanarYuvMaxWidthIntel", clcmd, cmdopts, r"CL_DEVICE_PLANAR_YUV_MAX_WIDTH_INTEL\s+(\d+)", int)
+            self.addc("Image3dMaxHeight", clcmd, cmdopts, r"CL_DEVICE_IMAGE3D_MAX_HEIGHT\s+(\d+)", int)
+            self.addc("Image3dMaxWidth", clcmd, cmdopts, r"CL_DEVICE_IMAGE3D_MAX_WIDTH\s+(\d+)", int)
+            self.addc("Image3dMaxDepth", clcmd, cmdopts, r"CL_DEVICE_IMAGE3D_MAX_DEPTH\s+(\d+)", int)
+            self.addc("MaxReadImageArgs", clcmd, cmdopts, r"CL_DEVICE_MAX_READ_IMAGE_ARGS\s+(\d+)", int)
+            self.addc("MaxWriteImageArgs", clcmd, cmdopts, r"CL_DEVICE_MAX_WRITE_IMAGE_ARGS\s+(\d+)", int)
+            self.addc("MaxReadWriteImageArgs", clcmd, cmdopts, r"CL_DEVICE_MAX_READ_WRITE_IMAGE_ARGS\s+(\d+)", int)
+            self.addc("MaxPipeArgs", clcmd, cmdopts, r"CL_DEVICE_MAX_PIPE_ARGS\s+(\d+)", int)
+            self.addc("PipeMaxActiveReservations", clcmd, cmdopts, r"CL_DEVICE_PIPE_MAX_ACTIVE_RESERVATIONS\s+(\d+)", int)
+            self.addc("PipeMaxPacketSize", clcmd, cmdopts, r"CL_DEVICE_PIPE_MAX_PACKET_SIZE\s+(\d+)", int)
+            self.addc("LocalMemType", clcmd, cmdopts, r"CL_DEVICE_LOCAL_MEM_TYPE\s+(.+)", str)
+            self.addc("MaxConstantArgs", clcmd, cmdopts, r"CL_DEVICE_MAX_CONSTANT_ARGS\s+(\d+)", int)
+            self.addc("MaxConstantBufferSize", clcmd, cmdopts, r"CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE\s+(\d+)", int)
+            self.addc("MaxParameterSize", clcmd, cmdopts, r"CL_DEVICE_MAX_PARAMETER_SIZE\s+(\d+)", int)
+            self.addc("QueueOnHostProperties", clcmd, cmdopts, r"CL_DEVICE_QUEUE_ON_HOST_PROPERTIES\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("QueueOnDeviceProperties", clcmd, cmdopts, r"CL_DEVICE_QUEUE_ON_DEVICE_PROPERTIES\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("QueueOnDevicePreferredSize", clcmd, cmdopts, r"CL_DEVICE_QUEUE_ON_DEVICE_PREFERRED_SIZE\s+(\d+)", int)
+            self.addc("QueueOnDeviceMaxSize", clcmd, cmdopts, r"CL_DEVICE_QUEUE_ON_DEVICE_MAX_SIZE\s+(\d+)", int)
+            self.addc("MaxOnDeviceQueues", clcmd, cmdopts, r"CL_DEVICE_MAX_ON_DEVICE_QUEUES\s+(\d+)", int)
+            self.addc("MaxOnDeviceEvents", clcmd, cmdopts, r"CL_DEVICE_MAX_ON_DEVICE_EVENTS\s+(\d+)", int)
+            self.addc("PreferredInteropUserSync", clcmd, cmdopts, r"CL_DEVICE_PREFERRED_INTEROP_USER_SYNC\s+(.+)", str)
+            self.addc("ProfilingTimerResolution", clcmd, cmdopts, r"CL_DEVICE_PROFILING_TIMER_RESOLUTION\s+(\d+)", int)
+            self.addc("ExecutionCapabilities", clcmd, cmdopts, r"CL_DEVICE_EXECUTION_CAPABILITIES\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("SubGroupIndependentForwardProgress", clcmd, cmdopts, r"CL_DEVICE_SUB_GROUP_INDEPENDENT_FORWARD_PROGRESS\s+(.+)", str)
+            self.addc("IlVersion", clcmd, cmdopts, r"CL_DEVICE_IL_VERSION\s+(.+)", str)
+            self.addc("SpirVersions", clcmd, cmdopts, r"CL_DEVICE_SPIR_VERSIONS\s+(.+)", str)
+            self.addc("PrintfBufferSize", clcmd, cmdopts, r"CL_DEVICE_PRINTF_BUFFER_SIZE\s+(\d+)", int)
+            self.addc("BuiltInKernels", clcmd, cmdopts, r"CL_DEVICE_BUILT_IN_KERNELS\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("MeVersionIntel", clcmd, cmdopts, r"CL_DEVICE_ME_VERSION_INTEL\s+(\d+)", int)
+            self.addc("AvcMeVersionIntel", clcmd, cmdopts, r"CL_DEVICE_AVC_ME_VERSION_INTEL\s+(\d+)", int)
+            self.addc("AvcMeSupportsTextureSamplerUseIntel", clcmd, cmdopts, r"CL_DEVICE_AVC_ME_SUPPORTS_TEXTURE_SAMPLER_USE_INTEL\s+(.+)", str)
+            self.addc("AvcMeSupportsPreemptionIntel", clcmd, cmdopts, r"CL_DEVICE_AVC_ME_SUPPORTS_PREEMPTION_INTEL\s+(.+)", str)
+            self.addc("DeviceExtensions", clcmd, cmdopts, r"CL_DEVICE_EXTENSIONS\s+(.+)", lambda x: tostrlist(x.strip()))
+            
+class OpenCLInfoPlatformClass(ListInfoGroup):
+    '''Class to read information for one OpenCL device (uses the clinfo command)'''
+    def __init__(self, platform, extended=False, anonymous=False, clinfo_path=""):
+        super(OpenCLInfoPlatformClass, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = platform
+        self.platform = platform
+        self.clinfo_path = clinfo_path
+        clcmd = pjoin(clinfo_path, "clinfo")
+        if not pexists(clcmd):
+            clcmd = which("clinfo")
+        if clcmd and len(clcmd) > 0:
+            cmdopts = "--raw --offline"
+            self.addc("Name", clcmd, cmdopts, r"\s+CL_PLATFORM_NAME\s+(.+)", str)
+            self.addc("Version", clcmd, cmdopts, r"\s+CL_PLATFORM_VERSION\s+(.+)", str)
+            self.addc("Extensions", clcmd, cmdopts, r"\s+CL_PLATFORM_EXTENSIONS\s+(.+)", lambda x: tostrlist(x.strip()))
+            self.addc("Profile", clcmd, cmdopts, r"\s+CL_PLATFORM_PROFILE\s+(.+)", str)
+            self.addc("Vendor", clcmd, cmdopts, r"\s+CL_PLATFORM_VENDOR\s+(.+)", str)
+            #self.commands["IcdSuffix"] = (clcmd, cmdopts, r"\s+CL_PLATFORM_ICD_SUFFIX_KHR\s+(.+)", str)
+            suffix = process_cmd((clcmd, cmdopts, r"\s+CL_PLATFORM_ICD_SUFFIX_KHR\s+(.+)", str))
+            self.const("IcdSuffix", suffix)
+            num_devs = process_cmd((clcmd, cmdopts, r".*{}.*#DEVICES\s*(\d+)".format(suffix), int))
+            if num_devs and num_devs > 0:
+                self.userlist = [r for r in range(num_devs)]
+                self.subargs = {"clinfo_path" : clinfo_path, "suffix" : suffix}
+                self.subclass = OpenCLInfoPlatformDeviceClass
+
+class OpenCLInfoLoaderClass(InfoGroup):
+    '''Class to read information for one OpenCL loader (uses the clinfo command)'''
+    def __init__(self, loader, extended=False, anonymous=False, clinfo_path=""):
+        super(OpenCLInfoLoaderClass, self).__init__(name=loader, extended=extended, anonymous=anonymous)
+        self.clinfo_path = clinfo_path
+        self.loader = loader
+        clcmd = pjoin(clinfo_path, "clinfo")
+        if not pexists(clcmd):
+            clcmd = which("clinfo")
+        if clcmd and len(clcmd) > 0:
+            cmdopts = "--raw --offline | grep '[OCLICD/*]'"
+            self.addc("Name", clcmd, cmdopts, r"\s+CL_ICDL_NAME\s+(.+)", str)
+            self.addc("Vendor", clcmd, cmdopts, r"\s+CL_ICDL_VENDOR\s+(.+)", str)
+            self.addc("Version", clcmd, cmdopts, r"\s+CL_ICDL_VERSION\s+(.+)", str)
+            self.addc("OclVersion", clcmd, cmdopts, r"\s+CL_ICDL_OCL_VERSION\s+(.+)", str)
+
+class OpenCLInfo(MultiClassInfoGroup):
+    '''Class to spawn subclasses for each OpenCL device and loader (uses the clinfo command)'''
+    def __init__(self, clinfo_path="", extended=False, anonymous=False):
+        super(OpenCLInfo, self).__init__(name="OpenCLInfo", extended=extended, anonymous=anonymous)
+        self.clinfo_path = clinfo_path
+        clcmd = pjoin(clinfo_path, "clinfo")
+        if not pexists(clcmd):
+            clcmd = which("clinfo")
+        if clcmd and len(clcmd) > 0:
+            out = process_cmd((clcmd, "--raw --offline"))
+            loaderlist = []
+            platlist = []
+            for l in out.split("\n"):
+                m = re.match(r".*CL_PLATFORM_NAME\s+(.*)", l)
+                if m and m.group(1) not in platlist:
+                    platlist.append(m.group(1))
+                    self.classlist.append(OpenCLInfoPlatformClass)
+                    self.classargs.append({"platform" : m.group(1), "clinfo_path" : clinfo_path})
+            for l in out.split("\n"):
+                m = re.match(r".*CL_ICDL_NAME\s+(.*)", l)
+                if m:
+                    self.classlist.append(OpenCLInfoLoaderClass)
+                    self.classargs.append({"loader" : m.group(1), "clinfo_path" : clinfo_path})
 
 ################################################################################
 # Skript code
@@ -2737,8 +3180,11 @@ def read_cli(cliargs):
                         help='sort JSON output (default: False)')
     parser.add_argument('-i', '--indent', default=4, type=int,
                         help='indention in JSON output (default: 4)')
-    parser.add_argument('-o', '--output', help='save JSON to file (default: stdout)', default=None)
+    parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
     parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
+    parser.add_argument('-m', '--no-meta', action='store_false', default=True,
+                        help='do not embed meta information in classes (recommended, default: True)')
+    parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(cliargs))
@@ -2775,6 +3221,7 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                   "modulecmd" : MODULECMD_PATH,
                   "vecmd_path" : VEOS_BASE,
                   "nvidia_path" : NVIDIA_PATH,
+                  "clinfo_path" : CLINFO_PATH,
                   "debug" : DEBUG_OUTPUT,
                   "anonymous" : False,
                   "extended" : False,
@@ -2812,6 +3259,150 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
 
     return configdict
 
+
+base_js = """
+<script>
+var acc = document.getElementsByClassName("accordion");
+var i;
+
+for (i = 0; i < acc.length; i++) {
+  acc[i].addEventListener("click", function() {
+    this.classList.toggle("active");
+    var children = this.parentNode.childNodes;
+    children.forEach(child => {
+        if(child.style) {
+    		if (child.style.maxHeight) {
+        		child.style.maxHeight = null;
+       		} else {
+	        	child.style.maxHeight = child.scrollHeight + "px";
+    	    }
+        }
+    });
+    adjust(this.parentNode);
+  });
+}
+
+var bExpand = document.getElementsByClassName("option expandable")[0];
+var bCollaps = document.getElementsByClassName("option collapsible")[0];
+
+bExpand.addEventListener("click", function() {
+	var accNonActive = Array.prototype.filter.call(acc, function(elem, i, acc) {
+		return !elem.className.includes("active");
+	});
+	for (i = 0; i < accNonActive.length; i++) {
+		accNonActive[i].click();
+	}
+});
+
+bCollaps.addEventListener("click", function() {
+	var accActive = Array.prototype.filter.call(acc, function(elem, i, acc) {
+		return elem.className.includes("active");
+	});
+	for (i = accActive.length - 1; i >= 0; i--) {
+		accActive[i].click();
+	}
+});
+
+function adjust(node) {
+	if(node.style) {
+        node.style.maxHeight = 10 * window.innerHeight + "px";
+    }
+    if(node.parentNode){
+    	adjust(node.parentNode);
+	}
+}
+</script>
+"""
+base_css = """
+<style>
+.accordion {
+  background-color: #eee;
+  color: #444;
+  cursor: pointer;
+  padding: 18px;
+  width: 98vw;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+  transition: 0.4s;
+}
+
+.active, .accordion:hover {
+  background-color: #ccc;
+}
+
+.accordion:after {
+  content: '\\002B';
+  color: #777;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+}
+
+.active:after {
+  content: "\\2212";
+}
+
+.panel {
+  padding: 0 18px;
+  background-color: white;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+  width: 97vw;
+}
+
+.option {
+  float: left;
+  background-color: #555555;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 15px;
+}
+
+.expandable {
+  background-color: #4CAF50;
+  width: 49vw;
+}
+
+.collapsible {
+  background-color: #f44336;
+  width: 49vw;
+}
+</style>
+"""
+
+base_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>MachineState</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+{css}
+</head>
+
+<body>
+<button class="option expandable">Expand all</button>
+<button class="option collapsible">Collapse all</button>
+{table}
+{script}
+</body>
+</html>
+"""
+
+def get_html(cls, css=True, js=True):
+    add_css = base_css if css is True else ""
+    add_js = base_js if js is True else ""
+    table = cls.get_html()
+    return base_html.format(table=table, css=add_css, script=add_js)
+
+
 def main():
     try:
         # Read command line arguments
@@ -2840,21 +3431,27 @@ def main():
     # Get JSON document string (either from the configuration or the state)
     jsonout = {}
     if not cliargs["config"]:
-        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"])
+        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"])
     else:
         jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
 
     # Determine output destination
     if not cliargs["output"]:
-        print(jsonout)
+        if cliargs["html"]:
+            print(get_html(mstate))
+        else:
+            print(jsonout)
     else:
         with open(cliargs["output"], "w") as outfp:
-            outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"]))
+            if cliargs["html"]:
+                outfp.write(get_html(mstate))
+            else:
+                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"]))
             outfp.write("\n")
     sys.exit(0)
 
 #    # This part is for testing purposes
-#    n = OSInfo(extended=cliargs["extended"])
+#    n = OperatingSystemInfo(extended=cliargs["extended"])
 #    n.generate()
 #    n.update()
 #    ndict = n.get()

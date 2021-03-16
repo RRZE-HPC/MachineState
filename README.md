@@ -5,9 +5,9 @@
 Introduction
 --------------------------------------------------------------------------------
 This script should be executed before running benchmarks to determine the
-current system settings and the execution enviroment.
+current system settings and the execution environment.
 
-On Linux, most information is gathered from sysfs/procfs files to reduce the dependecies.
+On Linux, most information is gathered from sysfs/procfs files to reduce the dependencies.
 Some information is only available through external tools (`likwid-*`, `nvidia-smi`,
 `vecmd`, `modulecmd`) and some basic tools (`hostname`, `users`, ...).
 On MacOS, most information is gathered through the `sysctl` command.
@@ -16,7 +16,7 @@ An example JSON (in extended mode) from an Intel Skylake Desktop system running 
 
 An example JSON (in extended mode) from an Intel Skylake Desktop system running macOS can be found [here](./examples/skylake-desktop-macos.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop-macos.json)). 
 
-[![Build Status](https://travis-ci.org/RRZE-HPC/MachineState.svg?branch=master)](https://travis-ci.org/RRZE-HPC/MachineState) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
+![test-n-publish action status](https://github.com/RRZE-HPC/MachineState/workflows/test-n-publish/badge.svg) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
 
 --------------------------------------------------------------------------------
 Installation
@@ -35,6 +35,11 @@ $ machinestate
 or
 $ python3
 >>> import machinestate
+```
+or just for the current project
+```
+$ wget https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/machinestate.py
+$ ./machinestate.py
 ```
 
 The module cannot be used with Python2!
@@ -82,11 +87,9 @@ Usage (CLI)
 --------------------------------------------------------------------------------
 Getting usage help:
 ```
-$ machinestate -h
 usage: machinestate.py [-h] [-e] [-a] [-c] [-s] [-i INDENT] [-o OUTPUT]
-                       [-j JSON] [--configfile CONFIGFILE]
+                       [-j JSON] [--html] [--configfile CONFIGFILE]
                        [executable]
-
 
 Reads and outputs system information as JSON document
 
@@ -102,8 +105,11 @@ optional arguments:
   -i INDENT, --indent INDENT
                         indention in JSON output (default: 4)
   -o OUTPUT, --output OUTPUT
-                        save JSON to file (default: stdout)
+                        save to file (default: stdout)
   -j JSON, --json JSON  compare given JSON with current state
+  -m, --no-meta         embed meta information in classes (recommended, default: True)
+  --html                generate HTML page with CSS and JavaScript embedded
+                        instead of JSON
   --configfile CONFIGFILE
                         Location of configuration file
 ```
@@ -182,6 +188,17 @@ Compare JSON file created with `machinestate.py` with current state
 ```
 $ machinestate -j oldstate.json
 ```
+
+Output the MachineState data as collapsible HTML table (with CSS and JavaScript):
+```
+$ machinestate --html
+```
+
+You can also redirekt the HTML output to a file directly:
+```
+$ machinestate --html --output machine.html
+```
+You can embedd the file in your HTML page within an `<iframe>`ö.
 
 --------------------------------------------------------------------------------
 Configuration file
@@ -266,7 +283,24 @@ $ python3
 >>> ms.generate()
 >>> ms.update()
 >>> ms == oldstate
-False
+True
+```
+In case of 'False', it reports the value differences and missing keys. For integer and float values, it compares the values with a tolerance of 20%. Be aware that if you use `oldstate.get() == ms.get()`, it uses the default `dict` comparison which does not print anything and matches exact.
+
+
+If you want to load an old state and use the class tree
+```
+$ python3
+>>> oldstate = {}           # dictionary of oldstate or
+                            # path to JSON file of oldstate or
+                            # JSON document (as string)
+                            # or a MachineState class
+                            # It has to contain the '_meta' entries
+                            # you get when calling get_json() or
+                            # get(meta=True)
+>>> ms = machinestate.MachineState.from_dict(oldstate)
+>>> ms == oldstate
+True
 ```
 
 --------------------------------------------------------------------------------
@@ -275,5 +309,22 @@ Differences between Shell and Python version
 The Shell version (`shell-version/machine-state.sh`) executes some commands and
 just dumps the output to stdout.
 
-The Python version (`machine-state.py`) collects all data and outputs it in JSON
+The Python version (`machinestate.py`) collects all data and outputs it in JSON
 format. This version is currently under development.
+
+
+--------------------------------------------------------------------------------
+Additional information by others
+--------------------------------------------------------------------------------
+- [The Tuned Project](https://tuned-project.org/)
+- [Intel® 64 and IA-32 Architectures Software Developer Manuals](https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html)
+- [Intel® 64 and IA-32 Architectures Optimization Reference Manual](https://software.intel.com/content/www/us/en/develop/download/intel-64-and-ia-32-architectures-optimization-reference-manual.html)
+- [AMD Tech Docs](https://developer.amd.com/resources/developer-guides-manuals/)
+- [ARM documetatation center](https://developer.arm.com/documentation/)
+- [Performance Optimization and Tuning Techniques for IBM Power Systems Processors Including IBM POWER8](http://www.redbooks.ibm.com/abstracts/sg248171.html)
+- [System Tuning Info for Linux Servers by Adrian Likins](http://people.redhat.com/alikins/system_tuning.html)
+- [Low latency tuning guide by Erik Rigtorp](https://rigtorp.se/low-latency-guide/)
+- https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_for_real_time/7/html/tuning_guide/real_time_throttling
+- [What are Interrupt Threads and How do They Work? by Mike Anderson](https://elinux.org/images/e/ef/InterruptThreads-Slides_Anderson.pdf)
+- [perf Examples by Brendan Gregg](http://brendangregg.com/perf.html)
+- [Tuning your Linux system for Gaming Performance by user u/sn0w75 on Reddit](https://www.reddit.com/r/linux_gaming/comments/8j0evj/tuning_your_linux_system_for_gaming_performance/)

@@ -21,6 +21,8 @@ class TestInfoGroup(InfoGroup):
     def __init__(self, name=None, extended=False, anonymous=False, basepath="", ident=-1):
         super(TestInfoGroup, self).__init__(extended=extended, name=name, anonymous=anonymous)
         self.name = "File{}".format(ident)
+        self.basepath = basepath
+        self.ident = ident
         path = os.path.join(basepath, "{}*".format(ident))
         files = glob.glob(path)
         self.addf("File{}".format(ident), files[0], r"(.+)")

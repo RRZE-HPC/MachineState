@@ -1337,6 +1337,7 @@ class CpuTopologyClass(InfoGroup):
     def __init__(self, ident, extended=False, anonymous=False):
         super(CpuTopologyClass, self).__init__(anonymous=anonymous, extended=extended)
         self.name = "Cpu{}".format(ident)
+        self.ident = ident
         base = "/sys/devices/system/cpu/cpu{}".format(ident)
         self.addf("CoreId", pjoin(base, "topology/core_id"), r"(\d+)", int)
         self.addf("PackageId", pjoin(base, "topology/physical_package_id"), r"(\d+)", int)

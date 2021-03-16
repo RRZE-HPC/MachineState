@@ -782,10 +782,10 @@ class InfoGroup:
             for arg in args:
                 if isinstance(arg, list):
                     for subarg in arg:
-                        if subarg not in self._operations:
+                        if subarg in self._operations:
                             self._operations[subarg].required = True
                 elif isinstance(arg, str):
-                    if arg not in self._operations:
+                    if arg in self._operations:
                         self._operations[arg].required = True
 
     def generate(self):
@@ -2604,7 +2604,8 @@ class ExecutableInfoExec(InfoGroup):
                 self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
                 if extended:
                     self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
-            self.required(["Name", "Size", "MD5sum"])
+                    self.required("MD5sum")
+            self.required(["Name", "Size"])
 
     @staticmethod
     def getmd5sum(filename):
@@ -2653,8 +2654,7 @@ class ExecutableInfoLibraries(InfoGroup):
                         libdict.update({lib : lib})
                     else:
                         libdict.update({lib : None})
-            self.required(list(libdict.keys()))
-        self._data = libdict
+        self.required(list(libdict.keys()))
 
 class ExecutableInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for analyzing a given executable'''

@@ -2502,14 +2502,19 @@ class PrefetcherInfo(PathMatchInfoGroup):
             abscmd = which(cmd)
 
         if abscmd:
-            data = process_cmd((abscmd, "-l -c 0", r"Feature\s+CPU\s(\d+)", int))
-            if data != 0:
-                data = process_cmd((abscmd, "-l -c 0", r"Feature\s+HWThread\s(\d+)", int))
-            if data == 0:
-                self.searchpath = "/sys/devices/system/cpu/cpu*"
-                self.match = r".*/cpu(\d+)$"
-                self.subclass = PrefetcherInfoClass
-                self.subargs = {"likwid_base" : likwid_base}
+            for r in [r"Feature\s+HWThread\s(\d+)", r"Feature\s+CPU\s(\d+)"]:
+                data = process_cmd((abscmd, "-l -c 0", r, str))
+                intdata = -1
+                try:
+                    intdata = int(data)
+                    if intdata == 0:
+                        self.searchpath = "/sys/devices/system/cpu/cpu*"
+                        self.match = r".*/cpu(\d+)$"
+                        self.subclass = PrefetcherInfoClass
+                        self.subargs = {"likwid_base" : likwid_base}
+                        break
+                except:
+                    pass
                 
 
 ################################################################################

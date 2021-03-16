@@ -114,6 +114,7 @@ from getpass import getuser
 from grp import getgrgid
 import inspect
 import logging
+import uuid
 
 ################################################################################
 # Configuration
@@ -570,10 +571,12 @@ class BaseOperation:
     def get(self):
         d = self.update()
         logging.debug("Update '%s'", str(d))
-        d = self.match(d)
-        logging.debug("Match '%s'", str(d))
-        d = self.parse(d)
-        logging.debug("Parse '%s'", str(d))
+        if self.match:
+            d = self.match(d)
+            logging.debug("Match '%s'", str(d))
+        if self.parse:
+            d = self.parse(d)
+            logging.debug("Parse '%s'", str(d))
         return d
     def _init_args(self):
         """Get list of tuples with __init__ arguments"""
@@ -597,8 +600,9 @@ class Constant(BaseOperation):
                                        required=required,
                                        tolerance=tolerance)
         self.value = value
+    def ident(self):
+        return uuid.uuid4()
     def valid(self):
-        res = super(Constant, self).valid()
         return True
     def update(self):
         return self.value
@@ -751,7 +755,7 @@ class InfoGroup:
                     initargs[k] = v
 
         c = cls(**dict(initargs))
-        validkeys = list(c.files.keys()) + list(c.commands.keys()) + list(c.constants.keys())
+        validkeys = list(c._operations.keys())
         for key, value in data.items():
             if isinstance(value, dict) and '_meta' in value:
                 clsname = value['_meta'].split("(")[0]
@@ -788,7 +792,7 @@ class InfoGroup:
 
     def update(self):
         '''Read object's files and commands. Triggers update() of subclasses'''
-        outdict = { k: None for (k,v) in self._operations.items() if v.valid()}
+        outdict = { k: None for (k,v) in self._operations.items()}
         for key, op in self._operations.items():
             if op.valid() and outdict[key] is None:
                 logging.debug("Updating key '%s'", key)
@@ -811,7 +815,7 @@ class InfoGroup:
 
     def get(self, meta=False):
         """Get the object's and all subobjects' data as dict"""
-        outdict = {}
+        outdict = { k: None for (k,v) in self._operations.items()}
         for inst in self._instances:
             clsout = inst.get(meta=meta)
             outdict.update({inst.name : clsout})
@@ -914,7 +918,7 @@ class InfoGroup:
 #        schemedict["properties"] = pdict
 #        return schemedict
 
-    def __eq__(self, other):
+    def compare(self, other):
         """Compare object with another object-like structure like Class,
            dict, JSON document or path to JSON file"""
         self_meta = False
@@ -972,38 +976,44 @@ class InfoGroup:
         selfdict = self.get(meta=self_meta)
         clsname = self.__class__.__name__
         key_not_found = 'KEY_NOT_FOUND_IN_OTHER_DICT'
-        selfkeys = selfdict.keys()
-        otherkeys = otherdict.keys()
-        if set(selfkeys) & set(self.required4equal) != set(self.required4equal):
+        instnames = [ inst.name for inst in self._instances ]
+        selfkeys = [ k for k in selfdict if k not in instnames ]
+        required4equal = [k for k in self._operations if self._operations[k].required]
+        otherkeys = [ k for k in otherdict if k not in instnames ]
+
+        if set(selfkeys) & set(required4equal) != set(required4equal):
             print("Required keys missing in object: {}".format(
-                  ", ".join(set(self.required4equal) - set(selfkeys)))
+                  ", ".join(set(required4equal) - set(selfkeys)))
                  )
-        if set(otherkeys) & set(self.required4equal) != set(self.required4equal):
+        if set(otherkeys) & set(required4equal) != set(required4equal):
             print("Required keys missing in compare object: {}".format(
-                  ", ".join(set(self.required4equal) - set(otherkeys)))
+                  ", ".join(set(required4equal) - set(otherkeys)))
                  )
-            
+
         inboth = set(selfkeys) & set(otherkeys)
         diff = {k:(selfdict[k], otherdict[k])
                 for k in inboth
                 if ((not valuecmp(k, clsname, selfdict[k], otherdict[k]))
-                     and k in self.required4equal
+                     and k in required4equal
                    )
                }
         diff.update({k:(selfdict[k], key_not_found)
-                     for k in selfkeys - inboth
-                     if k in self.required4equal
+                     for k in set(selfkeys) - inboth
+                     if k in required4equal
                     })
         diff.update({k:(key_not_found, otherdict[k])
-                     for k in otherkeys - inboth
-                     if k in self.required4equal
+                     for k in set(otherkeys) - inboth
+                     if k in required4equal
                     })
-#        for k in diff:
-#            print(k)
-#            print(v[0])
-#            print(v[1])
+        for inst in self._instances:
+            if inst.name in selfdict and inst.name in otherdict:
+                instdiff = inst.compare(otherdict[inst.name])
+                if len(instdiff) > 0:
+                    diff[inst.name] = instdiff
+        return diff
+    def __eq__(self, other):
+        diff = self.compare(other)
         return len(diff) == 0
-    
     def _init_args(self):
         """Get list of tuples with __init__ arguments"""
         parameters = inspect.signature(self.__init__).parameters.values()

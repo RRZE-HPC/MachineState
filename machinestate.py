@@ -2531,7 +2531,7 @@ class TurboInfo(InfoGroup):
         self.likwid_base = likwid_base
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
-        error_match = r"Cannot gather values.*"
+        error_matches = [r"Cannot gather values.*", r"Query Turbo Mode only supported.*"]
         names = ["BaseClock", "MinClock", "MinUncoreClock", "MaxUncoreClock"]
         matches = [r"Base clock:\s+([\d\.]+ MHz)",
                    r"Minimal clock:\s+([\d\.]+ MHz)",
@@ -2546,15 +2546,21 @@ class TurboInfo(InfoGroup):
             abscmd = which(cmd)
         if abscmd:
             data = process_cmd((abscmd, cmd_opts, matches[0]))
-            if len(data) > 0 and not re.match(error_match, data):
-                for name, regex in zip(names, matches):
-                    self.addc(name, abscmd, cmd_opts, regex, tohertz)
-                    self.required(name)
-                regex = r"^Performance energy bias:\s+(\d+)"
-                self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
-                self.required("PerfEnergyBias")
-                freqfunc = TurboInfo.getactivecores
-                self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
+            if len(data) > 0:
+                err = False
+                for regex in error_matches:
+                    if re.match(regex, data):
+                        err = True
+                        break
+                if not err:
+                    for name, regex in zip(names, matches):
+                        self.addc(name, abscmd, cmd_opts, regex, tohertz)
+                        self.required(name)
+                    regex = r"^Performance energy bias:\s+(\d+)"
+                    self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
+                    self.required("PerfEnergyBias")
+                    freqfunc = TurboInfo.getactivecores
+                    self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
     @staticmethod
     def getactivecores(indata):
         freqs = []

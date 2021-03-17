@@ -2638,21 +2638,22 @@ class ExecutableInfo(MultiClassInfoGroup):
         super(ExecutableInfo, self).__init__(
             name="ExecutableInfo", extended=extended, anonymous=anonymous)
         self.executable = executable
-        absexe = which(executable)
-        ldd = which("ldd")
-        objd = which("objdump")
-        if (not os.access(executable, os.X_OK)) and absexe:
-            if os.access(absexe, os.X_OK):
-                self.executable = absexe
-        self.classlist = [ExecutableInfoExec]
-        clsargs = {"executable" : self.executable}
-        self.classargs = [clsargs for i in range(len(self.classlist))]
-        if self.executable is not None:
-            if ldd is not None:
-                self.addc("LinkedLibraries", ldd, self.executable, r"(.*)", ExecutableInfo.parseLdd)
-            if objd is not None:
-                parser = ExecutableInfo.parseNeededLibs
-                self.addc("NeededLibraries", "objdump", "-p {}".format(executable), parse=parser)
+        absexe = executable
+        if executable is not None and not os.access(absexe, os.X_OK):
+            absexe = which(executable)
+        if absexe is not None:
+            self.executable = absexe
+            ldd = which("ldd")
+            objd = which("objdump")
+            self.classlist = [ExecutableInfoExec]
+            clsargs = {"executable" : self.executable}
+            self.classargs = [clsargs for i in range(len(self.classlist))]
+            if self.executable is not None:
+                if ldd is not None:
+                    self.addc("LinkedLibraries", ldd, absexe, r"(.*)", ExecutableInfo.parseLdd)
+                if objd is not None:
+                    parser = ExecutableInfo.parseNeededLibs
+                    self.addc("NeededLibraries", objd, "-p {}".format(absexe), parse=parser)
     @staticmethod
     def parseLdd(lddinput):
         libdict = {}

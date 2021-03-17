@@ -2624,7 +2624,6 @@ class ExecutableInfoExec(InfoGroup):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-<<<<<<< HEAD
     @staticmethod
     def getcompiledwith(value):
         for line in re.split(r"\n", value):

@@ -2602,11 +2602,16 @@ class ExecutableInfoExec(InfoGroup):
         if executable is not None:
             abscmd = which(self.executable)
             self.const("Name", str(self.executable))
+            self.required("Name")
             if abscmd and len(abscmd) > 0:
                 self.const("Abspath", abscmd)
                 self.const("Size", psize(abscmd))
-                pfunc = ExecutableInfoExec.getcompiledwith
-                self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
+                self.required("Size")
+                if which("readelf"):
+                    comp_regex = r"\s*\[\s*\d+\]\s+(.+)"
+                    self.addc("CompiledWith", "readelf", "-p .comment {}".format(abscmd), comp_regex)
+                    flags_regex = r"^\s*\<c\>\s+DW_AT_producer\s+:\s+\(.*\):\s*(.*)$"
+                    self.addc("CompilerFlags", "readelf", "-wi {}".format(abscmd), flags_regex)
                 if extended:
                     self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
                     self.required("MD5sum")
@@ -2620,46 +2625,44 @@ class ExecutableInfoExec(InfoGroup):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    @staticmethod
-    def getcompiledwith(value):
-        for line in re.split(r"\n", value):
-            if "CC" in line:
-                return line
-        return "Not detectable"
-
 class ExecutableInfoLibraries(InfoGroup):
     '''Class to read all libraries linked with given executable'''
     def __init__(self, executable, extended=False, anonymous=False):
         super(ExecutableInfoLibraries, self).__init__(
             name="LinkedLibraries", anonymous=anonymous, extended=extended)
         self.executable = executable
-        self.name = "LinkedLibraries"
-        self.ldd = None
         if executable is not None:
             self.executable = which(executable)
-            self.ldd = None
-            if self.executable and len(self.executable) > 0:
-                self.ldd = "LANG=C ldd {}; exit 0".format(self.executable)
-    
-    def update(self):
+            if which("objdump"):
+                parser = ExecutableInfoLibraries.parseNeededLibs
+                self.addc("NeededLibraries", "objdump", "-p {}".format(executable), parse=parser)
+            if which("ldd"):
+                parser = ExecutableInfoLibraries.parseLinkedLibs
+                self.addc("LinkedLibraries", "ldd", executable, parse=parser)
+    def parseLinkedLibs(data):
         libdict = {}
-        if self.ldd is not None:
-            rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
-            data = rawdata.decode(ENCODING)
-            libregex = re.compile(r"\s*([^\s]+)\s+.*")
-            pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
-            for line in data.split("\n"):
-                libmat = libregex.search(line)
-                if libmat:
-                    lib = libmat.group(1)
-                    pathmat = pathregex.search(line)
-                    if pathmat:
-                        libdict.update({lib : pathmat.group(1)})
-                    elif pexists(lib):
-                        libdict.update({lib : lib})
-                    else:
-                        libdict.update({lib : None})
+        libregex = re.compile(r"\s*([^\s]+)\s+.*")
+        pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
+        for line in data.split("\n"):
+            libmat = libregex.search(line)
+            if libmat:
+                lib = libmat.group(1)
+                pathmat = pathregex.search(line)
+                if pathmat:
+                    libdict.update({lib : pathmat.group(1)})
+                elif pexists(lib):
+                    libdict.update({lib : lib})
+                else:
+                    libdict.update({lib : None})
         self.required(list(libdict.keys()))
+        return libdict
+    def parseNeededLibs(data):
+        libs = []
+        for line in data.split("\n"):
+            m = re.match(r"^\s+NEEDED\s+(.*)$", line)
+            if m:
+                libs.append(m.group(1))
+        return libs
 
 class ExecutableInfo(MultiClassInfoGroup):
     '''Class to spawn subclasses for analyzing a given executable'''

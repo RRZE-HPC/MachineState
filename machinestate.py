@@ -2553,7 +2553,6 @@ class TurboInfo(InfoGroup):
                 self.required("PerfEnergyBias")
                 freqfunc = TurboInfo.getactivecores
                 self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
-        self.required4equal = self.commands.keys()
     @staticmethod
     def getactivecores(indata):
         freqs = []
@@ -2627,28 +2626,30 @@ class ExecutableInfoExec(InfoGroup):
                 return line
         return "Not detectable"
 
-class ExecutableInfoLibraries(InfoGroup):
-    '''Class to read all libraries linked with given executable'''
+
+class ExecutableInfo(MultiClassInfoGroup):
+    '''Class to spawn subclasses for analyzing a given executable'''
     def __init__(self, executable, extended=False, anonymous=False):
-        super(ExecutableInfoLibraries, self).__init__(
-            name="LinkedLibraries", anonymous=anonymous, extended=extended)
+        super(ExecutableInfo, self).__init__(
+            name="ExecutableInfo", extended=extended, anonymous=anonymous)
         self.executable = executable
-        self.name = "LinkedLibraries"
-        self.ldd = None
-        if executable is not None:
-            self.executable = which(executable)
-            self.ldd = None
-            if self.executable and len(self.executable) > 0:
-                self.ldd = "LANG=C ldd {}; exit 0".format(self.executable)
-    
-    def update(self):
+        absexe = which(executable)
+        ldd = which("ldd")
+        if (not os.access(executable, os.X_OK)) and absexe:
+            if os.access(absexe, os.X_OK):
+                self.executable = absexe
+        self.classlist = [ExecutableInfoExec]
+        clsargs = {"executable" : self.executable}
+        self.classargs = [clsargs for i in range(len(self.classlist))]
+        if self.executable is not None and ldd and len(ldd) > 0:
+            self.addc("LinkedLibraries", ldd, self.executable, r"(.*)", ExecutableInfo.parseLdd)
+    @staticmethod
+    def parseLdd(lddinput):
         libdict = {}
-        if self.ldd is not None:
-            rawdata = check_output(self.ldd, stderr=DEVNULL, shell=True)
-            data = rawdata.decode(ENCODING)
+        if lddinput:
             libregex = re.compile(r"\s*([^\s]+)\s+.*")
             pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
-            for line in data.split("\n"):
+            for line in lddinput.split("\n"):
                 libmat = libregex.search(line)
                 if libmat:
                     lib = libmat.group(1)
@@ -2659,17 +2660,7 @@ class ExecutableInfoLibraries(InfoGroup):
                         libdict.update({lib : lib})
                     else:
                         libdict.update({lib : None})
-        self.required(list(libdict.keys()))
-
-class ExecutableInfo(MultiClassInfoGroup):
-    '''Class to spawn subclasses for analyzing a given executable'''
-    def __init__(self, executable, extended=False, anonymous=False):
-        super(ExecutableInfo, self).__init__(
-            name="ExecutableInfo", extended=extended, anonymous=anonymous)
-        self.executable = executable
-        self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
-        clsargs = {"executable" : self.executable}
-        self.classargs = [clsargs for i in range(len(self.classlist))]
+        return libdict
 
 ################################################################################
 # Infos about the temperature using coretemp

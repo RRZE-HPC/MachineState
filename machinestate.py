@@ -1878,7 +1878,9 @@ class UptimeMacOs(InfoGroup):
     @staticmethod
     def parsereadable(string):
         uptime = UptimeMacOs.parsetime(string)
-        return Uptime.totimedelta(uptime)
+        if uptime is not None:
+            return Uptime.totimedelta(uptime)
+        return "Cannot parse uptime"
 
 
 class Uptime(InfoGroup):

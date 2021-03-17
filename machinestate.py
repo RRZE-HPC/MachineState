@@ -2601,11 +2601,16 @@ class ExecutableInfoExec(InfoGroup):
         if executable is not None:
             abscmd = which(self.executable)
             self.const("Name", str(self.executable))
+            self.required("Name")
             if abscmd and len(abscmd) > 0:
                 self.const("Abspath", abscmd)
                 self.const("Size", psize(abscmd))
-                pfunc = ExecutableInfoExec.getcompiledwith
-                self.addc("CompiledWith", "strings", "-a {}".format(abscmd), parse=pfunc)
+                self.required("Size")
+                if which("readelf"):
+                    comp_regex = r"\s*\[\s*\d+\]\s+(.+)"
+                    self.addc("CompiledWith", "readelf", "-p .comment {}".format(abscmd), comp_regex)
+                    flags_regex = r"^\s*\<c\>\s+DW_AT_producer\s+:\s+\(.*\):\s*(.*)$"
+                    self.addc("CompilerFlags", "readelf", "-wi {}".format(abscmd), flags_regex)
                 if extended:
                     self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
                     self.required("MD5sum")
@@ -2619,6 +2624,7 @@ class ExecutableInfoExec(InfoGroup):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
+<<<<<<< HEAD
     @staticmethod
     def getcompiledwith(value):
         for line in re.split(r"\n", value):
@@ -2635,14 +2641,19 @@ class ExecutableInfo(MultiClassInfoGroup):
         self.executable = executable
         absexe = which(executable)
         ldd = which("ldd")
+        objd = which("objdump")
         if (not os.access(executable, os.X_OK)) and absexe:
             if os.access(absexe, os.X_OK):
                 self.executable = absexe
         self.classlist = [ExecutableInfoExec]
         clsargs = {"executable" : self.executable}
         self.classargs = [clsargs for i in range(len(self.classlist))]
-        if self.executable is not None and ldd and len(ldd) > 0:
-            self.addc("LinkedLibraries", ldd, self.executable, r"(.*)", ExecutableInfo.parseLdd)
+        if self.executable is not None:
+            if ldd is not None:
+                self.addc("LinkedLibraries", ldd, self.executable, r"(.*)", ExecutableInfo.parseLdd)
+            if objd is not None:
+                parser = ExecutableInfo.parseNeededLibs
+                self.addc("NeededLibraries", "objdump", "-p {}".format(executable), parse=parser)
     @staticmethod
     def parseLdd(lddinput):
         libdict = {}
@@ -2661,6 +2672,14 @@ class ExecutableInfo(MultiClassInfoGroup):
                     else:
                         libdict.update({lib : None})
         return libdict
+    @staticmethod
+    def parseNeededLibs(data):
+        libs = []
+        for line in data.split("\n"):
+            m = re.match(r"^\s+NEEDED\s+(.*)$", line)
+            if m:
+                libs.append(m.group(1))
+        return libs
 
 ################################################################################
 # Infos about the temperature using coretemp

@@ -2531,7 +2531,9 @@ class TurboInfo(InfoGroup):
         self.likwid_base = likwid_base
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
-        error_matches = [r"Cannot gather values.*", r"Query Turbo Mode only supported.*"]
+        error_matches = [r"Cannot gather values.*",
+                         r"Query Turbo Mode only supported.*",
+                         r"^Failed.*"]
         names = ["BaseClock", "MinClock", "MinUncoreClock", "MaxUncoreClock"]
         matches = [r"Base clock:\s+([\d\.]+ MHz)",
                    r"Minimal clock:\s+([\d\.]+ MHz)",
@@ -2548,10 +2550,11 @@ class TurboInfo(InfoGroup):
             data = process_cmd((abscmd, cmd_opts, matches[0]))
             if len(data) > 0:
                 err = False
-                for regex in error_matches:
-                    if re.match(regex, data):
-                        err = True
-                        break
+                for l in data.split("\n"):
+                    for regex in error_matches:
+                        if re.match(regex, data):
+                            err = True
+                            break
                 if not err:
                     for name, regex in zip(names, matches):
                         self.addc(name, abscmd, cmd_opts, regex, tohertz)

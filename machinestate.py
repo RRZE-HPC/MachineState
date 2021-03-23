@@ -114,6 +114,8 @@ from shutil import which
 from getpass import getuser
 from grp import getgrgid
 import inspect
+import logging
+import uuid
 
 ################################################################################
 # Configuration
@@ -150,7 +152,8 @@ __version__ = MACHINESTATE_VERSION
 ################################################################################
 ENCODING = getpreferredencoding()
 
-DEBUG_OUTPUT = False
+DEFAULT_LOGLEVEL = "info"
+NEWLINE_REGEX = re.compile(r"\n")
 
 ################################################################################
 # Helper functions
@@ -161,8 +164,18 @@ def fopen(filename):
         try:
             filefp = open(filename, "rb")
         except PermissionError:
+            logging.debug("Not enough permissions to read file %s", filename)
+            return None
+        except Exception as e:
+            logging.error("File %s open: %s", filename, e)
             return None
         return filefp
+    elif filename is None:
+        logging.debug("Filename is None")
+    elif not pexists(filename):
+        logging.debug("Target of filename (%s) does not exist", filename)
+    elif not os.path.isfile(filename):
+        logging.debug("Target of filename (%s) is no file", filename)
     return None
 
 ################################################################################
@@ -523,6 +536,144 @@ def get_ostype():
     return "Unknown"
 
 ################################################################################
+# Classes for single operations
+################################################################################
+
+class BaseOperation:
+    def __init__(self, regex=None, parser=None, required=False, tolerance=None):
+        self.regex = regex
+        self.parser = parser
+        self.required = required
+        self.tolerance = tolerance
+    def valid(self):
+        return False
+    def ident(self):
+        return None
+    def match(self, data):
+        out = data
+        if self.regex is not None:
+            regex = re.compile(self.regex)
+            for l in NEWLINE_REGEX.split(data):
+                m = regex.match(l)
+                if m:
+                    out = m.group(1)
+                else:
+                    m = regex.search(l)
+                    if m:
+                        out = m.group(1)
+        return out
+    def parse(self, data):
+        out = data
+        if self.parser is not None:
+            if callable(self.parser):
+                out = self.parser(data)
+        return out
+    def update(self):
+        return None
+    def get(self):
+        d = self.update()
+        logging.debug("Update '%s'", str(d))
+        if self.match:
+            d = self.match(d)
+            logging.debug("Match '%s'", str(d))
+        if self.parse:
+            d = self.parse(d)
+            logging.debug("Parse '%s'", str(d))
+        return d
+    def _init_args(self):
+        """Get list of tuples with __init__ arguments"""
+        parameters = inspect.signature(self.__init__).parameters.values()
+        arglist = [
+            (p.name, getattr(self, p.name))
+            for p in parameters
+            if p.default is not getattr(self, p.name)
+        ]
+        return arglist
+
+    def __repr__(self):
+        cls = str(self.__class__.__name__)
+        args = ", ".join(["{}={!r}".format(k,v) for k,v in self._init_args()])
+        return "{}({})".format(cls, args)
+
+class Constant(BaseOperation):
+    def __init__(self, value, required=False, tolerance=None):
+        super(Constant, self).__init__(regex=None,
+                                       parser=None,
+                                       required=required,
+                                       tolerance=tolerance)
+        self.value = value
+    def ident(self):
+        return uuid.uuid4()
+    def valid(self):
+        return True
+    def update(self):
+        return self.value
+
+
+class File(BaseOperation):
+    def __init__(self, path, regex=None, parser=None, required=False, tolerance=None):
+        super(File, self).__init__(regex=regex,
+                                   parser=parser,
+                                   required=required,
+                                   tolerance=tolerance)
+        self.path = path
+    def ident(self):
+        return self.path
+    def valid(self):
+        res = super(File, self).valid()
+        if os.access(self.path, os.R_OK):
+            try:
+                filefp = fopen(self.path)
+                data = filefp.read(1)
+                filefp.close()
+                res = True
+            except BaseException as e:
+                logging.debug("File %s not valid: %s", self.path, e)
+                pass
+        #logging.debug("File %s valid: %s", self.path, res)
+        return res
+    def update(self):
+        data = None
+        logging.debug("Read file %s", self.path)
+        filefp = fopen(self.path)
+        if filefp:
+            try:
+                data = filefp.read().decode(ENCODING).strip()
+            except OSError as e:
+                logging.error("Failed to read file %s: %s", self.path, e)
+            finally:
+                filefp.close()
+        return data
+
+class Command(BaseOperation):
+    def __init__(self, cmd, cmd_args, regex=None, parser=None, required=False, tolerance=None):
+        super(Command, self).__init__(regex=regex,
+                                      parser=parser,
+                                      required=required,
+                                      tolerance=tolerance)
+        self.cmd = cmd
+        self.abscmd = self.cmd if os.access(self.cmd, os.X_OK) else which(self.cmd)
+        self.cmd_args = cmd_args
+    def ident(self):
+        return "{} {}".format(self.cmd, self.cmd_args)
+    def valid(self):
+        res = super(Command, self).valid()
+        if self.abscmd:
+            if os.access(self.abscmd, os.X_OK):
+                res = True
+            if self.abscmd and len(self.abscmd):
+                res = True
+        #logging.debug("Command %s valid: %s", self.abscmd, res)
+        return res
+    def update(self):
+        data = None
+        if self.valid():
+            logging.debug("Exec command %s %s", self.abscmd, self.cmd_args)
+            exe = "LANG=C {} {}; exit 0;".format(self.abscmd, self.cmd_args)
+            data = check_output(exe, stderr=DEVNULL, shell=True).decode(ENCODING).strip()
+        return data
+
+################################################################################
 # Base Classes
 ################################################################################
 
@@ -532,24 +683,25 @@ class InfoGroup:
     def __init__(self, name=None, extended=False, anonymous=False):
         # Holds subclasses
         self._instances = []
+        # Holds operations of this class instance
+        self._operations = {}
         # Holds the data of this class instance
         self._data = {}
-        # Space for file reads
+        # Space for file reads (deprecated)
         # Key -> (filename, regex_with_one_group, convert_function)
         # If regex_with_one_group is None, the whole content of filename is passed to
         # convert_function. If convert_function is None, the output is saved as string
         self.files = {}
-        # Space for commands for execution
+        # Space for commands for execution (deprecated)
         # Key -> (executable, exec_arguments, regex_with_one_group, convert_function)
         # If regex_with_one_group is None, the whole content of filename is passed to
         # convert_function. If convert_function is None, the output is saved as string
         self.commands = {}
-        # Space for constants
+        # Space for constants (deprecated)
         # Key -> Value
         self.constants = {}
-        # Keys in the group that are required to check equality
+        # Keys in the group that are required to check equality (deprecated)
         self.required4equal = []
-        self.name = None
         # Set attributes
         self.name = name
         self.extended = extended
@@ -605,7 +757,7 @@ class InfoGroup:
                     initargs[k] = v
 
         c = cls(**dict(initargs))
-        validkeys = list(c.files.keys()) + list(c.commands.keys()) + list(c.constants.keys())
+        validkeys = list(c._operations.keys())
         for key, value in data.items():
             if isinstance(value, dict) and '_meta' in value:
                 clsname = value['_meta'].split("(")[0]
@@ -617,24 +769,24 @@ class InfoGroup:
 
     def addf(self, key, filename, match=None, parse=None, extended=False):
         """Add file to object including regex and parser"""
-        self.files[key] = (filename, match, parse)
+        self._operations[key] = File(filename, regex=match, parser=parse)
     def addc(self, key, cmd, cmd_opts=None, match=None, parse=None, extended=False):
         """Add command to object including command options, regex and parser"""
-        self.commands[key] = (cmd, cmd_opts, match, parse)
+        self._operations[key] = Command(cmd, cmd_opts, regex=match, parser=parse)
     def const(self, key, value):
         """Add constant value to object"""
-        self.constants[key] = value
+        self._operations[key] = Constant(value)
     def required(self, *args):
         """Add item(s) to list of required fields at comparison"""
         if args:
             for arg in args:
                 if isinstance(arg, list):
                     for subarg in arg:
-                        if subarg not in self.required4equal:
-                            self.required4equal.append(subarg)
+                        if subarg in self._operations:
+                            self._operations[subarg].required = True
                 elif isinstance(arg, str):
-                    if arg not in self.required4equal:
-                        self.required4equal.append(arg)
+                    if arg in self._operations:
+                        self._operations[arg].required = True
 
     def generate(self):
         '''Generate subclasses, defined by derived classes'''
@@ -642,21 +794,30 @@ class InfoGroup:
 
     def update(self):
         '''Read object's files and commands. Triggers update() of subclasses'''
-        outdict = {}
-        if len(self.files) > 0:
-            outdict.update(process_files(self.files))
-        if len(self.commands) > 0:
-            outdict.update(process_cmds(self.commands))
-        if len(self.constants) > 0:
-            for key in self.constants:
-                outdict[key] = self.constants[key]
+        outdict = { k: None for (k,v) in self._operations.items()}
+        for key, op in self._operations.items():
+            if op.valid() and outdict[key] is None:
+                logging.debug("Updating key '%s'", key)
+                data = op.update()
+                if data is not None:
+                    for subkey, subop in self._operations.items():
+                        if not subop.valid(): continue
+                        if outdict[subkey] is not None: continue
+                        if key != subkey and op.ident() == subop.ident():
+                            logging.debug("Updating subkey '%s'", subkey)
+                            subdata = subop.match(data)
+                            subdata = subop.parse(subdata)
+                            outdict[subkey] = subdata
+                    data = op.match(data)
+                    data = op.parse(data)
+                    outdict[key] = data
         for inst in self._instances:
             inst.update()
         self._data.update(outdict)
 
     def get(self, meta=False):
         """Get the object's and all subobjects' data as dict"""
-        outdict = {}
+        outdict = { k: None for (k,v) in self._operations.items()}
         for inst in self._instances:
             clsout = inst.get(meta=meta)
             outdict.update({inst.name : clsout})
@@ -817,47 +978,44 @@ class InfoGroup:
         selfdict = self.get(meta=self_meta)
         clsname = self.__class__.__name__
         key_not_found = 'KEY_NOT_FOUND_IN_OTHER_DICT'
-        selfkeys = selfdict.keys()
-        ownkeys = [k for k,v in selfdict.items() if not isinstance(v, dict)]
-        subkeys = [k for k,v in selfdict.items() if isinstance(v, dict)]
-        otherkeys = otherdict.keys()
-        otherownkeys = [k for k,v in otherdict.items() if not isinstance(v, dict)]
-        othersubkeys = [k for k,v in otherdict.items() if isinstance(v, dict)]
-        if set(ownkeys) & set(self.required4equal) != set(self.required4equal):
+        instnames = [ inst.name for inst in self._instances ]
+        selfkeys = [ k for k in selfdict if k not in instnames ]
+        required4equal = [k for k in self._operations if self._operations[k].required]
+        otherkeys = [ k for k in otherdict if k not in instnames ]
+
+        if set(selfkeys) & set(required4equal) != set(required4equal):
             print("Required keys missing in object: {}".format(
-                  ", ".join(set(self.required4equal) - set(ownkeys)))
+                  ", ".join(set(required4equal) - set(selfkeys)))
                  )
-        if set(otherownkeys) & set(self.required4equal) != set(self.required4equal):
+        if set(otherkeys) & set(required4equal) != set(required4equal):
             print("Required keys missing in compare object: {}".format(
-                  ", ".join(set(self.required4equal) - set(otherownkeys)))
+                  ", ".join(set(required4equal) - set(otherkeys)))
                  )
-            
-        inboth = set(selfkeys) & set(otherkeys) & set(self.required4equal)
+
+        inboth = set(selfkeys) & set(otherkeys)
         diff = {k:(selfdict[k], otherdict[k])
                 for k in inboth
                 if ((not valuecmp(k, clsname, selfdict[k], otherdict[k]))
-                     and k in self.required4equal
+                     and k in required4equal
                    )
                }
         diff.update({k:(selfdict[k], key_not_found)
-                     for k in set(ownkeys) - inboth
-                     if k in self.required4equal
+                     for k in set(selfkeys) - inboth
+                     if k in required4equal
                     })
         diff.update({k:(key_not_found, otherdict[k])
-                     for k in set(otherownkeys) - inboth
-                     if k in self.required4equal
+                     for k in set(otherkeys) - inboth
+                     if k in required4equal
                     })
         for inst in self._instances:
-            if inst.name in subkeys and inst.name in othersubkeys:
+            if inst.name in selfdict and inst.name in otherdict:
                 instdiff = inst.compare(otherdict[inst.name])
                 if len(instdiff) > 0:
                     diff[inst.name] = instdiff
         return diff
-    
     def __eq__(self, other):
         diff = self.compare(other)
         return len(diff) == 0
-    
     def _init_args(self):
         """Get list of tuples with __init__ arguments"""
         parameters = inspect.signature(self.__init__).parameters.values()
@@ -1053,7 +1211,7 @@ class MachineState(MultiClassInfoGroup):
                  extended=False,
                  executable=None,
                  anonymous=False,
-                 debug=DEBUG_OUTPUT,
+                 loglevel=DEFAULT_LOGLEVEL,
                  dmifile=DMIDECODE_FILE,
                  likwid_enable=DO_LIKWID,
                  likwid_path=LIKWID_PATH,
@@ -1062,7 +1220,7 @@ class MachineState(MultiClassInfoGroup):
                  vecmd_path=VEOS_BASE,
                  clinfo_path=CLINFO_PATH):
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
-        self.debug = debug
+        self.loglevel = loglevel
         self.dmifile = dmifile
         self.likwid_enable = likwid_enable
         self.executable = executable
@@ -1720,7 +1878,9 @@ class UptimeMacOs(InfoGroup):
     @staticmethod
     def parsereadable(string):
         uptime = UptimeMacOs.parsetime(string)
-        return Uptime.totimedelta(uptime)
+        if uptime is not None:
+            return Uptime.totimedelta(uptime)
+        return "Cannot parse uptime"
 
 
 class Uptime(InfoGroup):
@@ -2344,12 +2504,20 @@ class PrefetcherInfo(PathMatchInfoGroup):
             abscmd = which(cmd)
 
         if abscmd:
-            data = process_cmd((abscmd, "-l -c 0", r"Feature\s+CPU\s(\d+)", int))
-            if data == 0:
-                self.searchpath = "/sys/devices/system/cpu/cpu*"
-                self.match = r".*/cpu(\d+)$"
-                self.subclass = PrefetcherInfoClass
-                self.subargs = {"likwid_base" : likwid_base}
+            for r in [r"Feature\s+HWThread\s(\d+)", r"Feature\s+CPU\s(\d+)"]:
+                data = process_cmd((abscmd, "-l -c 0", r, str))
+                intdata = -1
+                try:
+                    intdata = int(data)
+                    if intdata == 0:
+                        self.searchpath = "/sys/devices/system/cpu/cpu*"
+                        self.match = r".*/cpu(\d+)$"
+                        self.subclass = PrefetcherInfoClass
+                        self.subargs = {"likwid_base" : likwid_base}
+                        break
+                except:
+                    pass
+                
 
 ################################################################################
 # Infos about the turbo frequencies (LIKWID only)
@@ -2363,7 +2531,9 @@ class TurboInfo(InfoGroup):
         self.likwid_base = likwid_base
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
-        error_match = r"Cannot gather values.*"
+        error_matches = [r"Cannot gather values.*",
+                         r"Query Turbo Mode only supported.*",
+                         r"^Failed.*"]
         names = ["BaseClock", "MinClock", "MinUncoreClock", "MaxUncoreClock"]
         matches = [r"Base clock:\s+([\d\.]+ MHz)",
                    r"Minimal clock:\s+([\d\.]+ MHz)",
@@ -2378,16 +2548,22 @@ class TurboInfo(InfoGroup):
             abscmd = which(cmd)
         if abscmd:
             data = process_cmd((abscmd, cmd_opts, matches[0]))
-            if len(data) > 0 and not re.match(error_match, data):
-                for name, regex in zip(names, matches):
-                    self.addc(name, abscmd, cmd_opts, regex, tohertz)
-                    self.required(name)
-                regex = r"^Performance energy bias:\s+(\d+)"
-                self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
-                self.required("PerfEnergyBias")
-                freqfunc = TurboInfo.getactivecores
-                self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
-        self.required4equal = self.commands.keys()
+            if len(data) > 0:
+                err = False
+                for l in data.split("\n"):
+                    for regex in error_matches:
+                        if re.match(regex, data):
+                            err = True
+                            break
+                if not err:
+                    for name, regex in zip(names, matches):
+                        self.addc(name, abscmd, cmd_opts, regex, tohertz)
+                        self.required(name)
+                    regex = r"^Performance energy bias:\s+(\d+)"
+                    self.addc("PerfEnergyBias", abscmd, cmd_opts, regex, int)
+                    self.required("PerfEnergyBias")
+                    freqfunc = TurboInfo.getactivecores
+                    self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
     @staticmethod
     def getactivecores(indata):
         freqs = []
@@ -2449,6 +2625,7 @@ class ExecutableInfoExec(InfoGroup):
                 if extended:
                     self.const("MD5sum", ExecutableInfoExec.getmd5sum(abscmd))
                     self.required("MD5sum")
+            self.required(["Name", "Size"])
 
     @staticmethod
     def getmd5sum(filename):
@@ -2458,43 +2635,12 @@ class ExecutableInfoExec(InfoGroup):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-class ExecutableInfoLibraries(InfoGroup):
-    '''Class to read all libraries linked with given executable'''
-    def __init__(self, executable, extended=False, anonymous=False):
-        super(ExecutableInfoLibraries, self).__init__(
-            name="LinkedLibraries", anonymous=anonymous, extended=extended)
-        self.executable = executable
-        if executable is not None:
-            self.executable = which(executable)
-            if which("objdump"):
-                parser = ExecutableInfoLibraries.parseNeededLibs
-                self.addc("NeededLibraries", "objdump", "-p {}".format(executable), parse=parser)
-            if which("ldd"):
-                parser = ExecutableInfoLibraries.parseLinkedLibs
-                self.addc("LinkedLibraries", "ldd", executable, parse=parser)
-    def parseLinkedLibs(data):
-        libdict = {}
-        libregex = re.compile(r"\s*([^\s]+)\s+.*")
-        pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^(]+).*")
-        for line in data.split("\n"):
-            libmat = libregex.search(line)
-            if libmat:
-                lib = libmat.group(1)
-                pathmat = pathregex.search(line)
-                if pathmat:
-                    libdict.update({lib : pathmat.group(1)})
-                elif pexists(lib):
-                    libdict.update({lib : lib})
-                else:
-                    libdict.update({lib : None})
-        return libdict
-    def parseNeededLibs(data):
-        libs = []
-        for line in data.split("\n"):
-            m = re.match(r"^\s+NEEDED\s+(.*)$", line)
-            if m:
-                libs.append(m.group(1))
-        return libs
+    @staticmethod
+    def getcompiledwith(value):
+        for line in re.split(r"\n", value):
+            if "CC" in line:
+                return line
+        return "Not detectable"
 
 
 class ExecutableInfo(MultiClassInfoGroup):
@@ -2503,9 +2649,48 @@ class ExecutableInfo(MultiClassInfoGroup):
         super(ExecutableInfo, self).__init__(
             name="ExecutableInfo", extended=extended, anonymous=anonymous)
         self.executable = executable
-        self.classlist = [ExecutableInfoExec, ExecutableInfoLibraries]
-        clsargs = {"executable" : self.executable}
-        self.classargs = [clsargs for i in range(len(self.classlist))]
+        absexe = executable
+        if executable is not None and not os.access(absexe, os.X_OK):
+            absexe = which(executable)
+        if absexe is not None:
+            self.executable = absexe
+            ldd = which("ldd")
+            objd = which("objdump")
+            self.classlist = [ExecutableInfoExec]
+            clsargs = {"executable" : self.executable}
+            self.classargs = [clsargs for i in range(len(self.classlist))]
+            if self.executable is not None:
+                if ldd is not None:
+                    self.addc("LinkedLibraries", ldd, absexe, r"(.*)", ExecutableInfo.parseLdd)
+                if objd is not None:
+                    parser = ExecutableInfo.parseNeededLibs
+                    self.addc("NeededLibraries", objd, "-p {}".format(absexe), parse=parser)
+    @staticmethod
+    def parseLdd(lddinput):
+        libdict = {}
+        if lddinput:
+            libregex = re.compile(r"\s*([^\s]+)\s+.*")
+            pathregex = re.compile(r"\s*[^\s]+\s+=>\s+([^\s(]+).*")
+            for line in lddinput.split("\n"):
+                libmat = libregex.search(line)
+                if libmat:
+                    lib = libmat.group(1)
+                    pathmat = pathregex.search(line)
+                    if pathmat:
+                        libdict.update({lib : pathmat.group(1)})
+                    elif pexists(lib):
+                        libdict.update({lib : lib})
+                    else:
+                        libdict.update({lib : None})
+        return libdict
+    @staticmethod
+    def parseNeededLibs(data):
+        libs = []
+        for line in data.split("\n"):
+            m = re.match(r"^\s+NEEDED\s+(.*)$", line)
+            if m:
+                libs.append(m.group(1))
+        return libs
 
 ################################################################################
 # Infos about the temperature using coretemp
@@ -3161,6 +3346,7 @@ def read_cli(cliargs):
                         help='do not embed meta information in classes (recommended, default: True)')
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
+    parser.add_argument('--log', dest='loglevel', help='Loglevel (info, debug, warning, error)', default='info')
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
     pargs = vars(parser.parse_args(cliargs))
 
@@ -3183,6 +3369,11 @@ def read_cli(cliargs):
             raise ValueError("Configuration file '{}' does not exist".format(pargs["configfile"]))
         if not os.access(pargs["configfile"], os.R_OK):
             raise ValueError("Configuration file '{}' is not readable".format(pargs["configfile"]))
+    if pargs["loglevel"]:
+        numeric_level = getattr(logging, pargs["loglevel"].upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: {}'.format(pargs["loglevel"]))
+        logging.basicConfig(level=numeric_level)
     return pargs
 
 def read_config(config={"extended" : False, "anonymous" : False, "executable" : None}):
@@ -3196,8 +3387,8 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                   "modulecmd" : MODULECMD_PATH,
                   "vecmd_path" : VEOS_BASE,
                   "nvidia_path" : NVIDIA_PATH,
+                  "loglevel" : DEFAULT_LOGLEVEL,
                   "clinfo_path" : CLINFO_PATH,
-                  "debug" : DEBUG_OUTPUT,
                   "anonymous" : False,
                   "extended" : False,
                  }
@@ -3207,6 +3398,7 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
     configdict["anonymous"] = config.get("anonymous", False)
     configdict["extended"] = config.get("extended", False)
     configdict["executable"] = config.get("executable", None)
+    configdict["loglevel"] = config.get("loglevel", DEFAULT_LOGLEVEL)
 
     if userfile is not None:
         searchfiles.append(userfile)
@@ -3230,7 +3422,11 @@ def read_config(config={"extended" : False, "anonymous" : False, "executable" : 
                 sfp.close()
                 break
 
-
+    if configdict["loglevel"]:
+        numeric_level = getattr(logging, configdict["loglevel"].upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: {}'.format(configdict["loglevel"]))
+        logging.basicConfig(level=numeric_level)
 
     return configdict
 

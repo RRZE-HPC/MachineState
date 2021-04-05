@@ -16,7 +16,9 @@ An example JSON (in extended mode) from an Intel Skylake Desktop system running 
 
 An example JSON (in extended mode) from an Intel Skylake Desktop system running macOS can be found [here](./examples/skylake-desktop-macos.json) ([raw](https://raw.githubusercontent.com/RRZE-HPC/MachineState/master/examples/skylake-desktop-macos.json)). 
 
-![test-n-publish action status](https://github.com/RRZE-HPC/MachineState/workflows/test-n-publish/badge.svg) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern)
+![test-n-publish action status](https://github.com/RRZE-HPC/MachineState/workflows/test-n-publish/badge.svg) [![Codecov](https://codecov.io/github/RRZE-HPC/MachineState/coverage.svg?branch=master)](https://codecov.io/github/RRZE-HPC/MachineState?branch=mastern) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4599778.svg)](https://doi.org/10.5281/zenodo.4599778)
+
+
 
 --------------------------------------------------------------------------------
 Installation

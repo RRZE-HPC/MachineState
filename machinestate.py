@@ -2561,7 +2561,24 @@ class PrefetcherInfo(PathMatchInfoGroup):
 ################################################################################
 # Infos about the turbo frequencies (LIKWID only)
 ################################################################################
-class TurboInfo(InfoGroup):
+class TurboInfoCpu(InfoGroup):
+    '''Class to read information about turbo settings per HW thread'''
+    def __init__(self, cpu, extended=False, anonymous=False, likwid_base=None):
+        super(TurboInfoCpu, self).__init__(extended=extended, anonymous=anonymous)
+        self.name = "HWthread {}".format(cpu)
+        self.likwid_base = likwid_base
+        self.cpu = cpu
+        match = r"HWThread {}.*Turbo (\d+)".format(self.cpu)
+        if self.likwid_base and len(self.likwid_base) > 0 and os.path.isdir(self.likwid_base):
+            tmpcmd = pjoin(self.likwid_base, "likwid-setFrequencies")
+            if pexists(tmpcmd):
+                abscmd = tmpcmd
+        else:
+            abscmd = which(cmd)
+        if abscmd:
+            self.addc("TurboMode", abscmd, "-p", match, tobool)
+
+class TurboInfo(PathMatchInfoGroup):
     '''Class to read information about CPU/Uncore frequencies and perf-energy-bias
     (uses the likwid-powermeter command)
     '''
@@ -2603,6 +2620,10 @@ class TurboInfo(InfoGroup):
                     self.required("PerfEnergyBias")
                     freqfunc = TurboInfo.getactivecores
                     self.addc("TurboFrequencies", abscmd, cmd_opts, None, freqfunc)
+        self.searchpath = "/sys/devices/system/cpu/cpu*"
+        self.match = r".*/cpu(\d+)$"
+        self.subclass = TurboInfoCpu
+        self.subargs = {"likwid_base" : self.likwid_base}
     @staticmethod
     def getactivecores(indata):
         freqs = []

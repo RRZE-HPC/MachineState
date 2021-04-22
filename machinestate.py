@@ -358,7 +358,7 @@ def tobool(value):
 
 def int_from_str(s):
     """Parse int from string, either hex with leading 0x or plain integer."""
-    if re.match(str'0x[0-9a-fA-F]+', s):
+    if re.match(r'0x[0-9a-fA-F]+', s):
         return int(s, base=16)
     else:
         return int(s)

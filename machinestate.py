@@ -2584,6 +2584,7 @@ class TurboInfo(InfoGroup):
         cmd = "likwid-powermeter"
         cmd_opts = "-i 2>&1"
         error_matches = [r"Cannot gather values.*",
+                         r"Cannot get access.*",
                          r"Query Turbo Mode only supported.*",
                          r"^Failed.*"]
         names = ["BaseClock", "MinClock", "MinUncoreClock", "MaxUncoreClock"]

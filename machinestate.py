@@ -355,6 +355,15 @@ def tobool(value):
             return False
     return False
 
+
+def int_from_str(s):
+    """Parse int from string, either hex with leading 0x or plain integer."""
+    if re.match(str'0x[0-9a-fA-F]+', s):
+        return int(s, base=16)
+    else:
+        return int(s)
+
+
 ################################################################################
 # Processing functions for entries in class attributes 'files' and 'commands'  #
 ################################################################################
@@ -1430,10 +1439,14 @@ class CpuInfo(InfoGroup):
             self.addf("Stepping", "/proc/cpuinfo", r"stepping\s+:\s(.+)", int)
         elif march in ["aarch64"]:
             self.addf("Vendor", "/proc/cpuinfo", r"CPU implementer\s+:\s([x0-9a-fA-F]+)")
-            self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)", int)
-            self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)", int)
-            self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)", int)
-            self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)", int)
+            self.addf("Family", "/proc/cpuinfo", r"CPU architecture\s*:\s([x0-9a-fA-F]+)",
+                      int_from_str)
+            self.addf("Model", "/proc/cpuinfo", r"CPU variant\s+:\s([x0-9a-fA-F]+)",
+                      int_from_str)
+            self.addf("Stepping", "/proc/cpuinfo", r"CPU revision\s+:\s([x0-9a-fA-F]+)",
+                      int_from_str)
+            self.addf("Variant", "/proc/cpuinfo", r"CPU part\s+:\s([x0-9a-fA-F]+)",
+                      int_from_str)
         elif march in ["ppc64le", "ppc64"]:
             self.addf("Platform", "/proc/cpuinfo", r"platform\s+:\s(.*)")
             self.addf("Name", "/proc/cpuinfo", r"model\s+:\s(.+)")

@@ -1512,7 +1512,7 @@ class CpuTopologyClass(InfoGroup):
         base = "/sys/devices/system/cpu/cpu{}".format(ident)
         self.addf("CoreId", pjoin(base, "topology/core_id"), r"(\d+)", int)
         self.addf("PackageId", pjoin(base, "topology/physical_package_id"), r"(\d+)", int)
-        self.addf("PackageId", pjoin(base, "topology/die_id"), r"(\d+)", int)
+        self.const("DieId", CpuTopologyClass.getdieid(ident))
         self.const("HWThread", ident)
         self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
         if extended:
@@ -1556,6 +1556,17 @@ class CpuTopologyClass(InfoGroup):
         if len(dlist) > 1:
             print("WARN: Hardware thread {} contains to {} NUMA nodes".format(hwthread, len(dlist)))
         return max(int(nmatch.match(dlist[0]).group(1)), 0)
+
+    @staticmethod
+    def getdieid(hwthread):
+        base = "/sys/devices/system/cpu/cpu{}/topology/".format(hwthread)
+        path = pjoin(base, "die_id")
+        if not os.access(path, os.R_OK):
+            path = pjoin(base, "physical_package_id")
+        fp = fopen(path)
+        if fp is not None:
+            data = fp.read().decode(ENCODING).strip()
+            return int(data)
 
 class CpuTopology(PathMatchInfoGroup):
     def __init__(self, extended=False, anonymous=False):

@@ -196,7 +196,7 @@ Output the MachineState data as collapsible HTML table (with CSS and JavaScript)
 $ machinestate --html
 ```
 
-You can also redirekt the HTML output to a file directly:
+You can also redirect the HTML output to a file directly:
 ```
 $ machinestate --html --output machine.html
 ```

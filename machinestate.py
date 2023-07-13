@@ -2473,7 +2473,7 @@ class MpiInfo(ListInfoGroup):
                 self.addc("OpenMpiParams", ompi, ompi_args, parse=MpiInfo.openmpiparams)
             impi = which("impi_info")
             if impi and len(impi) > 0 and extended:
-                self.addc("IntelMpiParams", impi, "| grep I_MPI", parse=MpiInfo.intelmpiparams)
+                self.addc("IntelMpiParams", impi, "| grep \"|\"", parse=MpiInfo.intelmpiparams)
     @staticmethod
     def openmpiparams(value):
         outdict = {}
@@ -2486,6 +2486,8 @@ class MpiInfo(ListInfoGroup):
     @staticmethod
     def intelmpiparams(value):
         outdict = {}
+        # process output to overcome bug in impi_info 2021
+        value = value.replace("\n", "").replace("|I_MPI", "\n|I_MPI")
         for line in value.split("\n"):
             if "I_MPI" not in line: continue
             if not line.strip(): continue

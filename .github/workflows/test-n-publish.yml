@@ -12,8 +12,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
       name: Set up Python ${{ matrix.python-version }}
       with:
         python-version: ${{ matrix.python-version }}
@@ -51,7 +51,7 @@ jobs:
         coverage run -p `which machinestate` -j output-ext.json
         coverage run -p `which machinestate` --html
         coverage run -p `which machinestate` --html -o output.html
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v3
     - name: Build package
       run: |
         python setup.py build sdist

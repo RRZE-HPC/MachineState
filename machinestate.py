@@ -2983,7 +2983,7 @@ class ModulesInfo(InfoGroup):
                                           anonymous=anonymous)
         self.modulecmd = modulecmd
         parse = ModulesInfo.parsemodules
-        cmd_opts = "sh list -t 2>&1"
+        cmd_opts = "sh -t list 2>&1"
         cmd = modulecmd
         abspath = which(cmd)
         if modulecmd is not None and len(modulecmd) > 0:
@@ -3001,8 +3001,10 @@ class ModulesInfo(InfoGroup):
             self.addc("Loaded", abscmd, cmd_opts, None, parse)
     @staticmethod
     def parsemodules(value):
-        slist = re.split("\n", value)
-        return slist[1:]
+        slist = [ x for x in re.split("\n", value) if ";" not in x ]
+        if re.match("^Currently Loaded.+$", slist[0]):
+            slist = slist[1:]
+        return slist
 
 ################################################################################
 # Infos about interrupt handling

@@ -2981,6 +2981,8 @@ class ModulesInfo(InfoGroup):
         super(ModulesInfo, self).__init__(name="ModulesInfo",
                                           extended=extended,
                                           anonymous=anonymous)
+        if os.getenv("LMOD_CMD"):
+            modulecmd = os.getenv("LMOD_CMD")
         self.modulecmd = modulecmd
         parse = ModulesInfo.parsemodules
         cmd_opts = "sh -t list 2>&1"

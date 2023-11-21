@@ -2430,8 +2430,8 @@ class MpiInfoClass(InfoGroup):
     def __init__(self, executable, extended=False, anonymous=False):
         super(MpiInfoClass, self).__init__(name=executable, extended=extended, anonymous=anonymous)
         self.executable = executable
-        self.addc("Version", executable, "--version", r"(.+)", MpiInfoClass.mpiversion)
-        self.addc("Implementor", executable, "--version", r"(.+)", MpiInfoClass.mpivendor)
+        self.addc("Version", executable, "--version", None, MpiInfoClass.mpiversion)
+        self.addc("Implementor", executable, "--version", None, MpiInfoClass.mpivendor)
         abscmd = which(executable)
         if abscmd and len(abscmd) > 0:
             self.const("Path", abscmd)
@@ -2439,6 +2439,7 @@ class MpiInfoClass(InfoGroup):
 
     @staticmethod
     def mpivendor(value):
+        print(value)
         if "Open MPI" in value or "OpenRTE" in value:
             return "OpenMPI"
         elif "Intel" in value and "MPI" in value:

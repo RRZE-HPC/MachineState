@@ -2439,7 +2439,6 @@ class MpiInfoClass(InfoGroup):
 
     @staticmethod
     def mpivendor(value):
-        print(value)
         if "Open MPI" in value or "OpenRTE" in value:
             return "OpenMPI"
         elif "Intel" in value and "MPI" in value:

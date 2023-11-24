@@ -4,7 +4,10 @@ on:
   push:
     tags:
       - v*
-
+  workflow_run:
+    workflows: [buildtest]
+    types:
+      - completed
 jobs:
   publish:
     runs-on: ubuntu-latest

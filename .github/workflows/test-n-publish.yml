@@ -1,9 +1,15 @@
-name: test-n-publish
+name: buildtest
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - "machinestate.py"
+  pull_request:
+    paths:
+      - "machinestate.py"
 
 jobs:
-  test-n-publish:
+  buildtest:
     strategy:
       fail-fast: false
       matrix:
@@ -52,13 +58,6 @@ jobs:
         coverage run -p `which machinestate` --html
         coverage run -p `which machinestate` --html -o output.html
     - uses: codecov/codecov-action@v3
-    - name: Build package
-      run: |
-        python setup.py build sdist
-    - name: Publish to PyPI
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && startsWith(matrix.os, 'ubuntu')
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        skip_existing: true
-        user: __token__
+
         password: ${{ secrets.pypi_password }}
+

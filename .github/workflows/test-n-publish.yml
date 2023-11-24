@@ -59,5 +59,3 @@ jobs:
         coverage run -p `which machinestate` --html -o output.html
     - uses: codecov/codecov-action@v3
 
-        password: ${{ secrets.pypi_password }}
-

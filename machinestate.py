@@ -1515,6 +1515,8 @@ class CpuTopologyClass(InfoGroup):
         self.const("DieId", CpuTopologyClass.getdieid(ident))
         self.const("HWThread", ident)
         self.const("ThreadId", CpuTopologyClass.getthreadid(ident))
+        if os.access(pjoin(base, "topology/cluster_id"), os.R_OK):
+            self.addf("ClusterId", pjoin(base, "topology/cluster_id"), r"(\d+)", int)
         if extended:
             self.const("Present", CpuTopologyClass.inlist("present", ident))
             self.const("Online", CpuTopologyClass.inlist("online", ident))

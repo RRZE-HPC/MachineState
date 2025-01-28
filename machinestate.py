@@ -575,7 +575,15 @@ class BaseOperation:
         out = data
         if self.parser is not None:
             if callable(self.parser):
-                out = self.parser(data)
+                try:
+                    if isinstance(data, str) and data.startswith("0x"):
+                        # Convert hexadecimal string to integer
+                        out = int(data, 16)
+                    else:
+                        out = self.parser(data)
+                except ValueError as e:
+                    print(f"Error parsing data: {data}. Exception: {e}")
+                    raise
         return out
     def update(self):
         return None

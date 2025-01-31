@@ -63,15 +63,15 @@ jobs:
     - name: Test
       run: |
         coverage run -p tests/all_tests.py
-        coverage run -p `which python3` -m machinestate -e -s -i 4
-        coverage run -p `which python3` -m machinestate -e -s -i 4 -o output-ext.json
-        coverage run -p `which python3` -m machinestate -s -i 4 -o output.json
+        coverage run -p `which machinestate` -e -s -i 4
+        coverage run -p `which machinestate` -e -s -i 4 -o output-ext.json
+        coverage run -p `which machinestate` -s -i 4 -o output.json
         CC=testcompiler CXX=testccompiler FC=testfortran coverage run -p `which machinestate` -c
-        coverage run -p `which python3` -m machinestate -e -s -a -m hostname
-        coverage run -p `which python3` -m machinestate -j output.json
-        coverage run -p `which python3` -m machinestate -e -j output.json
-        coverage run -p `which python3` -m machinestate -j output-ext.json
-        coverage run -p `which python3` -m machinestate --html
-        coverage run -p `which python3` -m machinestate --html -o output.html
+        coverage run -p `which machinestate` -e -s -a -m hostname
+        coverage run -p `which machinestate` -j output.json
+        coverage run -p `which machinestate` -e -j output.json
+        coverage run -p `which machinestate` -j output-ext.json
+        coverage run -p `which machinestate` --html
+        coverage run -p `which machinestate` --html -o output.html
     - uses: codecov/codecov-action@v4
 

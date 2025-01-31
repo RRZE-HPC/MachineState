@@ -52,6 +52,7 @@ jobs:
         export PATH="/usr/local/opt/gcc@14/bin":$PATH;
         export CC=gcc-14; export CXX=g++-14;
         export FC=gfortran
+    - name: Pre-Install (generic)
       run: |
         python -m pip install codecov
         python -m pip install requests

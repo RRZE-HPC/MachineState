@@ -70,8 +70,8 @@ jobs:
         #coverage run -p `which machinestate` -e -s -a -m hostname
         #coverage run -p `which machinestate` -j output.json
         #coverage run -p `which machinestate` -e -j output.json
-        coverage run -p `which machinestate` -j output-ext.json
-        coverage run -p `which machinestate` --html
-        coverage run -p `which machinestate` --html -o output.html
+        coverage run -p machinestate -j output-ext.json
+        coverage run -p machinestate --html
+        coverage run -p machinestate --html -o output.html
     - uses: codecov/codecov-action@v3
 

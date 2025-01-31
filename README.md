@@ -46,7 +46,8 @@ $ ./machinestate.py
 
 The module cannot be used with Python2!
 
-The module is tested on Ubuntu Xenial for Python versions 3.4, 3.5, 3.6, 3.7 and 3.8 for the architectures AMD64, PPC64le and ARM8. For macOS, only Python versions 3.7 and 3.8 for the AMD64 architecture are tested.
+The module is tested on the latest Ubuntu distro for all Python versions with security support for the architectures AMD64, PPC64le and ARM8.
+For macOS, all Python versions with security support for the ARM8 architecture are tested.
 
 
 

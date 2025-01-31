@@ -13,13 +13,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, macos-11, macos-12]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       name: Set up Python ${{ matrix.python-version }}
       with:
         python-version: ${{ matrix.python-version }}
@@ -33,8 +33,8 @@ jobs:
       if: startsWith(matrix.os, 'macos')
       run: |
         brew install slurm open-mpi gcc clinfo modules;
-        export PATH="/usr/local/opt/gcc@10/bin":$PATH;
-        export CC=gcc-10; export CXX=g++-10;
+        export PATH="/usr/local/opt/gcc@14/bin":$PATH;
+        export CC=gcc-14; export CXX=g++-14;
         export FC=gfortran
     - name: Pre-Install (generic)
       run: |
@@ -57,5 +57,5 @@ jobs:
         coverage run -p `which machinestate` -j output-ext.json
         coverage run -p `which machinestate` --html
         coverage run -p `which machinestate` --html -o output.html
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v5
 

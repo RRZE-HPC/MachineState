@@ -73,5 +73,5 @@ jobs:
         coverage run -p `which machinestate` -j output-ext.json
         coverage run -p `which machinestate` --html
         coverage run -p `which machinestate` --html -o output.html
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v3
 

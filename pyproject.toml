@@ -36,3 +36,6 @@ Issues = "https://github.com/RRZE-HPC/MachineState/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "machinestate.MACHINESTATE_VERSION" }
+
+[project.scripts]
+machinestate = "machinestate:main"

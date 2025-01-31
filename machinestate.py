@@ -143,7 +143,7 @@ CLINFO_PATH = "/usr/bin"
 ################################################################################
 # Version information
 ################################################################################
-MACHINESTATE_VERSION = "0.5.0"
+MACHINESTATE_VERSION = "0.5.1"
 MACHINESTATE_SCHEMA_VERSION = "v1"
 __version__ = MACHINESTATE_VERSION
 

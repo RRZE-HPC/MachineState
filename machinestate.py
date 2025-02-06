@@ -1418,20 +1418,46 @@ class HostInfo(InfoGroup):
 class CpuInfoMacOS(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(CpuInfoMacOS, self).__init__(name="CpuInfo", extended=extended, anonymous=anonymous)
-        self.const("MachineType", platform.machine())
-        self.addc("Vendor", "sysctl", "-a", r"machdep.cpu.vendor: (.*)")
-        self.addc("Name", "sysctl", "-a", r"machdep.cpu.brand_string: (.*)")
-        self.addc("Family", "sysctl", "-a", r"machdep.cpu.family: (\d+)", int)
-        self.addc("Model", "sysctl", "-a", r"machdep.cpu.model: (\d+)", int)
-        self.addc("Stepping", "sysctl", "-a", r"machdep.cpu.stepping: (\d+)", int)
-        if extended:
-            self.addc("Flags", "sysctl", "-a", r"machdep.cpu.features: (.*)", tostrlist)
-            self.addc("ExtFlags", "sysctl", "-a", r"machdep.cpu.extfeatures: (.*)", tostrlist)
-            self.addc("Leaf7Flags", "sysctl", "-a", r"machdep.cpu.leaf7_features: (.*)", tostrlist)
-            self.addc("Microcode", "sysctl", "-a", r"machdep.cpu.microcode_version: (.*)")
-            self.addc("ExtFamily", "sysctl", "-a", r"machdep.cpu.extfamily: (\d+)", int)
-            self.addc("ExtModel", "sysctl", "-a", r"machdep.cpu.extmodel: (\d+)", int)
-        self.required(["Vendor", "Family", "Model", "Stepping"])
+        march = platform.machine()
+        self.const("MachineType", march)
+        if march in ["x86_64"]:
+            self.addc("Vendor", "sysctl", "-a", r"machdep.cpu.vendor: (.*)")
+            self.addc("Name", "sysctl", "-a", r"machdep.cpu.brand_string: (.*)")
+            self.addc("Family", "sysctl", "-a", r"machdep.cpu.family: (\d+)", int)
+            self.addc("Model", "sysctl", "-a", r"machdep.cpu.model: (\d+)", int)
+            self.addc("Stepping", "sysctl", "-a", r"machdep.cpu.stepping: (\d+)", int)
+            if extended:
+                self.addc("Flags", "sysctl", "-a", r"machdep.cpu.features: (.*)", tostrlist)
+                self.addc("ExtFlags", "sysctl", "-a", r"machdep.cpu.extfeatures: (.*)", tostrlist)
+                self.addc("Leaf7Flags", "sysctl", "-a", r"machdep.cpu.leaf7_features: (.*)", tostrlist)
+                self.addc("Microcode", "sysctl", "-a", r"machdep.cpu.microcode_version: (.*)")
+                self.addc("ExtFamily", "sysctl", "-a", r"machdep.cpu.extfamily: (\d+)", int)
+                self.addc("ExtModel", "sysctl", "-a", r"machdep.cpu.extmodel: (\d+)", int)
+            self.required(["Vendor", "Family", "Model", "Stepping"])
+        elif march in ["arm64"]:
+            # TODO: Is there a way to get Vendor?
+            self.const("Vendor", "Apple")
+            self.addc("Name", "sysctl", "-a", r"machdep.cpu.brand_string: (.*)")
+            self.addc("Family", "sysctl", "-a", r"hw.cpufamily: (\d+)", int)
+            self.addc("Model", "sysctl", "-a", r"hw.cputype: (\d+)", int)
+            self.addc("Stepping", "sysctl", "-a", r"hw.cpusubtype: (\d+)", int)
+            if extended:
+                self.addc("Flags", "sysctl", "-a hw.optional", parse=CpuInfoMacOS.getflags_arm64)
+            self.required(["Vendor", "Family", "Model", "Stepping"])
+
+    @staticmethod
+    def getflags_arm64(string):
+        cmd = "sysctl", "-a", r"hw.optional"
+        outlist = []
+        for line in string.split("\n"):
+            key, value = [
+                    field.split(":") for field in line.split("hw.optional.") if len(field)
+                ][0]
+            if int(value):
+                key = key.replace("arm.", "")
+                outlist.append(key)
+        return outlist
+
 
 class CpuInfo(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -1684,8 +1710,11 @@ class CpuFrequencyMacOs(MultiClassInfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(CpuFrequencyMacOs, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "CpuFrequency"
-        self.classlist = [CpuFrequencyMacOsCpu, CpuFrequencyMacOsBus]
-        self.classargs = [{} for c in self.classlist]
+        # Apple Silicon with MacOS does not easily print out CPU/BUS freqs, see
+        # https://github.com/giampaolo/psutil/issues/1892
+        if platform.machine() == "x86_64":
+            self.classlist = [CpuFrequencyMacOsCpu, CpuFrequencyMacOsBus]
+            self.classargs = [{} for c in self.classlist]
         self.addc("TimerFreq", "sysctl", "-a", r"hw.tbfrequency: (\d+)", int)
 
 class CpuFrequencyClass(InfoGroup):
@@ -1837,8 +1866,8 @@ class CacheTopologyMacOSClass(InfoGroup):
             ncpus = process_cmd(("sysctl", "-n hw.ncpu", r"(\d+)", int))
             cconfig = process_cmd(("sysctl", "-n hw.cacheconfig", r"([\d\s]+)", tointlist))
             if cconfig and ncpus:
-                if len(cconfig) > int(level):
-                    sharedbycount = int(cconfig[int(level)])
+                sharedbycount = int(cconfig[int(level)])
+                if sharedbycount:
                     for i in range(ncpus//sharedbycount):
                         clist.append(list(range(i*sharedbycount, (i+1)*sharedbycount)))
         return clist
@@ -1848,8 +1877,12 @@ class CacheTopologyMacOSClass(InfoGroup):
 class CacheTopologyMacOS(ListInfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(CacheTopologyMacOS, self).__init__(anonymous=anonymous, extended=extended)
+        march = platform.machine()
         self.name = "CacheTopology"
-        self.userlist = ["l1i", "l1d", "l2", "l3"]
+        if march in ["x86_64"]:
+            self.userlist = ["l1i", "l1d", "l2", "l3"]
+        elif march in ["arm64"]:
+            self.userlist = ["l1i", "l1d", "l2"]
         self.subclass = CacheTopologyMacOSClass
 
 

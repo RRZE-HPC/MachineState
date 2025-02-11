@@ -1712,8 +1712,9 @@ class CpuFrequencyMacOsCpu(InfoGroup):
 
     @staticmethod
     def get_ioreg_states(string):
-        bytestr = re.match(r".*<([0-9A-Fa-f]+)>", string).group(1)
+        bytestr = re.match(r".*<([0-9A-Fa-f]+)>", string)
         if bytestr:
+            bytestr = bytestr.group(1)
             # numbers consecutive in 4-byte little-endian
             states_int = struct.unpack("<" + int(len(bytestr)/8) * "i", bytes.fromhex(bytestr))
             # voltage states are in pairs of (freq, voltage)

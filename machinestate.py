@@ -3415,6 +3415,7 @@ class OpenCLInfoPlatformClass(ListInfoGroup):
                 suffix = "P0"
             self.const("IcdSuffix", suffix)
             num_devs = process_cmd((clcmd, cmdopts, r".*{}.*#DEVICES\s*(\d+)".format(suffix), int))
+            print(num_devs)
             if num_devs and num_devs > 0:
                 self.userlist = [r for r in range(num_devs)]
                 self.subargs = {"clinfo_path" : clinfo_path, "suffix" : suffix}

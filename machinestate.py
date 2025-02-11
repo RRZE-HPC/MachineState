@@ -563,14 +563,20 @@ class BaseOperation:
         out = data
         if self.regex is not None:
             regex = re.compile(self.regex)
+            m = None
             for l in NEWLINE_REGEX.split(data):
                 m = regex.match(l)
                 if m:
                     out = m.group(1)
+                    break
                 else:
                     m = regex.search(l)
                     if m:
                         out = m.group(1)
+                        break
+            if not m:
+                out = ""
+                self.parser = None
         return out
     def parse(self, data):
         out = data
@@ -3405,6 +3411,8 @@ class OpenCLInfoPlatformClass(ListInfoGroup):
             self.addc("Vendor", clcmd, cmdopts, r"\s+CL_PLATFORM_VENDOR\s+(.+)", str)
             #self.commands["IcdSuffix"] = (clcmd, cmdopts, r"\s+CL_PLATFORM_ICD_SUFFIX_KHR\s+(.+)", str)
             suffix = process_cmd((clcmd, cmdopts, r"\s+CL_PLATFORM_ICD_SUFFIX_KHR\s+(.+)", str))
+            if " " in suffix:
+                suffix = "P0"
             self.const("IcdSuffix", suffix)
             num_devs = process_cmd((clcmd, cmdopts, r".*{}.*#DEVICES\s*(\d+)".format(suffix), int))
             if num_devs and num_devs > 0:

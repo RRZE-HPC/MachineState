@@ -1713,11 +1713,13 @@ class CpuFrequencyMacOsCpu(InfoGroup):
     @staticmethod
     def get_ioreg_states(string):
         bytestr = re.match(r".*<([0-9A-Fa-f]+)>", string).group(1)
-        # numbers consecutive in 4-byte little-endian
-        states_int = struct.unpack("<" + int(len(bytestr)/8) * "i", bytes.fromhex(bytestr))
-        # voltage states are in pairs of (freq, voltage)
-        states_int = [x for x in states_int if states_int.index(x)%2 == 0 and x > 0]
-        return states_int
+        if bytestr:
+            # numbers consecutive in 4-byte little-endian
+            states_int = struct.unpack("<" + int(len(bytestr)/8) * "i", bytes.fromhex(bytestr))
+            # voltage states are in pairs of (freq, voltage)
+            states_int = [x for x in states_int if states_int.index(x)%2 == 0 and x > 0]
+            return states_int
+        return string
 
 class CpuFrequencyMacOsBus(InfoGroup):
     def __init__(self, extended=False, anonymous=False):

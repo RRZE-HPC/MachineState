@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-13, macos-14, macos-15]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     
@@ -51,7 +51,6 @@ jobs:
         export PATH="/usr/local/opt/gcc@14/bin":$PATH;
         export CC=gcc-14; export CXX=g++-14;
         export FC=gfortran
-        clinfo --raw --offline
     - name: Pre-Install (generic)
       run: |
         python -m pip install codecov

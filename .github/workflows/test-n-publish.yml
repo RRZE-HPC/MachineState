@@ -54,6 +54,7 @@ jobs:
     # do not install clinfo as it is broken for macos-14/15
     - name: Pre-Install (MacOS Arm64)
       if: startsWith(matrix.os, 'macos') && !contains(matrix.os, 'macos-13')
+      run: |
         brew install slurm open-mpi gcc modules;
         export PATH="/usr/local/opt/gcc@14/bin":$PATH;
         export CC=gcc-14; export CXX=g++-14;

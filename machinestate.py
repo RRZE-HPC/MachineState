@@ -99,6 +99,7 @@ import sys
 import re
 import json
 import platform
+import struct
 from subprocess import check_output, DEVNULL
 from glob import glob
 from os.path import join as pjoin
@@ -1447,7 +1448,6 @@ class CpuInfoMacOS(InfoGroup):
 
     @staticmethod
     def getflags_arm64(string):
-        cmd = "sysctl", "-a", r"hw.optional"
         outlist = []
         for line in string.split("\n"):
             key, value = [
@@ -1696,8 +1696,22 @@ class CpuFrequencyMacOsCpu(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
         super(CpuFrequencyMacOsCpu, self).__init__(extended=extended, anonymous=anonymous)
         self.name = "Cpus"
-        self.addc("MaxFreq", "sysctl", "-a", r"hw.cpufrequency_max: (\d+)", int)
-        self.addc("MinFreq", "sysctl", "-a", r"hw.cpufrequency_min: (\d+)", int)
+        if platform.machine() == "x86_64":
+            self.addc("MaxFreq", "sysctl", "-a", r"hw.cpufrequency_max: (\d+)", int)
+            self.addc("MinFreq", "sysctl", "-a", r"hw.cpufrequency_min: (\d+)", int)
+        elif platform.machine() == "arm64":
+            # AppleSilicon
+            self.addc("Freqs-E-Core", "ioreg", "-k voltage-states1-sram | grep voltage-states1-sram", parse=CpuFrequencyMacOsCpu.get_ioreg_states)
+            self.addc("Freqs-P-Core", "ioreg", "-k voltage-states5-sram | grep voltage-states5-sram", parse=CpuFrequencyMacOsCpu.get_ioreg_states)
+
+    @staticmethod
+    def get_ioreg_states(string):
+        bytestr = re.match(r".*<([0-9A-Fa-f]+)>", string).group(1)
+        # numbers consecutive in 4-byte little-endian
+        states_int = struct.unpack("<" + int(len(bytestr)/8) * "i", bytes.fromhex(bytestr))
+        # voltage states are in pairs of (freq, voltage)
+        states_int = [x for x in states_int if states_int.index(x)%2 == 0 and x > 0]
+        return states_int
 
 class CpuFrequencyMacOsBus(InfoGroup):
     def __init__(self, extended=False, anonymous=False):
@@ -1714,7 +1728,9 @@ class CpuFrequencyMacOs(MultiClassInfoGroup):
         # https://github.com/giampaolo/psutil/issues/1892
         if platform.machine() == "x86_64":
             self.classlist = [CpuFrequencyMacOsCpu, CpuFrequencyMacOsBus]
-            self.classargs = [{} for c in self.classlist]
+        elif platform.machine() == "arm64":
+            self.classlist = [CpuFrequencyMacOsCpu]
+        self.classargs = [{} for c in self.classlist]
         self.addc("TimerFreq", "sysctl", "-a", r"hw.tbfrequency: (\d+)", int)
 
 class CpuFrequencyClass(InfoGroup):

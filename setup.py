@@ -63,5 +63,4 @@ setup(name='MachineState',
         'Programming Language :: Python :: 3.7',
     ],
 
-    keywords='benchmarking, linux, system state, topology'
 )

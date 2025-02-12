@@ -1716,9 +1716,9 @@ class CpuFrequencyMacOsCpu(InfoGroup):
         if bytestr:
             bytestr = bytestr.group(1)
             # numbers consecutive in 4-byte little-endian
-            states_int = struct.unpack("<" + int(len(bytestr)/8) * "i", bytes.fromhex(bytestr))
+            states_int = struct.unpack("<" + int(len(bytestr)/8) * "I", bytes.fromhex(bytestr))
             # voltage states are in pairs of (freq, voltage)
-            states_int = [x for x in states_int if states_int.index(x)%2 == 0 and x > 0]
+            states_int = [x for x in states_int if states_int.index(x)%2 == 0]
             return states_int
         return string
 

@@ -28,8 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # let's not check MacOS for now (add `macos-latest` later)
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-13, macos-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     
@@ -45,10 +44,18 @@ jobs:
         sudo apt-get update
         sudo apt-get install slurm slurm-client openmpi-bin clang gfortran clinfo
         sudo apt-get install environment-modules likwid
-    - name: Pre-Install (MacOS)
-      if: startsWith(matrix.os, 'macos')
+    - name: Pre-Install (MacOS x86)
+      if: startsWith(matrix.os, 'macos-13')
       run: |
         brew install slurm open-mpi gcc clinfo modules;
+        export PATH="/usr/local/opt/gcc@14/bin":$PATH;
+        export CC=gcc-14; export CXX=g++-14;
+        export FC=gfortran
+    # do not install clinfo as it is broken for macos-14/15
+    - name: Pre-Install (MacOS Arm64)
+      if: startsWith(matrix.os, 'macos') && !contains(matrix.os, 'macos-13')
+      run: |
+        brew install slurm open-mpi gcc modules;
         export PATH="/usr/local/opt/gcc@14/bin":$PATH;
         export CC=gcc-14; export CXX=g++-14;
         export FC=gfortran

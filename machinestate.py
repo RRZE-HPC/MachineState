@@ -3072,6 +3072,9 @@ class ModulesInfo(InfoGroup):
     @staticmethod
     def parsemodules(value):
         slist = [ x for x in re.split("\n", value) if ";" not in x ]
+        if len(slist) == 0:
+            # workaround for module output `echo '<module/x.y.z>';`
+            slist = [ x.split("'")[1] for x in re.split("\n", value) if "echo" in x and "'" in x ]
         if re.match("^Currently Loaded.+$", slist[0]):
             slist = slist[1:]
         return slist

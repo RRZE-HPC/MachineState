@@ -3200,6 +3200,10 @@ class NvidiaSmiInfo(ListInfoGroup):
         abscmd = which(self.cmd)
         if abscmd:
             num_gpus = process_cmd((self.cmd, self.cmd_opts, r"Attached GPUs\s+:\s+(\d+)", int))
+            if not isinstance(int):
+                # command failed (because nvidia-smi is installed but non-functional)
+                # don't add abcmd to list
+                return
             if num_gpus > 0:
                 self.userlist = [i for i in range(num_gpus)]
                 self.subclass = NvidiaSmiInfoClass

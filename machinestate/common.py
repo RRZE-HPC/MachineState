@@ -117,55 +117,11 @@ from grp import getgrgid
 import inspect
 import logging
 import uuid
-from .CpuInfo import CpuInfo, CpuTopology
 import shutil
 
 def which(cmd: str) -> str | None:
     """Cross-platform wrapper for shutil.which."""
     return shutil.which(cmd)
-from .DmiDecodeFile import DmiDecodeFile
-from .MpiInfo import MpiInfo
-from .ShellEnvironment import ShellEnvironment
-from .PythonInfo import PythonInfo
-from .HostInfo import HostInfo
-from .OperatingSystemInfo import OperatingSystemInfo, OSInfoMacOS
-from .KernelInfo import KernelInfo
-from .Uptime import Uptime, UptimeMacOs
-from .LoadAvg import LoadAvg
-from .MemInfo import MemInfo, MemInfoMacOS
-from .CgroupInfo import CgroupInfo
-from .WritebackWorkqueue import WritebackWorkqueue
-from .CpuFrequency import CpuFrequency, CpuFrequencyMacOs
-from .NumaBalance import NumaBalance
-from .NumaInfo import NumaInfo, NumaInfoMacOS
-from .CacheTopology import CacheTopology, CacheTopologyMacOS
-from .TransparentHugepages import TransparentHugepages
-from .PowercapInfo import PowercapInfo
-from .Hugepages import Hugepages
-from .CompilerInfo import CompilerInfo
-from .ClocksourceInfo import ClocksourceInfo
-from .CoretempInfo import CoretempInfo
-from .BiosInfo import BiosInfo
-from .ThermalZoneInfo import ThermalZoneInfo
-from .VulnerabilitiesInfo import VulnerabilitiesInfo
-from .UsersInfo import UsersInfo
-from .IrqAffinity import IrqAffinity
-from .CpuAffinity import CpuAffinity
-from .ModulesInfo import ModulesInfo
-from .NvidiaSmiInfo import NvidiaSmiInfo
-from .NecTsubasaInfo import NecTsubasaInfo
-from .OpenCLInfo import OpenCLInfo
-from .PrefetcherInfo import PrefetcherInfo
-from .TurboInfo import TurboInfo
-from .DmiDecodeFile import DmiDecodeFile
-from .common import InfoGroup, ListInfoGroup, MultiClassInfoGroup, process_cmd, which, pexists, re, os
-from .CpuTopology import CpuTopology, CpuTopologyMacOS
-from .WritebackInfo import WritebackInfo
-from .ExecutableInfo import ExecutableInfo
-from .CpuInfo import CpuInfoMacOS
-from .LoadAvg import LoadAvgMacOs
-
-
 
 ################################################################################
 # Configuration
@@ -1292,6 +1248,46 @@ class MachineState(MultiClassInfoGroup):
                  modulecmd=MODULECMD_PATH,
                  vecmd_path=VEOS_BASE,
                  clinfo_path=CLINFO_PATH):
+        from .DmiDecodeFile import DmiDecodeFile
+        from .MpiInfo import MpiInfo
+        from .ShellEnvironment import ShellEnvironment
+        from .PythonInfo import PythonInfo
+        from .HostInfo import HostInfo
+        from .OperatingSystemInfo import OperatingSystemInfo, OSInfoMacOS
+        from .KernelInfo import KernelInfo
+        from .Uptime import Uptime, UptimeMacOs
+        from .LoadAvg import LoadAvg
+        from .MemInfo import MemInfo, MemInfoMacOS
+        from .CgroupInfo import CgroupInfo
+        from .WritebackWorkqueue import WritebackWorkqueue
+        from .CpuFrequency import CpuFrequency, CpuFrequencyMacOs
+        from .NumaBalance import NumaBalance
+        from .NumaInfo import NumaInfo, NumaInfoMacOS
+        from .CacheTopology import CacheTopology, CacheTopologyMacOS
+        from .TransparentHugepages import TransparentHugepages
+        from .PowercapInfo import PowercapInfo
+        from .Hugepages import Hugepages
+        from .CompilerInfo import CompilerInfo
+        from .ClocksourceInfo import ClocksourceInfo
+        from .CoretempInfo import CoretempInfo
+        from .BiosInfo import BiosInfo
+        from .ThermalZoneInfo import ThermalZoneInfo
+        from .VulnerabilitiesInfo import VulnerabilitiesInfo
+        from .UsersInfo import UsersInfo
+        from .IrqAffinity import IrqAffinity
+        from .CpuAffinity import CpuAffinity
+        from .ModulesInfo import ModulesInfo
+        from .NvidiaSmiInfo import NvidiaSmiInfo
+        from .NecTsubasaInfo import NecTsubasaInfo
+        from .OpenCLInfo import OpenCLInfo
+        from .PrefetcherInfo import PrefetcherInfo
+        from .TurboInfo import TurboInfo
+        from .common import InfoGroup, ListInfoGroup, MultiClassInfoGroup, process_cmd, which, pexists, re, os
+        from .CpuTopology import CpuTopology, CpuTopologyMacOS
+        from .WritebackInfo import WritebackInfo
+        from .ExecutableInfo import ExecutableInfo
+        from .CpuInfo import CpuInfo, CpuInfoMacOS
+        from .LoadAvg import LoadAvgMacOs
         super(MachineState, self).__init__(extended=extended, anonymous=anonymous)
         self.loglevel = loglevel
         self.dmifile = dmifile

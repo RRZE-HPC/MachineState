@@ -50,7 +50,6 @@ OUT = "machinestate.py"
 # Regexes to strip package-relative imports and __main__ blocks
 REL_IMPORT_RE = re.compile(r'^\s*from\s+\.\w+\s+import\s+.*$', re.M)
 PKG_IMPORT_RE = re.compile(r'^\s*from\s+machinestate(?:\.\w+)?\s+import\s+.*$', re.M)
-DUnderMain_START = re.compile(r'^\s*if\s+__name__\s*==\s*[\'"]__main__[\'"]\s*:\s*$', re.M)
 
 def strip_relative_imports(text: str) -> str:
     # Remove "from .X import Y"

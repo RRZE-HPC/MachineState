@@ -61,40 +61,6 @@ def strip_relative_imports(text: str) -> str:
     text = re.sub(r'^\s*import\s+machinestate\s*$', '', text, flags=re.M)
     return text
 
-def strip_dunder_main_blocks(text: str) -> str:
-    # Remove simple one-line "__main__" blocks or indented suites
-    out_lines = []
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if DUnderMain_START.match(line):
-            # Skip this line and the indented block that follows
-            i += 1
-            # Consume all lines that are more indented than the start indent
-            # Determine base indent of the first block line (if any)
-            while i < len(lines):
-                if lines[i].strip() == '':
-                    i += 1
-                    continue
-                first_block_indent = len(lines[i]) - len(lines[i].lstrip(' '))
-                break
-            # Now skip until indentation decreases to 0 (or we hit EOF)
-            while i < len(lines):
-                # Stop when indentation level is 0 (new top-level)
-                if lines[i].strip() == '':
-                    i += 1
-                    continue
-                curr_indent = len(lines[i]) - len(lines[i].lstrip(' '))
-                if curr_indent < first_block_indent:
-                    break
-                i += 1
-            continue
-        else:
-            out_lines.append(line)
-            i += 1
-    return "\n".join(out_lines) + "\n"
-
 def add_section_banner(path: str) -> str:
     filename = os.path.basename(path)
     return (
@@ -123,9 +89,7 @@ def main():
             continue
         text = src_path.read_text(encoding='utf-8')
 
-        # Strip problematic lines BEFORE concatenation
         text = strip_relative_imports(text)
-        text = strip_dunder_main_blocks(text)
 
         chunks.append(add_section_banner(rel))
         chunks.append(text.rstrip() + "\n")

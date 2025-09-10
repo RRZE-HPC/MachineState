@@ -1,0 +1,57 @@
+name: Build single-file machinestate.py
+
+on:
+  push:
+    branches: [ modularize ]
+  workflow_dispatch:
+
+concurrency:
+  group: build-single-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-single:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show Python version
+        run: python -V
+
+      # Install deps if your builder needs any. Otherwise this is harmless.
+      - name: Install dependencies (optional)
+        run: |
+          python -m pip install --upgrade pip
+          # pip install -r requirements.txt
+
+      - name: Build single-file script
+        run: |
+          echo "[info] Running build_single.py..."
+          python build_single.py
+          echo "[info] Build complete."
+          test -f machinestate.py && ls -lh machinestate.py
+
+      # Optional smoke test; uncomment if 'machinestate.py -h' should work headlessly
+      # - name: Smoke test
+      #   run: |
+      #     python machinestate.py -h || true
+
+      - name: Upload machinestate.py artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: machinestate-single-${{ github.sha }}
+          path: machinestate.py
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 14
+

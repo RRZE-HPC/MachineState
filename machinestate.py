@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Auto-generated single-file MachineState (2025-09-10 10:34:17)
+# Auto-generated single-file MachineState (2025-09-10 11:02:58)
 # Do not edit manually; edit sources and re-run build_single_py.py
 
 
@@ -4086,7 +4086,4 @@ def main():
 
 __main__ = main
 if __name__ == "__main__":
-    try:
-        main()  # defined in script.py
-    except NameError:
-        raise SystemExit("[error] main() not found — ensure script.py defines main()")
+    main()

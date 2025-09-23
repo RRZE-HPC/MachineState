@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Auto-generated single-file MachineState (2025-09-10 11:02:58)
+# Auto-generated single-file MachineState (2025-09-23 15:54:44)
 # Do not edit manually; edit sources and re-run build_single_py.py
 
 
@@ -3775,6 +3775,10 @@ class WritebackWorkqueue(InfoGroup):
 
 
 
+try:
+    import yaml
+except Exception:
+    yaml = None
 
 ################################################################################
 # Skript code
@@ -3799,6 +3803,7 @@ def read_cli(cliargs):
     parser.add_argument('-m', '--no-meta', action='store_false', default=True,
                         help='do not embed meta information in classes (recommended, default: True)')
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
+    parser.add_argument('--yaml', help='generate YAML output instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
     parser.add_argument('--log', dest='loglevel', help='Loglevel (info, debug, warning, error)', default='info')
     parser.add_argument('executable', help='analyze executable (optional)', nargs='?', default=None)
@@ -4064,14 +4069,47 @@ def main():
     if not cliargs["output"]:
         if cliargs["html"]:
             print(get_html(mstate))
+        elif cliargs.get("yaml", False):
+            if yaml is None:
+                raise SystemExit("YAML output requested but PyYAML is not installed")
+            data_obj = json.loads(jsonout)
+            sys.stdout.write(
+                yaml.safe_dump(
+                    data_obj,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    default_flow_style=False
+                )
+            )
         else:
             print(jsonout)
     else:
-        with open(cliargs["output"], "w") as outfp:
+        with open(cliargs["output"], "w", encoding="utf-8") as outfp:
             if cliargs["html"]:
                 outfp.write(get_html(mstate))
+            elif cliargs.get("yaml", False):
+                if yaml is None:
+                    raise SystemExit(
+                        "[error] YAML output requested but PyYAML is not installed.\n"
+                        "Install with: pip install pyyaml"
+                    )
+                data_obj = json.loads(jsonout)  # JSON string → Python object
+                outfp.write(
+                    yaml.safe_dump(
+                        data_obj,
+                        allow_unicode=True,
+                        sort_keys=False,
+                        default_flow_style=False
+                    )
+                )
             else:
-                outfp.write(mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"]))
+                outfp.write(
+                    mstate.get_json(
+                        sort=cliargs["sort"],
+                        intend=cliargs["indent"],
+                        meta=cliargs["no_meta"]
+                    )
+                )
             outfp.write("\n")
     sys.exit(0)
 

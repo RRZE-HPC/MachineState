@@ -10,9 +10,40 @@ except Exception:
 # Skript code
 ################################################################################
 
+def load_structured_file(path: str):
+    """Load JSON or YAML from a file. Prefer JSON; if that fails, try YAML."""
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    # Try JSON first
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    # Try YAML
+    if yaml is not None:
+        try:
+            return yaml.safe_load(text)
+        except Exception:
+            pass
+
+    # If both failed, check if this looks like HTML and tailor the message
+    t = text.lstrip().lower()
+    if t.startswith("<!doctype html") or t.startswith("<html") or "<html" in t[:2000]:
+        raise SystemExit(
+            "[error] The provided file looks like HTML. Comparison expects a JSON or YAML state file."
+        )
+
+    # Generic failure
+    if yaml is None:
+        raise SystemExit(
+            f"[error] Could not parse '{path}' as JSON, and PyYAML is not installed.\n"
+            "Install with: pip install pyyaml"
+        )
+    raise SystemExit(f"[error] Could not parse '{path}' as JSON or YAML.")
+
 def read_cli(cliargs):
     # Create CLI parser
-    desc = 'Reads and outputs system information as JSON document'
+    desc = 'Reads and outputs system information (JSON/HTML/YAML).'
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument('-e', '--extended', action='store_true', default=False,
                         help='extended output (default: False)')
@@ -21,11 +52,11 @@ def read_cli(cliargs):
     parser.add_argument('-c', '--config', default=False, action='store_true',
                         help='print configuration as JSON (files, commands, ...)')
     parser.add_argument('-s', '--sort', action='store_true', default=False,
-                        help='sort JSON output (default: False)')
+                        help='sort structured output (default: False)')
     parser.add_argument('-i', '--indent', default=4, type=int,
-                        help='indention in JSON output (default: 4)')
+                        help='indentation in structured output (default: 4)')
     parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
-    parser.add_argument('-j', '--json', help='compare given JSON with current state', default=None)
+    parser.add_argument('-j', '--json', help='compare current state to a saved state file(JSON or YAML)', default=None)
     parser.add_argument('-m', '--no-meta', action='store_false', default=True,
                         help='do not embed meta information in classes (recommended, default: True)')
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
@@ -45,9 +76,9 @@ def read_cli(cliargs):
     # Check if JSON file exists and is readable
     if pargs["json"] is not None:
         if not pexists(pargs["json"]):
-            raise ValueError("JSON document '{}' does not exist".format(pargs["json"]))
+            raise ValueError("State file '{}' does not exist".format(pargs["json"]))
         if not os.access(pargs["json"], os.R_OK):
-            raise ValueError("JSON document '{}' is not readable".format(pargs["json"]))
+            raise ValueError("State file '{}' is not readable".format(pargs["json"]))
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
         if not pexists(pargs["configfile"]):
@@ -266,79 +297,101 @@ def main():
         # Read configuration from configuration file
         runargs = read_config(cliargs)
     except Exception as e:
-        print(e)
+        import traceback
+        print("[fatal] initialization failed:", e)
+        traceback.print_exc()
         sys.exit(1)
 
     # Initialize MachineState class
     mstate = MachineState(**runargs)
+    
+    # Generate subclasses and update (wrap to show the failing path)
+    try:
+        mstate.generate()
+        mstate.update()
+    except OSError as e:
+        import traceback
+        print("[probe] OSError while probing:", e)
+        traceback.print_exc()
+        sys.exit(1)
     # Generate subclasses of MachineState
     mstate.generate()
     # Update the current state
     mstate.update()
 
-    # Compare a given JSON document (previously created with the same script)
+    # Compare current state to a saved file
     if cliargs["json"] is not None:
-        if mstate == cliargs["json"]:
-            print("Current state matches with input file")
+        curr_json = mstate.get_json(
+            sort=cliargs["sort"],
+            intend=cliargs["indent"],
+            meta=cliargs["no_meta"]
+        )
+        curr_obj = json.loads(curr_json)
+        ref_obj = load_structured_file(cliargs["json"])
+
+        if curr_obj == ref_obj:
+            print("Current state is identical to '{}'".format(cliargs["json"]))
         else:
-            print("The current state differs at least in one setting with input file")
+            print("Current state differs from '{}'".format(cliargs["json"]))
         sys.exit(0)
-
-    # Get JSON document string (either from the configuration or the state)
-    jsonout = {}
     if not cliargs["config"]:
-        jsonout = mstate.get_json(sort=cliargs["sort"], intend=cliargs["indent"], meta=cliargs["no_meta"])
+        json_str = mstate.get_json(
+            sort=cliargs["sort"],
+            intend=cliargs["indent"],
+            meta=cliargs["no_meta"]
+        )
     else:
-        jsonout = mstate.get_config(sort=cliargs["sort"], intend=cliargs["indent"])
+        json_str = mstate.get_config(
+            sort=cliargs["sort"],
+            intend=cliargs["indent"]
+        )
+    dict_obj = json.loads(json_str)
 
-    # Determine output destination
+    # serialize according to requested format
+    def write_json(fp):
+        # Use standard json to ensure indent and sort flags are applied (again) consistently
+        json.dump(dict_obj, fp, ensure_ascii=False, indent=cliargs["indent"], sort_keys=cliargs["sort"])
+        fp.write("\n")
+
+    def write_yaml(fp):
+        if yaml is None:
+            raise SystemExit(
+                "[error] YAML output requested but PyYAML is not installed.\n"
+                "Install with: pip install pyyaml"
+            )
+        fp.write(
+            yaml.safe_dump(
+                dict_obj,
+                allow_unicode=True,
+                sort_keys=cliargs["sort"],
+                default_flow_style=False,
+                indent=cliargs["indent"],
+            )
+        )
+
+    def write_html(fp):
+        # Your HTML uses the live object methods; sorting/meta were already applied when building dict_obj
+        fp.write(get_html(mstate))
+        fp.write("\n")
+
+   # Stdout vs file
     if not cliargs["output"]:
         if cliargs["html"]:
-            print(get_html(mstate))
+            write_html(sys.stdout)
         elif cliargs.get("yaml", False):
-            if yaml is None:
-                raise SystemExit("YAML output requested but PyYAML is not installed")
-            data_obj = json.loads(jsonout)
-            sys.stdout.write(
-                yaml.safe_dump(
-                    data_obj,
-                    allow_unicode=True,
-                    sort_keys=False,
-                    default_flow_style=False
-                )
-            )
+            write_yaml(sys.stdout)
         else:
-            print(jsonout)
+            write_json(sys.stdout)
     else:
         with open(cliargs["output"], "w", encoding="utf-8") as outfp:
             if cliargs["html"]:
-                outfp.write(get_html(mstate))
+                write_html(outfp)
             elif cliargs.get("yaml", False):
-                if yaml is None:
-                    raise SystemExit(
-                        "[error] YAML output requested but PyYAML is not installed.\n"
-                        "Install with: pip install pyyaml"
-                    )
-                data_obj = json.loads(jsonout)  # JSON string → Python object
-                outfp.write(
-                    yaml.safe_dump(
-                        data_obj,
-                        allow_unicode=True,
-                        sort_keys=False,
-                        default_flow_style=False
-                    )
-                )
+                write_yaml(outfp)
             else:
-                outfp.write(
-                    mstate.get_json(
-                        sort=cliargs["sort"],
-                        intend=cliargs["indent"],
-                        meta=cliargs["no_meta"]
-                    )
-                )
-            outfp.write("\n")
-    sys.exit(0)
+                write_json(outfp)
 
+    sys.exit(0)  
 #    # This part is for testing purposes
 #    n = OperatingSystemInfo(extended=cliargs["extended"])
 #    n.generate()

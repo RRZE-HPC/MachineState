@@ -56,9 +56,10 @@ def read_cli(cliargs):
     parser.add_argument('-i', '--indent', default=4, type=int,
                         help='indentation in structured output (default: 4)')
     parser.add_argument('-o', '--output', help='save to file (default: stdout)', default=None)
-    parser.add_argument('-j', '--json', help='compare current state to a saved state file(JSON or YAML)', default=None)
+    parser.add_argument('-p', '--compare', help='compare current state to a saved state file (JSON or YAML)', default=None)
     parser.add_argument('-m', '--no-meta', action='store_false', default=True,
                         help='do not embed meta information in classes (recommended, default: True)')
+    parser.add_argument('--json', help='generate JSON output (default if no other format is chosen)', action='store_true', default=False)
     parser.add_argument('--html', help='generate HTML page with CSS and JavaScript embedded instead of JSON', action='store_true', default=False)
     parser.add_argument('--yaml', help='generate YAML output instead of JSON', action='store_true', default=False)
     parser.add_argument('--configfile', help='Location of configuration file', default=None)
@@ -73,11 +74,11 @@ def read_cli(cliargs):
             raise ValueError("Executable '{}' does not exist".format(pargs["executable"]))
         if not os.access(abspath, os.X_OK):
             raise ValueError("Executable '{}' is not executable".format(pargs["executable"]))
-    # Check if JSON file exists and is readable
-    if pargs["json"] is not None:
-        if not pexists(pargs["json"]):
+    # Check if compare file exists and readable
+    if pargs["compare"] is not None:
+        if not pexists(pargs["compare"]):
             raise ValueError("State file '{}' does not exist".format(pargs["json"]))
-        if not os.access(pargs["json"], os.R_OK):
+        if not os.access(pargs["compare"], os.R_OK):
             raise ValueError("State file '{}' is not readable".format(pargs["json"]))
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
@@ -320,19 +321,19 @@ def main():
     mstate.update()
 
     # Compare current state to a saved file
-    if cliargs["json"] is not None:
+    if cliargs["compare"] is not None:
         curr_json = mstate.get_json(
             sort=cliargs["sort"],
             intend=cliargs["indent"],
             meta=cliargs["no_meta"]
         )
         curr_obj = json.loads(curr_json)
-        ref_obj = load_structured_file(cliargs["json"])
+        ref_obj = load_structured_file(cliargs["compare"])
 
         if curr_obj == ref_obj:
-            print("Current state is identical to '{}'".format(cliargs["json"]))
+            print("Current state is identical to '{}'".format(cliargs["compare"]))
         else:
-            print("Current state differs from '{}'".format(cliargs["json"]))
+            print("Current state differs from '{}'".format(cliargs["compare"]))
         sys.exit(0)
     if not cliargs["config"]:
         json_str = mstate.get_json(
@@ -375,12 +376,15 @@ def main():
         fp.write("\n")
 
    # Stdout vs file
+    def want_json(args):
+        return args.get("json", False) or not (args.get("html") or args.get("yaml"))
+
     if not cliargs["output"]:
         if cliargs["html"]:
             write_html(sys.stdout)
         elif cliargs.get("yaml", False):
             write_yaml(sys.stdout)
-        else:
+        elif want_json(cliargs):
             write_json(sys.stdout)
     else:
         with open(cliargs["output"], "w", encoding="utf-8") as outfp:
@@ -388,7 +392,7 @@ def main():
                 write_html(outfp)
             elif cliargs.get("yaml", False):
                 write_yaml(outfp)
-            else:
+            elif want_json(cliargs):
                 write_json(outfp)
 
     sys.exit(0)  

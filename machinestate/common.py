@@ -119,7 +119,7 @@ import logging
 import uuid
 import shutil
 
-def which(cmd: str) -> str | None:
+def which(cmd: str) -> (str, None):
     """Cross-platform wrapper for shutil.which."""
     return shutil.which(cmd)
 

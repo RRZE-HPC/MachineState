@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Auto-generated single-file MachineState (2025-09-30 14:28:58)
+# Auto-generated single-file MachineState (2025-10-20 14:37:15)
 # Do not edit manually; edit sources and re-run build_single_py.py
 
 
@@ -128,7 +128,7 @@ import logging
 import uuid
 import shutil
 
-def which(cmd: str) -> str | None:
+def which(cmd: str) -> (str, None):
     """Cross-platform wrapper for shutil.which."""
     return shutil.which(cmd)
 

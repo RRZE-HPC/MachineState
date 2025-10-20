@@ -87,7 +87,7 @@ class TestCliParser(unittest.TestCase):
         self.assertEqual(conf["output"], fname)
     def test_jsoncmp_short(self):
         fname = self.readable.name
-        cli = ["-j", fname]
+        cli = ["-p", fname]
         conf = machinestate.read_cli(cli)
         self.assertEqual(conf["json"], fname)
     def test_jsoncmp_long(self):

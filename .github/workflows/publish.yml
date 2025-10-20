@@ -27,6 +27,10 @@ jobs:
           python -m pip install build 
           python -m pip install setuptools
           python -m pip install --upgrade pip
+      - name: Build single-file
+        run: |
+          python build_single.py
+          test -f machinestate.py && echo "machinestate.py generated."
       - name: Build package
         run: |
           python -m build --wheel --sdist

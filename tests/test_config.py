@@ -35,7 +35,7 @@ class TestCliParser(unittest.TestCase):
         self.assertEqual(conf["anonymous"], False)
         self.assertEqual(conf["config"], False)
         self.assertEqual(conf["configfile"], None)
-        self.assertEqual(conf["json"], None)
+        self.assertEqual(conf["compare"], None)
         self.assertEqual(conf["output"], None)
         self.assertEqual(conf["executable"], None)
         self.assertEqual(conf["indent"], 4)
@@ -89,19 +89,19 @@ class TestCliParser(unittest.TestCase):
         fname = self.readable.name
         cli = ["-p", fname]
         conf = machinestate.read_cli(cli)
-        self.assertEqual(conf["json"], fname)
+        self.assertEqual(conf["compare"], fname)
     def test_jsoncmp_long(self):
         fname = self.readable.name
-        cli = ["--json", fname]
+        cli = ["--compare", fname]
         conf = machinestate.read_cli(cli)
-        self.assertEqual(conf["json"], fname)
+        self.assertEqual(conf["compare"], fname)
     def test_jsoncmp_not_exist(self):
         fname = self.readable.name+"bla"
-        cli = ["--json", fname]
+        cli = ["--compare", fname]
         self.assertRaises(ValueError, machinestate.read_cli, cli)
     def test_jsoncmp_not_readable(self):
         fname = self.cmd.name
-        cli = ["--json", fname]
+        cli = ["--compare", fname]
         self.assertRaises(ValueError, machinestate.read_cli, cli)
     def test_executable(self):
         fname = self.cmd.name

@@ -77,9 +77,9 @@ def read_cli(cliargs):
     # Check if compare file exists and readable
     if pargs["compare"] is not None:
         if not pexists(pargs["compare"]):
-            raise ValueError("State file '{}' does not exist".format(pargs["json"]))
+            raise ValueError("State file '{}' does not exist".format(pargs["compare"]))
         if not os.access(pargs["compare"], os.R_OK):
-            raise ValueError("State file '{}' is not readable".format(pargs["json"]))
+            raise ValueError("State file '{}' is not readable".format(pargs["compare"]))
     # Check if configuration file exists and is readable
     if pargs["configfile"] is not None:
         if not pexists(pargs["configfile"]):
@@ -315,10 +315,6 @@ def main():
         print("[probe] OSError while probing:", e)
         traceback.print_exc()
         sys.exit(1)
-    # Generate subclasses of MachineState
-    mstate.generate()
-    # Update the current state
-    mstate.update()
 
     # Compare current state to a saved file
     if cliargs["compare"] is not None:

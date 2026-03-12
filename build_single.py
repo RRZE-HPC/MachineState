@@ -1,50 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import re, sys, os, pathlib, time
-
-FILES = [
-    "machinestate_pkg/common.py",
-    "machinestate_pkg/BiosInfo.py",
-    "machinestate_pkg/CacheTopology.py",
-    "machinestate_pkg/CgroupInfo.py",
-    "machinestate_pkg/ClocksourceInfo.py",
-    "machinestate_pkg/CompilerInfo.py",
-    "machinestate_pkg/CoretempInfo.py",
-    "machinestate_pkg/CpuAffinity.py",
-    "machinestate_pkg/CpuFrequency.py",
-    "machinestate_pkg/CpuInfo.py",
-    "machinestate_pkg/CpuTopology.py",
-    "machinestate_pkg/DmiDecodeFile.py",
-    "machinestate_pkg/ExecutableInfo.py",
-    "machinestate_pkg/HostInfo.py",
-    "machinestate_pkg/Hugepages.py",
-    "machinestate_pkg/InfinibandInfo.py",
-    "machinestate_pkg/IrqAffinity.py",
-    "machinestate_pkg/KernelInfo.py",
-    "machinestate_pkg/LoadAvg.py",
-    "machinestate_pkg/MemInfo.py",
-    "machinestate_pkg/ModulesInfo.py",
-    "machinestate_pkg/MpiInfo.py",
-    "machinestate_pkg/NecTsubasaInfo.py",
-    "machinestate_pkg/NumaBalance.py",
-    "machinestate_pkg/NumaInfo.py",
-    "machinestate_pkg/NvidiaSmiInfo.py",
-    "machinestate_pkg/OpenCLInfo.py",
-    "machinestate_pkg/OperatingSystemInfo.py",
-    "machinestate_pkg/PowercapInfo.py",
-    "machinestate_pkg/PrefetcherInfo.py",
-    "machinestate_pkg/PythonInfo.py",
-    "machinestate_pkg/ShellEnvironment.py",
-    "machinestate_pkg/ThermalZoneInfo.py",
-    "machinestate_pkg/TransparentHugepages.py",
-    "machinestate_pkg/TurboInfo.py",
-    "machinestate_pkg/Uptime.py",
-    "machinestate_pkg/UsersInfo.py",
-    "machinestate_pkg/VulnerabilitiesInfo.py",
-    "machinestate_pkg/WritebackInfo.py",
-    "machinestate_pkg/WritebackWorkqueue.py",
-    "machinestate_pkg/script.py",
-]
+import re, sys, os, pathlib, time, glob
+from typing import List
 
 OUT = "machinestate.py"
 
@@ -70,6 +27,23 @@ def add_section_banner(path: str) -> str:
         "#" * 80 + "\n"
     )
 
+def collect_files(root: pathlib.Path) -> List[str]:
+    pkg = root / "machinestate_pkg"
+
+    files = []
+
+    common_py = pkg / "common.py"
+    if common_py.exists():
+        files.append(str(common_py))
+
+    files.extend(sorted(glob.glob(str(pkg / "*" / "*.py"))))
+
+    script_py = pkg / "script.py"
+    if script_py.exists():
+        files.append(str(script_py))
+
+    return files
+
 def main():
     root = pathlib.Path(__file__).parent
     out_path = root / OUT
@@ -82,23 +56,23 @@ def main():
 
     chunks = [header]
 
-    for rel in FILES:
-        src_path = root / rel
+    for src in collect_files(root):
+        src_path = pathlib.Path(src)
+        rel = src_path.relative_to(root)
+
         if not src_path.exists():
             print(f"[warn] missing file: {rel}", file=sys.stderr)
             continue
-        text = src_path.read_text(encoding='utf-8')
 
+        text = src_path.read_text(encoding="utf-8")
         text = strip_relative_imports(text)
 
-        chunks.append(add_section_banner(rel))
+        chunks.append(add_section_banner(str(rel)))
         chunks.append(text.rstrip() + "\n")
 
-    # Ensure only ONE top-level runner: rely on script.py:main()
-    # If script.py doesn't have main(), you can add one here.
     result = "".join(chunks)
 
-    out_path.write_text(result, encoding='utf-8')
+    out_path.write_text(result, encoding="utf-8")
     os.chmod(out_path, 0o755)
     print(f"[ok] wrote {OUT} ({out_path.stat().st_size} bytes)")
 

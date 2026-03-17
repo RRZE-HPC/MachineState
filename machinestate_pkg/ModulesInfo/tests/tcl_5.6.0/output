@@ -1,0 +1,9 @@
+{
+    "Loaded": [
+        "intel/2025.0.0",
+        "intelmpi/2021.14.0",
+        "cuda/12.9.0",
+        "likwid/5.5.1-cuda"
+    ],
+    "_meta": "ModulesInfo(modulecmd='./tests/fakemodules.sh')"
+}

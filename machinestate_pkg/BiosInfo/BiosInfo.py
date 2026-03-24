@@ -1,4 +1,4 @@
-from .common import InfoGroup, pexists, pjoin
+from common import InfoGroup, pexists, pjoin
 
 ################################################################################
 # Infos about the BIOS

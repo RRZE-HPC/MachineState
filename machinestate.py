@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Auto-generated single-file MachineState (2026-03-12 13:17:35)
+# Auto-generated single-file MachineState (2026-04-02 19:00:07)
 # Do not edit manually; edit sources and re-run build_single_py.py
 
 

@@ -9,6 +9,9 @@ concurrency:
   group: build-single-${{ github.ref }}
   cancel-in-progress: true
 
+permission:
+  contents: write
+
 jobs:
   build-single:
     runs-on: ubuntu-latest
@@ -28,12 +31,10 @@ jobs:
       - name: Show Python version
         run: python -V
 
-      # Install deps if your builder needs any. Otherwise this is harmless.
-      - name: Install dependencies (optional)
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml
-          # pip install -r requirements.txt
 
       - name: Build single-file script
         run: |
@@ -42,17 +43,8 @@ jobs:
           echo "[info] Build complete."
           test -f machinestate.py && ls -lh machinestate.py
 
-      # Optional smoke test; uncomment if 'machinestate.py -h' should work headlessly
-      # - name: Smoke test
-      #   run: |
-      #     python machinestate.py -h || true
-
-      - name: Upload machinestate.py artifact
-        uses: actions/upload-artifact@v4
+      - name: Commit and push updated machinestate.py
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          name: machinestate-single
-          path: machinestate.py
-          if-no-files-found: error
-          compression-level: 9
-          retention-days: 14
-
+          commit_message: "Update machinestate.py"
+          file_pattern: machinestate.py

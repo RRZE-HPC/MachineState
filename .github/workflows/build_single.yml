@@ -9,7 +9,7 @@ concurrency:
   group: build-single-${{ github.ref }}
   cancel-in-progress: true
 
-permission:
+permissions:
   contents: write
 
 jobs:

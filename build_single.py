@@ -7,11 +7,14 @@ OUT = "machinestate.py"
 
 # Regexes to strip package-relative imports and __main__ blocks
 REL_IMPORT_RE = re.compile(r'^\s*from\s+\.\w+\s+import\s+.*$', re.M)
+COMMON_IMPORT_RE = re.compile(r'^\s*from\s+common\s+import\s+.*$', re.M)
 PKG_IMPORT_RE = re.compile(r'^\s*from\s+machinestate(?:\.\w+)?\s+import\s+.*$', re.M)
 
 def strip_relative_imports(text: str) -> str:
     # Remove "from .X import Y"
     text = REL_IMPORT_RE.sub('', text)
+    # Remove "from common import Y"
+    text = COMMON_IMPORT_RE.sub('', text)
     # Remove "from machinestate(.X)? import Y"
     text = PKG_IMPORT_RE.sub('', text)
     # Also remove "import machinestate" (rare)
@@ -36,7 +39,11 @@ def collect_files(root: pathlib.Path) -> List[str]:
     if common_py.exists():
         files.append(str(common_py))
 
-    files.extend(sorted(glob.glob(str(pkg / "*" / "*.py"))))
+    allfiles = sorted(glob.glob(str(pkg / "*" / "*.py")))
+    for f in allfiles:
+        fname = os.path.basename(str(f))
+        if not fname.startswith("test_"):
+           files.append(str(f))
 
     script_py = pkg / "script.py"
     if script_py.exists():

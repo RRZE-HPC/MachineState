@@ -1,0 +1,4 @@
+Currently Loaded Modulefiles:
+openmpi/5.0.5-gcc13.3.0
+fftw/3.3.10-gcc13.3.0-openmpi
+python/3.12-conda

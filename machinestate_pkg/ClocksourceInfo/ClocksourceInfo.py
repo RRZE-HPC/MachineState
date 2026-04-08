@@ -10,7 +10,7 @@ class ClocksourceInfoClass(InfoGroup):
         self.ident = ident
         self.name = "Clocksource{}".format(ident)
         base = "/sys/devices/system/clocksource/clocksource{}".format(ident)
-        self.addf("Current", pjoin(base, "current_clocksource"), r"(\s+)", str)
+        self.addf("Current", pjoin(base, "current_clocksource"), r"(\S+)", str)
         if extended:
             self.addf("Available", pjoin(base, "available_clocksource"), r"(.+)", tostrlist)
         self.required("Current")

@@ -1,0 +1,7 @@
+{
+    "Clocksource0": {
+        "Current": "tsc",
+        "_meta": "ClocksourceInfoClass(ident=0)"
+    },
+    "_meta": "ClocksourceInfo()"
+}

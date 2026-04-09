@@ -1,0 +1,12 @@
+{
+    "Clocksource0": {
+        "Current": "tsc",
+        "Available": [
+            "tsc",
+            "hpet",
+            "acpi_pm"
+        ],
+        "_meta": "ClocksourceInfoClass(ident=0, extended=True)"
+    },
+    "_meta": "ClocksourceInfo(extended=True)"
+}
